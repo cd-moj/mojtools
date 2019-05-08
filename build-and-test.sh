@@ -44,6 +44,8 @@ exec 2> $workdirbase/build-and-test.log
 mkdir -p $workdir
 echo $workdirbase
 
+cd $(dirname $0)
+
 cp "$SRCCODE" $workdir/
 
 declare -a BIN
@@ -82,7 +84,7 @@ for l in ${!ULIMITS[@]}; do
 done
 
 #default locations
-LANGUAGEDIR=$(dirname $0)/lang/$LANGUAGE
+LANGUAGEDIR=lang/$LANGUAGE
 LANGUAGEDIR=$(realpath $LANGUAGEDIR)
 #LANGCOMPILE=$(realpath $LANGCOMPILE)
 
