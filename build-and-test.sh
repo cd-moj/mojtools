@@ -55,6 +55,7 @@ declare -A TLMOD
 
 DEFAULTSHIELDCPU=3
 DEFAULTSHIELDUSER=judge
+DEFAULTMEMLIMIT=600
 
 #set default values
 #configurações de variáveis do ulimit
@@ -102,7 +103,7 @@ fi
 [[ -x $LANGUAGEDIR/prep.sh ]] && $LANGUAGEDIR/prep.sh $workdir
 
 if [[ "$USER" == root ]]; then
-  SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER"
+  SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
 fi
 
 LOG "# Compiling"
@@ -241,7 +242,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     SMALLRESP=TMT
     ((RESPERRO++))
     [[ ! -n "$EXECTIME" ]] && EXECTIME="$(grep '^real' $workdirbase/$FILE-log.bwraptime|awk '{print $NF}')"
-  elif (( BWRAPEXITCODE != 0 )) && [[ "$SMALLRESP" != "TLE" ]]; then
+  elif (( BWRAPEXITCODE != 0 )) && ( [[ "$SMALLRESP" != "TLE" ]] || grep -q signal $workdirbase/$FILE-log.timelog ); then
     RESP="Runtime Error"
     LOG "## $FILE Runtime Error"
     SMALLRESP=RE
