@@ -1,0 +1,11 @@
+      .data
+space:		.asciiz  " "          # space
+new_line:	.asciiz  "\n"         # newline
+olamundo:	.asciiz  "Ola Mundo\n"
+	.text
+main:
+	la   $a0, olamundo
+      	li   $v0, 4		# specify Print String service
+      	syscall               	# print heading
+	li   $v0, 10          # system call for exit
+	syscall               # we are out of here.
