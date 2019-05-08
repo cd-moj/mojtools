@@ -20,6 +20,11 @@ function LOG()
   echo "$*" >&2
 }
 
+if [[ ! -n "$3" ]]; then
+  echo "$0 <LANGUAGE> <SRCFILE> <PROBLEMTEMPLATEDIR> <RUNALL?yes:no>"
+  exit 1
+fi
+
 LANGUAGE=$1
 SRCCODE=$(realpath $2)
 PROBLEMTEMPLATEDIR=$(realpath $3)
