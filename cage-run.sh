@@ -36,12 +36,13 @@ Usage: $0 <options>
               this option allows '-d','-i' and '-o' to be ommited
 -S, --shield-cpu          List of CPU's to be shielded
               this option will reserve a CPU, the program will not be able to
-              run outside this group
--U, --shield-user         User to be used to run inside the shield
+              run outside this group (must be invoked as root)
+-U, --shield-user         User to be used to run inside the shield (must be invoked as root)
+-M, --memlimit            Memory limit, in MB, to be allowed inside the shield (must be invoked as root)
 EOF
 }
 
-TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:' -l 'shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:' -n "$0" -- "$@")
+TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:M:' -l 'memlimit:,shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:' -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 unset TEMP
@@ -59,6 +60,11 @@ while [[ "$1" != "--" ]]; do
     ;;
     '-U'|'--shield-user')
       SHIELDUSER="$2"
+      shift 2
+      continue
+    ;;
+    '-M'|'--memlimit')
+      MEMLIMIT="$2"
       shift 2
       continue
     ;;
@@ -203,6 +209,14 @@ if [[ "$USER" == "root" ]] && [[ -n "$(which cset)" ]]; then
   if [[ -n "$RWDIR" ]]; then
     chown -R $SHIELDUSER $RWDIR $(dirname $TIMELOG)
   fi
+  if [[ -n "$MEMLIMIT" ]]; then
+    if [[ ! -d /sys/fs/cgroup/memory/mojtools ]]; then
+      mkdir /sys/fs/cgroup/memory/mojtools
+    fi
+    echo $((MEMLIMIT*1024*1024)) > /sys/fs/cgroup/memory/mojtools/memory.limit_in_bytes
+    echo $$ > /sys/fs/cgroup/memory/mojtools/tasks
+  fi
+
 fi
 
 SAFETLE=$(echo "$TLE + 1"|bc -l)
