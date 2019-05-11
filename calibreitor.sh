@@ -93,7 +93,7 @@ echo "TL[default]=$BESTTIME" >> $PROBLEMDIR/tl
 cat $PROBLEMDIR/tl
 echo
 
-for TLs in $PROBLEMDIR/sols/tle/*; do
+for TLs in $PROBLEMDIR/sols/slow/*; do
   if [[ ! -e $TLs ]]; then echo none; continue;fi
   echo "${TLs##*/}:"
   LANG="${TLs##*.}"
