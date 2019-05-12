@@ -22,7 +22,7 @@ TOREMOVE=
 function sai()
 {
   rm $TEMP
-  rm $TEMP.*
+  rm -f $TEMP.*
   rm -rf $TOREMOVE
 }
 
@@ -79,7 +79,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   fi
   TOREMOVE+=" ${T}"
   exec 7<&-
-  rm -f $TEMP.coproc
+  rm -f $TEMP.coprocout
 done
 
 TLMULT=1.35
