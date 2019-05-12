@@ -59,7 +59,6 @@ for AC in $PROBLEMDIR/sols/good/*; do
   #read -u ${COPROC[0]} T
   exec 7<$TEMP.coprocout
   read -u 7 T
-  tail -f --pid=$COPROC_PID $T/build-and-test.log|
   while read L; do
     if ! grep -q '^EXECTIME' <<< "$L" ; then continue;fi
     echo "$L" |grep '^EXECTIME' > $TEMP
@@ -69,7 +68,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
         WORSTTIMEPERLANG[$LANG]=$ET
       fi
     done < $TEMP
-  done
+  done <<< $(tail -f --pid=$COPROC_PID $T/build-and-test.log)
   echo
 
   read -u 7 A
