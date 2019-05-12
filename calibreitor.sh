@@ -22,6 +22,7 @@ TOREMOVE=
 function sai()
 {
   rm $TEMP
+  rm $TEMP.*
   rm -rf $TOREMOVE
 }
 
@@ -47,27 +48,38 @@ declare -A ULIMITS TLMOD
 WORSTTIME=0.01
 declare -A WORSTTIMEPERLANG
 
+echo "AC solutions:"
 for AC in $PROBLEMDIR/sols/good/*; do
   echo "${AC##*/}:"
   LANG=${AC##*.}
   [[ ! -n "${WORSTTIMEPERLANG[$LANG]}" ]] && WORSTTIMEPERLANG[$LANG]=0.01
 
-  readarray -t T <<< $(bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR)
-  if [[ "${T[1]}" == "Accepted" ]]; then
-    grep '^EXECTIME' ${T[0]}/build-and-test.log > $TEMP
+  mkfifo $TEMP.coprocout
+  coproc bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR &>$TEMP.coprocout
+  #read -u ${COPROC[0]} T
+  exec 7<$TEMP.coprocout
+  read -u 7 T
+  tail -f --pid=$COPROC_PID $T/build-and-test.log|
+  while read L; do
+    if ! grep -q '^EXECTIME' <<< "$L" ; then continue;fi
+    echo "$L" |grep '^EXECTIME' > $TEMP
     while read l l ET SMALLRESP; do
       printf "$ET "
       if echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
         WORSTTIMEPERLANG[$LANG]=$ET
       fi
     done < $TEMP
-    echo
+  done
+  echo
 
-  else
-    echo "$AC got '${T[1]}', was waiting Accepted. Check ${T[0]}"
+  read -u 7 A
+  if [[ "${A}" != "Accepted" ]]; then
+    echo "$AC got '${A}', was waiting Accepted. Check ${T}"
     exit 1
   fi
-  TOREMOVE+=" ${T[0]}"
+  TOREMOVE+=" ${T}"
+  exec 7<&-
+  rm -f $TEMP.coproc
 done
 
 TLMULT=1.35
@@ -90,18 +102,30 @@ done
 
 echo "TL[default]=$BESTTIME" >> $PROBLEMDIR/tl
 
-cat $PROBLEMDIR/tl
+echo "Calibrated TL:"
+tail -n+1 $PROBLEMDIR/tl
 echo
 
+echo "SLOW solutions:"
 for TLs in $PROBLEMDIR/sols/slow/*; do
   if [[ ! -e $TLs ]]; then echo none; continue;fi
   echo "${TLs##*/}:"
   LANG="${TLs##*.}"
-  readarray -t T <<< $(bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR runnall)
-  grep '^EXECTIME' ${T[0]}/build-and-test.log > $TEMP
-  while read l l ET SMALLRESP; do
-    printf "$ET($SMALLRESP) "
-  done < $TEMP
+  mkfifo $TEMP.coproc
+  coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR runnall >$TEMP.coproc
+  exec 7<$TEMP.coproc
+  read -u 7 T
+  tail -f --pid=$COPROC_PID $T/build-and-test.log|
+  while read L; do
+    if ! grep -q '^EXECTIME' <<< "$L" ; then continue;fi
+    grep '^EXECTIME' <<< "$L" > $TEMP
+    while read l l ET SMALLRESP; do
+      printf "$ET($SMALLRESP) "
+    done < $TEMP
+  done
   echo
-  TOREMOVE+=" ${T[0]}"
+  read -u 7 BIGRESP
+  exec 7<&-
+  rm -f $TEMP.coproc
+  TOREMOVE+=" ${T}"
 done
