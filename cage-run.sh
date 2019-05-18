@@ -228,10 +228,10 @@ SAFETLE=$(echo "$TLE + 1"|bc -l)
   --symlink ../tmp var/tmp \
   --proc /proc \
   --dev /dev \
-  --symlink usr/lib /lib \
-  --symlink usr/lib64 /lib64 \
-  --symlink usr/bin /bin \
-  --symlink usr/sbin /sbin \
+  --ro-bind /lib /lib \
+  --ro-bind /lib64 /lib64 \
+  --ro-bind /bin /bin \
+  --ro-bind /sbin /sbin \
   --chdir / \
   --unshare-all \
   --die-with-parent \
