@@ -211,7 +211,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     LOG "$(< $f)"
     LOG ""
   done
-  $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE &> $workdirbase/$FILE-log.compare
+  $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
   COMPAREEXIT=$?
   LOG "## $FILE compare output"
   LOG "$(< $workdirbase/$FILE-log.compare)"
