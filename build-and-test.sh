@@ -86,13 +86,14 @@ done
 
 #default locations
 LANGUAGEDIR=lang/$LANGUAGE
-LANGUAGEDIR=$(realpath $LANGUAGEDIR)
+PROBLEMLANGUAGEDIR="$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE"
+DEFAULTLANGUAGEDIR=$(realpath $LANGUAGEDIR)
 #LANGCOMPILE=$(realpath $LANGCOMPILE)
 
-# check for other source of compile
-[[ -d "$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE/" ]] && LANGUAGEDIR="$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE"
-
-LANGCOMPILE=$LANGUAGEDIR/compile.sh
+#search for special compile script for problem
+#if it does not exist defaults to default language compile
+LANGCOMPILE=$PROBLEMLANGUAGEDIR/compile.sh
+[[ ! -e "$LANGCOMPILE" ]] && LANGCOMPILE="$DEFAULTLANGUAGEDIR/compile.sh"
 
 if [[ ! -e "$LANGCOMPILE" ]]; then
   echo "Language '$LANGUAGE' not availale"
@@ -100,7 +101,10 @@ if [[ ! -e "$LANGCOMPILE" ]]; then
   exit 3
 fi
 
-[[ -x $LANGUAGEDIR/prep.sh ]] && $LANGUAGEDIR/prep.sh $workdir
+PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
+[[ -x "$PREPLANGUAGE" ]] && $PREPLANGUAGE $workdir
+[[ ! -e "$PREPLANGUAGE" ]] && [[ -e "$DEFAULTLANGUAGEDIR/prep.sh" ]] &&
+  $DEFAULTLANGUAGEDIR/prep.sh $workdir
 
 if [[ "$USER" == root ]]; then
   SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
@@ -134,12 +138,18 @@ LOG ""
 LOG ""
 LOG "# Running"
 
-LANGRUN=$LANGUAGEDIR/run.sh
-#LANGRUN=$(realpath $LANGRUN)
+#search for runner script, first in problem second default
+LANGRUN=$PROBLEMLANGUAGEDIR/run.sh
+[[ ! -e "$LANGRUN" ]] && LANGRUN=$DEFAULTLANGUAGEDIR/run.sh
 
-#[[ -e "$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE/run.sh" ]] && LANGRUN="$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE/run.sh"
-
-LANGCOMPARE=$LANGUAGEDIR/compare.sh
+#Search for compare script, first: language specific in problem
+# second: common in problem
+# third: language specific default
+# fourth: commom default
+LANGCOMPARE=$PROBLEMLANGUAGEDIR/compare.sh
+[[ ! -e "$LANGCOMPARE" ]] && LANGCOMPARE=$PROBLEMTEMPLATEDIR/scripts/compare.sh
+[[ ! -e "$LANGCOMPARE" ]] && LANGCOMPARE=$DEFAULTLANGUAGEDIR/compare.sh
+[[ ! -e "$LANGCOMPARE" ]] && LANGCOMPARE=$(realpath lang/compare.sh)
 #LANGCOMPARE=$(realpath $LANGCOMPARE)
 
 #[[ -e "$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE/compare.sh" ]] && LANGCOMPARE="$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE/compare.sh"
