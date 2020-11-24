@@ -65,7 +65,7 @@ ULIMITS[-s]=204800
 
 ## file size
 ### default to 100MB
-ULIMITS[-f]=25600
+ULIMITS[-f]=256000
 
 ## virtual memory
 ### default to 600MB
