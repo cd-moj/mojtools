@@ -41,6 +41,15 @@ fi
 
 exec 2> $workdirbase/build-and-test.log
 
+LOG "% Running: $(basename $PROBLEMTEMPLATEDIR)"
+LOG ""
+LOG "- Minimal Information"
+LOG "  - Submission Language: $LANGUAGE"
+LOG "  - Submission SRCFILE: $(basename $SRCCODE)"
+LOG "  - Run all even on critical error: $RUNALL"
+LOG ""
+LOG ""
+
 mkdir -p $workdir
 echo $workdirbase
 
@@ -78,11 +87,15 @@ ULIMITS[-u]=1024
 #check if there is conf
 [[ -e $PROBLEMTEMPLATEDIR/conf ]] && source $PROBLEMTEMPLATEDIR/conf
 
+LOG "## LIMITS via ulimits"
+LOG ""
 #set ulimits
 for l in ${!ULIMITS[@]}; do
   ulimit $l ${ULIMITS[$l]}
   LOG "set: ulimit $l ${ULIMITS[$l]}"
 done
+LOG ""
+LOG ""
 
 #default locations
 LANGUAGEDIR=lang/$LANGUAGE
@@ -97,6 +110,7 @@ LANGCOMPILE=$PROBLEMLANGUAGEDIR/compile.sh
 
 if [[ ! -e "$LANGCOMPILE" ]]; then
   echo "Language '$LANGUAGE' not availale"
+  LOG "Language '$LANGUAGE' not availale"
   LOG "$LANGCOMPILE not found"
   exit 3
 fi
@@ -110,7 +124,8 @@ if [[ "$USER" == root ]]; then
   SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
 fi
 
-LOG "# Compiling"
+LOG "# Compiling code"
+LOG ""
 bash cage-run.sh -w $workdir -r $LANGCOMPILE $SHIELDPARAMS\
                     -s $workdirbase/compile.log.stderr \
                     -o $workdirbase/compile.log.stdout \
@@ -121,6 +136,8 @@ bash cage-run.sh -w $workdir -r $LANGCOMPILE $SHIELDPARAMS\
 CAGERET=$?
 
 if ! grep -q ^BIN= $workdirbase/compile.log.stdout || (( CAGERET != 0 )) ; then
+  LOG "   COMPILATION ERROR"
+  LOG ""
   LOG "CE $workdir"
   for f in $workdirbase/compile.log.{stdout,stderr,cage-run,time,bwraptime}; do
     LOG "## $f"
@@ -136,7 +153,7 @@ echo BIN=${BIN[0]} > $workdir/binfile.sh
 
 LOG ""
 LOG ""
-LOG "# Running"
+LOG "# Running test files"
 
 #search for runner script, first in problem second default
 LANGRUN=$PROBLEMLANGUAGEDIR/run.sh
@@ -195,7 +212,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   fi
   FILE=$(basename $INPUT)
   LOG ""
-  LOG "# $INPUT"
+  LOG "## Testfile: $FILE"
   LOG ""
 
   bash cage-run.sh -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
@@ -205,17 +222,22 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
                       -T $ETL\
                       -B $workdirbase/$FILE-log.bwraptime &> $workdirbase/$FILE-log.cage-run
   BWRAPEXITCODE=$?
+  LOG ""
+  LOG "### CAGE CONTROL DATA this is for Bruno to check"
+  LOG "8<-------------------------8<------------------"
   for f in $workdirbase/$FILE-{stderr,log.cage-run,log.timelog,log.bwraptime}; do
+    wc -c "$f"|grep -q "^0 " && continue;
     [[ "$f" == "$workdirbase/$FILE-team_output" ]] && continue
-    LOG "## $f"
+    LOG "#### $(basename $f)"
     LOG "$(< $f)"
-    LOG ""
   done
+  LOG "8<-------------------------8<------------------"
+  LOG "### END CAGE CONTROL DATA"
+  LOG ""
+  LOG ""
   $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
   COMPAREEXIT=$?
-  LOG "## $FILE compare output"
-  LOG "$(< $workdirbase/$FILE-log.compare)"
-  LOG ""
+  LOG "### CHECKING SOLUTION THIS IS USUALLY A DIFF OUTPUT"
   if (( COMPAREEXIT == 4 )); then
     if (( RESPERRO == 0 )); then
       RESP="Accepted"
@@ -234,16 +256,17 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     SMALLRESP=UE
     ((RESPERRO++))
   fi
-  LOG "$FILE COMPARE $COMPAREEXIT"
+  #LOG " - Test Veredict: $SMALLRESP ($RESP)"
 
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     OLDRESP="$RESP"
     RESP="Time Limit Exceeded"
     SMALLRESP=TLE
-    LOG "## $FILE TLE $EXECTIME > ${TL[$LANGUAGE]}"
+    LOG "- $FILE TLE ($RESP) $EXECTIME > ${TL[$LANGUAGE]}"
     if (( COMPAREEXIT == 4 )); then
-      LOG "### $FILE But it was finished with $OLDRESP"
+      #LOG " - $FILE But it was finished with $OLDRESP if it had more time"
+      true
     fi
   fi
 
@@ -254,16 +277,27 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     [[ ! -n "$EXECTIME" ]] && EXECTIME="$(grep '^real' $workdirbase/$FILE-log.bwraptime|awk '{print $NF}')"
   elif (( BWRAPEXITCODE != 0 )) && ( [[ "$SMALLRESP" != "TLE" ]] || grep -q signal $workdirbase/$FILE-log.timelog ); then
     RESP="Runtime Error"
-    LOG "## $FILE Runtime Error"
+    #LOG "- $FILE Runtime Error"
     SMALLRESP=RE
     ((RESPERRO++))
   fi
 
-  LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
-  LOG
+  #LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
+  LOG " - Execution Time: $EXECTIME"
+  LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
+  LOG " - Veredict for this output: $SMALLRESP ($RESP)"
+  LOG ""
+  [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
+  [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
+  LOG ""
   [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
 
 done
+
+LOG ""
+LOG ""
+LOG "# FINAL VEREDICT"
+LOG "  - $RESP ($SMALLRESP)"
 
 echo "$RESP"
 exit 0
