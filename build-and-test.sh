@@ -282,7 +282,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     ((RESPERRO++))
   fi
 
-  #LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
+  LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
   LOG " - Execution Time: $EXECTIME"
   LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
   LOG " - Veredict for this output: $SMALLRESP ($RESP)"
