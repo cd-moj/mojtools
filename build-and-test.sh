@@ -202,6 +202,8 @@ fi
 ETL=$(echo 2*${TL[$LANGUAGE]}+5|bc -l)
 RESP=
 RESPERRO=0
+CORRECT=0
+TOTALTESTS=$(ls $PROBLEMTEMPLATEDIR/tests/input/*|wc -l)
 
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
@@ -242,11 +244,12 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     if (( RESPERRO == 0 )); then
       RESP="Accepted"
       SMALLRESP=AC
+      ((CORRECT++))
     fi
   elif (( COMPAREEXIT == 5 )); then
-    RESP="Presentation Error"
-    SMALLRESP=PE
-    ((RESPERRO++))
+    RESP="Accepted,PE"
+    SMALLRESP=AC,PE
+    ((CORRECT++))
   elif (( COMPAREEXIT == 6 )); then
     RESP="Wrong Aswer"
     SMALLRESP=WA
@@ -264,9 +267,10 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     RESP="Time Limit Exceeded"
     SMALLRESP=TLE
     LOG "- $FILE TLE ($RESP) $EXECTIME > ${TL[$LANGUAGE]}"
-    if (( COMPAREEXIT == 4 )); then
+    if (( COMPAREEXIT == 4 )) || ((COMPAREEXIT == 5 )); then
       #LOG " - $FILE But it was finished with $OLDRESP if it had more time"
-      true
+	true
+	((CORRECT--))
     fi
   fi
 
@@ -290,7 +294,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
   [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
   LOG ""
-  [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
+  [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Accepted,PE" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
 
 done
 
@@ -298,6 +302,7 @@ LOG ""
 LOG ""
 LOG "# FINAL VEREDICT"
 LOG "  - $RESP ($SMALLRESP)"
+LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
-echo "$RESP"
+echo "$RESP,$((CORRECT*100/TOTALTESTS))p"
 exit 0
