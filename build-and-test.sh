@@ -199,7 +199,7 @@ if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then
   TLMOD[$LANGUAGE.drift]=0
 fi
 
-ETL=$(echo 2*${TL[$LANGUAGE]}+5|bc -l)
+ETL=$(echo 2*${TL[$LANGUAGE]}+1|bc -l)
 RESP=
 RESPERRO=0
 CORRECT=0
@@ -237,47 +237,18 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "### END CAGE CONTROL DATA"
   LOG ""
   LOG ""
-  $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
-  COMPAREEXIT=$?
-  LOG "### CHECKING SOLUTION THIS IS USUALLY A DIFF OUTPUT"
-  if (( COMPAREEXIT == 4 )); then
-    if (( RESPERRO == 0 )); then
-      RESP="Accepted"
-    fi
-    SMALLRESP=AC
-    ((CORRECT++))
-  elif (( COMPAREEXIT == 5 )); then
-    if ((RESPERRO == 0 )) ; then
-      RESP="Accepted,PE"
-    fi
-    SMALLRESP=AC,PE
-    ((CORRECT++))
-  elif (( COMPAREEXIT == 6 )); then
-    RESP="Wrong Aswer"
-    SMALLRESP=WA
-    ((RESPERRO++))
-  else
-    RESP="Unknown Error"
-    SMALLRESP=UE
-    ((RESPERRO++))
-  fi
-  #LOG " - Test Veredict: $SMALLRESP ($RESP)"
-
+  SMALLRESP=none
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     OLDRESP="$RESP"
-    RESP="Time Limit Exceeded"
+    [[ "$RESP" != "Runtime Error" ]] && RESP="Time Limit Exceeded"
     SMALLRESP=TLE
-    LOG "- $FILE TLE ($RESP) $EXECTIME > ${TL[$LANGUAGE]}"
-    if (( COMPAREEXIT == 4 )) || ((COMPAREEXIT == 5 )); then
-      #LOG " - $FILE But it was finished with $OLDRESP if it had more time"
-	true
-	((CORRECT--))
-    fi
+    LOG "- $FILE TLE $EXECTIME > ${TL[$LANGUAGE]}"
+    ((RESPERRO++))
   fi
 
   if (( BWRAPEXITCODE == 124 )) && [[ "$SMALLRESP" != "TLE" ]]; then
-    RESP="Time Limit Exceeded"
+    [[ "$RESP" != "Runtime Error" ]] && RESP="Time Limit Exceeded"
     SMALLRESP=TMT
     ((RESPERRO++))
     [[ ! -n "$EXECTIME" ]] && EXECTIME="$(grep '^real' $workdirbase/$FILE-log.bwraptime|awk '{print $NF}')"
@@ -287,6 +258,37 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     SMALLRESP=RE
     ((RESPERRO++))
   fi
+
+  if [[ "$SMALLRESP" == "none" ]]; then
+    $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
+    COMPAREEXIT=$?
+    LOG "### CHECKING SOLUTION THIS IS USUALLY A DIFF OUTPUT"
+    if (( COMPAREEXIT == 4 )); then
+      if (( RESPERRO == 0 )); then
+        RESP="Accepted"
+      fi
+      SMALLRESP=AC
+      ((CORRECT++))
+    elif (( COMPAREEXIT == 5 )); then
+      if ((RESPERRO == 0 )) ; then
+        RESP="Accepted,PE"
+      fi
+      SMALLRESP=AC,PE
+      ((CORRECT++))
+    elif (( COMPAREEXIT == 6 )); then
+      [[ "$RESP" != "Time Limit Exceeded" ]] && [[ "$RESP" != "Runtime Error" ]] && RESP="Wrong Aswer"
+      SMALLRESP=WA
+      ((RESPERRO++))
+    else
+      RESP="Unknown Error"
+      SMALLRESP=UE
+    ((RESPERRO++))
+    fi
+  else
+    LOG " - Not checking answer because of $SMALLRESP"
+  fi
+  #LOG " - Test Veredict: $SMALLRESP ($RESP)"
+
 
   LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
   LOG " - Execution Time: $EXECTIME"
