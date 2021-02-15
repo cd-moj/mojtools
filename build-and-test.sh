@@ -243,11 +243,13 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   if (( COMPAREEXIT == 4 )); then
     if (( RESPERRO == 0 )); then
       RESP="Accepted"
-      SMALLRESP=AC
-      ((CORRECT++))
     fi
+    SMALLRESP=AC
+    ((CORRECT++))
   elif (( COMPAREEXIT == 5 )); then
-    RESP="Accepted,PE"
+    if ((RESPERRO == 0 )) ; then
+      RESP="Accepted,PE"
+    fi
     SMALLRESP=AC,PE
     ((CORRECT++))
   elif (( COMPAREEXIT == 6 )); then
@@ -289,10 +291,11 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
   LOG " - Execution Time: $EXECTIME"
   LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
-  LOG " - Veredict for this output: $SMALLRESP ($RESP)"
+  LOG " - Veredict for this output: $SMALLRESP"
   LOG ""
-  [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
-  [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
+  ((RESPERRO > 2 )) && LOG " - Will NOT show DIFFS or Courtesy for MORE than 2 errors"
+  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
+  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
   LOG ""
   [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Accepted,PE" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
 
@@ -301,7 +304,7 @@ done
 LOG ""
 LOG ""
 LOG "# FINAL VEREDICT"
-LOG "  - $RESP ($SMALLRESP)"
+LOG "  - $RESP"
 LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
 echo "$RESP,$((CORRECT*100/TOTALTESTS))p"
