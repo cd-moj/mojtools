@@ -72,7 +72,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   echo
 
   read -u 7 A
-  if [[ "${A}" != "Accepted" ]]; then
+  if [[ "${A}" != "Accepted,100p" ]]; then
     echo "$AC got '${A}', was waiting Accepted. Check ${T}"
     exit 1
   fi
