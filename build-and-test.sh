@@ -327,9 +327,9 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
   LOG " - Veredict for this output: $SMALLRESP"
   LOG ""
-  ((RESPERRO > 2 )) && LOG " - Will NOT show DIFFS or Courtesy for MORE than 2 errors"
+  ((RESPERRO > 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "AC,PE" ]] && LOG " - Will NOT show DIFFS or Courtesy for MORE than 2 errors"
   ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TMT" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
-  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
+  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC,PE" ]] && [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
   LOG ""
   [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Accepted,PE" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
 
