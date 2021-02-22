@@ -308,7 +308,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
       SMALLRESP=AC,PE
       ((CORRECT++))
     elif (( COMPAREEXIT == 6 )); then
-      [[ "$RESP" != "Time Limit Exceeded" ]] && [[ "$RESP" != "Runtime Error" ]] && RESP="Wrong Aswer"
+      [[ "$RESP" != "Time Limit Exceeded" ]] && [[ "$RESP" != "Runtime Error" ]] && RESP="Wrong Answer"
       SMALLRESP=WA
       ((RESPERRO++))
     else
