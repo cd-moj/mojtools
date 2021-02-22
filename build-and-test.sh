@@ -199,11 +199,45 @@ if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then
   TLMOD[$LANGUAGE.drift]=0
 fi
 
-ETL=$(echo 2*${TL[$LANGUAGE]}+1|bc -l)
+ETL=$(echo 2*${TL[$LANGUAGE]}+0.2|bc -l)
 RESP=""
 RESPERRO=0
 CORRECT=0
 TOTALTESTS=$(ls $PROBLEMTEMPLATEDIR/tests/input/*|wc -l)
+
+function run-testinput()
+{
+  local INPUT=$1
+  local FILE=$(basename $INPUT)
+  bash cage-run.sh -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+       -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
+       -r $LANGRUN \
+       -t $workdirbase/$FILE-log.timelog\
+       -T $ETL\
+       -B $workdirbase/$FILE-log.bwraptime &> $workdirbase/$FILE-log.cage-run
+  BWRAPEXITCODE=$?
+  echo $BWRAPEXITCODE > $workdirbase/$FILE-log.bwrapexitcode
+}
+
+JOBSCOUNT=0
+NPROC=$(nproc)
+[[ "$ALLOWPARALLELTEST" == "n" ]] && NPROC=1 && LOG " - Parallel Test not allowed in this problem"
+LOG " - NPROC: $NPROC"
+for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
+  if [[ ! -e "$INPUT" ]]; then
+    echo "Wrong package format. No input found"
+    LOG "$INPUT not found"
+    exit 3
+  fi
+  run-testinput $INPUT &
+  ((JOBSCOUNT++))
+  if (( JOBSCOUNT > NPROC-1 )); then
+      wait -n
+      ((JOBSCOUNT--))
+  fi
+done
+
+wait
 
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
@@ -216,18 +250,15 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG ""
   LOG "## Testfile: $FILE"
   LOG ""
-
-  bash cage-run.sh -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
-                   -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
-                      -r $LANGRUN \
-                      -t $workdirbase/$FILE-log.timelog\
-                      -T $ETL\
-                      -B $workdirbase/$FILE-log.bwraptime &> $workdirbase/$FILE-log.cage-run
-  BWRAPEXITCODE=$?
+  EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
+  if [[ "$ALLOWPARALLELTEST" != "n" ]] && echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
+      LOG " - Rerun: because got TLE while running parallel tests"
+      run-testinput $INPUT
+  fi
   LOG ""
   LOG "### CAGE CONTROL DATA this is for Bruno to check"
   LOG "8<-------------------------8<------------------"
-  for f in $workdirbase/$FILE-{stderr,log.cage-run,log.timelog,log.bwraptime}; do
+  for f in $workdirbase/$FILE-{stderr,log.cage-run,log.timelog,log.bwraptime,log.bwrapexitcode}; do
     wc -c "$f"|grep -q "^0 " && continue;
     [[ "$f" == "$workdirbase/$FILE-team_output" ]] && continue
     LOG "#### $(basename $f)"
@@ -238,6 +269,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG ""
   LOG ""
   SMALLRESP=none
+  BWRAPEXITCODE=$(< $workdirbase/$FILE-log.bwrapexitcode)
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     OLDRESP="$RESP"
@@ -247,8 +279,8 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     ((RESPERRO++))
   fi
 
-  if (( BWRAPEXITCODE == 124 )) && [[ "$SMALLRESP" != "TLE" ]]; then
-    [[ "$RESP" != "Runtime Error" ]] && RESP="Time Limit Exceeded"
+  if (( BWRAPEXITCODE != 0 )) && [[ "$SMALLRESP" != "TLE" ]] && ! grep -q signal $workdirbase/$FILE-log.timelog; then
+    [[ "$RESP" != "Runtime Error" ]] && RESP="Runtime Error - Signaled PPID"
     SMALLRESP=TMT
     ((RESPERRO++))
     [[ ! -n "$EXECTIME" ]] && EXECTIME="$(grep '^real' $workdirbase/$FILE-log.bwraptime|awk '{print $NF}')"
