@@ -116,7 +116,7 @@ for TLs in $PROBLEMDIR/sols/slow/*; do
   read -u 7 T
   tail -f --pid=$COPROC_PID $T/build-and-test.log|
   while read L; do
-    if ! grep -q '^EXECTIME' <<< "$L" ; then continue;fi
+    [[ "$L" =~ "EXECTIME" ]] || continue;
     grep '^EXECTIME' <<< "$L" > $TEMP
     while read l l ET SMALLRESP; do
       printf "$ET($SMALLRESP) "
