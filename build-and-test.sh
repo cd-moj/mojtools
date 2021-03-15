@@ -239,6 +239,8 @@ done
 
 wait
 
+TLERERUN=0
+
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
   if [[ ! -e "$INPUT" ]]; then
@@ -252,8 +254,11 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG ""
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   if [[ "$ALLOWPARALLELTEST" != "n" ]] && echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-      LOG " - Rerun: because got TLE while running parallel tests"
-      run-testinput $INPUT
+      if (( TLERERUN == 0 )); then
+	  LOG " - Rerun: because got TLE while running parallel tests"
+	  run-testinput $INPUT
+	  ((TLERERUN++))
+      fi
   fi
   LOG ""
   LOG "### CAGE CONTROL DATA this is for Bruno to check"
