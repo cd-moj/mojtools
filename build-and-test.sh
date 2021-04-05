@@ -184,6 +184,11 @@ if [[ ! -e "$LANGCOMPARE" ]]; then
 fi
 
 declare -A TL
+if [[ ! -e "$PROBLEMTEMPLATEDIR/tl" ]]; then
+  echo "Wrong package format. No TimeLimit found"
+  LOG "Timelimit is not set"
+  exit 3
+fi
 source $PROBLEMTEMPLATEDIR/tl
 
 [[ ! -n "${TL[$LANGUAGE]}" ]] && TL[$LANGUAGE]=${TL[default]}
