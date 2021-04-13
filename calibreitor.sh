@@ -55,6 +55,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   [[ ! -n "${WORSTTIMEPERLANG[$LANG]}" ]] && WORSTTIMEPERLANG[$LANG]=0.01
 
   mkfifo $TEMP.coprocout
+  export ALLOWPARALLELTEST=n
   coproc bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR &>$TEMP.coprocout
   #read -u ${COPROC[0]} T
   exec 7<$TEMP.coprocout
