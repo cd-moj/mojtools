@@ -39,7 +39,7 @@ if [[ ! -e build-and-test.sh ]]; then
 fi
 
 #create dummy TL file, must be remove later
-echo 'TL[default]=600' > $PROBLEMDIR/tl
+echo 'TL[default]=150' > $PROBLEMDIR/tl
 
 declare -A ULIMITS TLMOD
 [[ -e $PROBLEMDIR/conf ]] && source $PROBLEMDIR/conf
