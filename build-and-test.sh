@@ -204,7 +204,7 @@ if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then
   TLMOD[$LANGUAGE.drift]=0
 fi
 
-ETL=$(echo 2*${TL[$LANGUAGE]}+0.2|bc -l)
+ETL=$(echo 2*${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
 RESP=""
 RESPERRO=0
 CORRECT=0
@@ -244,7 +244,7 @@ done
 
 wait
 
-TLERERUN=0
+TLERERUN=y
 
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
@@ -257,12 +257,15 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG ""
   LOG "## Testfile: $FILE"
   LOG ""
+  THISRERUN=0
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   if [[ "$ALLOWPARALLELTEST" != "n" ]] && echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-      if (( TLERERUN == 0 )); then
+      if [[ "$TLERERUN" == "y" ]]; then
 	  LOG " - Rerun: because got TLE while running parallel tests"
 	  run-testinput $INPUT
-	  ((TLERERUN++))
+	  THISRERUN=1
+      else
+	  LOG " - Rerun: It will not be RERUNNED because previous RERUN were TLE"
       fi
   fi
   LOG ""
@@ -287,6 +290,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
     SMALLRESP=TLE
     LOG "- $FILE TLE $EXECTIME > ${TL[$LANGUAGE]}"
     ((RESPERRO++))
+    ((THISRERUN==1)) && TLERERUN=n
   fi
 
   if (( BWRAPEXITCODE != 0 )) && [[ "$SMALLRESP" != "TLE" ]] && ! grep -q signal $workdirbase/$FILE-log.timelog; then
