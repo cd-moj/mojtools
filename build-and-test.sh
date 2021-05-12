@@ -208,7 +208,7 @@ ETL=$(echo 2*${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
 RESP=""
 RESPERRO=0
 CORRECT=0
-TOTALTESTS=$(ls $PROBLEMTEMPLATEDIR/tests/input/*|wc -l)
+TOTALTESTS=$(ls -d $PROBLEMTEMPLATEDIR/tests/input/*|wc -l)
 
 function run-testinput()
 {
