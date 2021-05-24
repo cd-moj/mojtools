@@ -4,7 +4,7 @@ HARDDEPS='bash awk getopt /usr/bin/time timeout bwrap diff make bc'
 
 SOFTDEPS='cset'
 
-COMPILERS='gcc g++ fpc javac gccgo python2 python3 bash spim ocamlopt'
+COMPILERS='gcc g++ fpc javac gccgo python2 python3 bash spim ocamlopt rustc'
 
 function checkdeps()
 {
