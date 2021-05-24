@@ -6,12 +6,11 @@ cd /tmp/rwdir
 cat > Makefile << 'EOF'
 
 SRC=$(wildcard *.ml)
-MLFLAGS=-O3
 
 all: $(patsubst %.ml,%,${SRC})
 
 %: %.ml
-	@ocamlopt -O3 ${CXXFLAGS} $^ -o $@
+	@ocamlopt -O3 $^ -o $@
 	@echo BIN=$@
 EOF
 
