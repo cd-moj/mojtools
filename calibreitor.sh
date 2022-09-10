@@ -38,11 +38,12 @@ if [[ ! -e build-and-test.sh ]]; then
   exit 1
 fi
 
-#create dummy TL file, must be remove later
-echo 'TL[default]=150' > $PROBLEMDIR/tl
-
 declare -A ULIMITS TLMOD
 [[ -e $PROBLEMDIR/conf ]] && source $PROBLEMDIR/conf
+
+#create dummy TL file, must be removed later
+[[ -z "$CALIBRATIONTL" ]] && CALIBRATIONTL=5
+echo "TL[default]=$CALIBRATIONTL" > $PROBLEMDIR/tl
 
 # find -ac solutions
 WORSTTIME=0.01
@@ -104,28 +105,31 @@ echo "TL[default]=$BESTTIME" >> $PROBLEMDIR/tl
 
 echo "Calibrated TL:"
 tail -n+1 $PROBLEMDIR/tl
-echo
 
-echo "SLOW solutions:"
-for TLs in $PROBLEMDIR/sols/slow/*; do
-  if [[ ! -e $TLs ]]; then echo none; continue;fi
-  echo "${TLs##*/}:"
-  LANG="${TLs##*.}"
-  mkfifo $TEMP.coproc
-  coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR runnall >$TEMP.coproc
-  exec 7<$TEMP.coproc
-  read -u 7 T
-  tail -f --pid=$COPROC_PID $T/build-and-test.log|
-  while read L; do
-    [[ "$L" =~ "EXECTIME" ]] || continue;
-    grep '^EXECTIME' <<< "$L" > $TEMP
-    while read l l ET SMALLRESP; do
-      printf "$ET($SMALLRESP) "
-    done < $TEMP
-  done
+for OTHERSOL in pass slow wrong; do
+  [[ ! -d "$PROBLEMDIR/sols/$OTHERSOL" ]] && continue
   echo
-  read -u 7 BIGRESP
-  exec 7<&-
-  rm -f $TEMP.coproc
-  TOREMOVE+=" ${T}"
+  echo "${OTHERSOL^^} solutions:"
+  for TLs in $PROBLEMDIR/sols/$OTHERSOL/*; do
+    if [[ ! -e $TLs ]]; then echo none; continue;fi
+    echo "${TLs##*/}:"
+    LANG="${TLs##*.}"
+    mkfifo $TEMP.coproc
+    coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR runnall >$TEMP.coproc
+    exec 7<$TEMP.coproc
+    read -u 7 T
+    tail -f --pid=$COPROC_PID $T/build-and-test.log|
+      while read L; do
+        [[ "$L" =~ "EXECTIME" ]] || continue;
+        grep '^EXECTIME' <<< "$L" > $TEMP
+        while read l l ET SMALLRESP; do
+          printf "$ET($SMALLRESP) "
+        done < $TEMP
+      done
+    echo
+    read -u 7 BIGRESP
+    exec 7<&-
+    rm -f $TEMP.coproc
+    TOREMOVE+=" ${T}"
+  done
 done
