@@ -62,14 +62,12 @@ for AC in $PROBLEMDIR/sols/good/*; do
   exec 7<$TEMP.coprocout
   read -u 7 T
   while read L; do
-    if ! grep -q '^EXECTIME' <<< "$L" ; then continue;fi
-    echo "$L" |grep '^EXECTIME' > $TEMP
-    while read l l ET SMALLRESP; do
-      printf "$ET "
-      if echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
-        WORSTTIMEPERLANG[$LANG]=$ET
-      fi
-    done < $TEMP
+    [[ "$L" =~ "EXECTIME" ]] || continue;
+    read l l ET SMALLRESP <<< "$L"
+    printf "$ET "
+    if echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
+      WORSTTIMEPERLANG[$LANG]=$ET
+    fi
   done <<< $(tail -f --pid=$COPROC_PID $T/build-and-test.log)
   echo
 
@@ -121,10 +119,8 @@ for OTHERSOL in pass slow wrong; do
     tail -f --pid=$COPROC_PID $T/build-and-test.log|
       while read L; do
         [[ "$L" =~ "EXECTIME" ]] || continue;
-        grep '^EXECTIME' <<< "$L" > $TEMP
-        while read l l ET SMALLRESP; do
-          printf "$ET($SMALLRESP) "
-        done < $TEMP
+        read l l ET SMALLRESP <<< "$L"
+        printf "$ET($SMALLRESP) "
       done
     echo
     read -u 7 BIGRESP
