@@ -204,7 +204,7 @@ if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then
   TLMOD[$LANGUAGE.drift]=0
 fi
 
-ETL=$(echo 2*${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
+ETL=$(echo 2+${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
 RESP=""
 RESPERRO=0
 CORRECT=0
