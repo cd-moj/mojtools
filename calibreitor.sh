@@ -57,15 +57,16 @@ for AC in $PROBLEMDIR/sols/good/*; do
 
   mkfifo $TEMP.coprocout
   export ALLOWPARALLELTEST=n
-  coproc bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR &>$TEMP.coprocout
+  coproc bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR $ALLOWTLEDURINGCALIBRATION &>$TEMP.coprocout
   #read -u ${COPROC[0]} T
   exec 7<$TEMP.coprocout
   read -u 7 T
   while read L; do
     [[ "$L" =~ "EXECTIME" ]] || continue;
     read l l ET SMALLRESP <<< "$L"
-    printf "$ET "
-    if echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
+    printf " $ET"
+    [[ "$SMALLRESP" != "AC" ]] && printf "($SMALLRESP)"
+    if [[ "$SMALLRESP" == "AC" ]] && echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
       WORSTTIMEPERLANG[$LANG]=$ET
     fi
   done <<< $(tail -f --pid=$COPROC_PID $T/build-and-test.log)
@@ -73,8 +74,13 @@ for AC in $PROBLEMDIR/sols/good/*; do
 
   read -u 7 A
   if [[ "${A}" != "Accepted,100p" ]]; then
-    echo "$AC got '${A}', was waiting Accepted. Check ${T}"
-    exit 1
+    if [[ "${A}" =~ "Time Limit Exceeded" &&
+            "$ALLOWTLEDURINGCALIBRATION" == "y" ]]; then
+      true
+    else
+      echo "$AC got '${A}', was waiting Accepted. Check ${T}"
+      exit 1
+    fi
   fi
   TOREMOVE+=" ${T}"
   exec 7<&-
