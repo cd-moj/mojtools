@@ -6,7 +6,7 @@ cd /tmp/rwdir
 cat > Makefile << 'EOF'
 
 SRC=$(wildcard *.cpp)
-CXXFLAGS=-lm -O2 -static -std=c++14 -pipe
+CXXFLAGS=-lm -O2 -static -std=gnu++20 -pipe
 
 all: $(patsubst %.cpp,%,${SRC})
 
