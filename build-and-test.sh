@@ -244,7 +244,7 @@ done
 
 wait
 
-TLERERUN=y
+TLERERUN=${TLERERUN:=y}
 
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
