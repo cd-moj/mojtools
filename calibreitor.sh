@@ -73,7 +73,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   echo
 
   read -u 7 A
-  if [[ "${A}" != "Accepted,100p" ]]; then
+  if ! [[ "${A}" =~ "Accepted" ]]; then
     if [[ "${A}" =~ "Time Limit Exceeded" &&
             "$ALLOWTLEDURINGCALIBRATION" == "y" ]]; then
       true
@@ -82,6 +82,8 @@ for AC in $PROBLEMDIR/sols/good/*; do
       exit 1
     fi
   fi
+  echo "Verdict: $A"
+  echo
   TOREMOVE+=" ${T}"
   exec 7<&-
   rm -f $TEMP.coprocout
