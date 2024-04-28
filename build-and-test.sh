@@ -21,7 +21,7 @@ function LOG()
 }
 
 if [[ ! -n "$3" ]]; then
-  echo "$0 <LANGUAGE> <SRCFILE> <PROBLEMTEMPLATEDIR> <RUNALL?yes:no>"
+  echo "$0 <LANGUAGE> <SRCFILE> <PROBLEMTEMPLATEDIR> [<RUNALL?y:n>]"
   exit 1
 fi
 
@@ -220,8 +220,38 @@ function run-testinput()
        -t $workdirbase/$FILE-log.timelog\
        -T $ETL\
        -B $workdirbase/$FILE-log.bwraptime &> $workdirbase/$FILE-log.cage-run
-  BWRAPEXITCODE=$?
+  local BWRAPEXITCODE=$?
   echo $BWRAPEXITCODE > $workdirbase/$FILE-log.bwrapexitcode
+  local EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
+  local ERR=0
+  local VERDICT=""
+  if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
+    VERDICT=TLE
+    ((ERR++))
+  elif (( BWRAPEXITCODE == 139 )) ; then
+    VERDICT=RE
+    ((ERR++))
+  elif (( BWRAPEXITCODE != 0 )) && grep -q signal $workdirbase/$FILE-log.timelog; then
+    VERDICT=TMT
+    ((ERR++))
+  else
+    $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
+    COMPAREEXIT=$?
+    if (( COMPAREEXIT == 4 )); then
+      VERDICT=AC
+    elif (( COMPAREEXIT == 5 )); then
+      VERDICT=AC,PE
+    elif (( COMPAREEXIT == 6 )); then
+      VERDICT=WA
+      ((ERR++))
+    else
+      VERDICT=UE
+      ((ERR++))
+    fi
+  fi
+  echo "VERDICT[$FILE]=$VERDICT" >> $workdirbase/log.verdictall
+  echo "$VERDICT" > $workdirbase/$FILE-log.verdict
+  return $ERR
 }
 
 JOBSCOUNT=0
@@ -237,14 +267,29 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   run-testinput $INPUT &
   ((JOBSCOUNT++))
   if (( JOBSCOUNT > NPROC-1 )); then
-      wait -n
-      ((JOBSCOUNT--))
+    wait -n
+    RET=$?
+    (( RET != 0 )) && [[ "$RUNALL" != "y" ]] && break
+    ((JOBSCOUNT--))
   fi
 done
 
 wait
 
 TLERERUN=${TLERERUN:=y}
+
+declare -A VERDICT
+[[ -e $workdirbase/log.verdictall ]] && source $workdirbase/log.verdictall
+
+declare -A VERDICTORDER
+VERDICTORDER[UE]=6
+VERDICTORDER[TLE]=5
+VERDICTORDER[RE]=4
+VERDICTORDER[TMT]=3
+VERDICTORDER[WA]=2
+VERDICTORDER[AC]=1
+VERDICTORDER[AC,PE]=1
+SMALLRESP=AC
 
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
@@ -258,16 +303,24 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "## Testfile: $FILE"
   LOG ""
   THISRERUN=0
-  EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
-  if [[ "$ALLOWPARALLELTEST" != "n" ]] && echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-      if [[ "$TLERERUN" == "y" ]]; then
-	  LOG " - Rerun: because got TLE while running parallel tests"
-	  run-testinput $INPUT
-	  THISRERUN=1
-      else
-	  LOG " - Rerun: It will not be RERUNNED because previous RERUN were TLE"
-      fi
+  THISVERDICT=${VERDICT[$FILE]}
+  [[ -z "$THISVERDICT" ]] &&
+    LOG " - Can't find VERDICT for this FILE($INPUT)" &&
+    RESP="INPUT NOT TESTED" && ((RESPERRO++)) && continue
+
+  if [[ "$THISVERDICT" == "TLE" ]]; then
+    if [[ "$TLERERUN" == "y" ]]; then
+	    LOG " - Rerun: because got TLE while running parallel tests"
+	    run-testinput $INPUT
+	    THISRERUN=1
+      source $workdirbase/log.verdictall
+      THISVERDICT="${VERDICT[$FILE]}"
+      [[ "$THISVERDICT" == "TLE" ]] && TLERERUN=n
+    else
+	    LOG " - Rerun: It will not be RERUNNED because previous RERUN were TLE"
+    fi
   fi
+
   LOG ""
   LOG "### CAGE CONTROL DATA this is for Bruno to check"
   LOG "8<-------------------------8<------------------"
@@ -281,79 +334,47 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "### END CAGE CONTROL DATA"
   LOG ""
   LOG ""
-  SMALLRESP=none
-  BWRAPEXITCODE=$(< $workdirbase/$FILE-log.bwrapexitcode)
+
   EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
-  if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-    OLDRESP="$RESP"
-    [[ "$RESP" != "Runtime Error" ]] && RESP="Time Limit Exceeded"
-    SMALLRESP=TLE
-    LOG "- $FILE TLE $EXECTIME > ${TL[$LANGUAGE]}"
-    ((RESPERRO++))
-    ((THISRERUN==1)) && TLERERUN=n
-  fi
-
-  if (( BWRAPEXITCODE != 0 )) && [[ "$SMALLRESP" != "TLE" ]] && ! grep -q signal $workdirbase/$FILE-log.timelog; then
-    [[ "$RESP" != "Runtime Error" ]] && RESP="Runtime Error - Signaled PPID"
-    SMALLRESP=TMT
-    ((RESPERRO++))
-    [[ ! -n "$EXECTIME" ]] && EXECTIME="$(grep '^real' $workdirbase/$FILE-log.bwraptime|awk '{print $NF}')"
-  elif (( BWRAPEXITCODE != 0 )) && ( [[ "$SMALLRESP" != "TLE" ]] || grep -q signal $workdirbase/$FILE-log.timelog ); then
-    RESP="Runtime Error"
-    #LOG "- $FILE Runtime Error"
-    SMALLRESP=RE
-    ((RESPERRO++))
-  fi
-
-  if [[ "$SMALLRESP" == "none" ]]; then
-    $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
-    COMPAREEXIT=$?
-    LOG "### CHECKING SOLUTION THIS IS USUALLY A DIFF OUTPUT"
-    if (( COMPAREEXIT == 4 )); then
-      if (( RESPERRO == 0 )); then
-        RESP="Accepted"
-      fi
-      SMALLRESP=AC
-      ((CORRECT++))
-    elif (( COMPAREEXIT == 5 )); then
-      if ((RESPERRO == 0 )) ; then
-        RESP="Accepted,PE"
-      fi
-      SMALLRESP=AC,PE
-      ((CORRECT++))
-    elif (( COMPAREEXIT == 6 )); then
-      [[ "$RESP" != "Time Limit Exceeded" ]] && [[ "$RESP" != "Runtime Error" ]] && RESP="Wrong Answer"
-      SMALLRESP=WA
-      ((RESPERRO++))
-    else
-      RESP="Unknown Error"
-      SMALLRESP=UE
-    ((RESPERRO++))
-    fi
-  else
-    LOG " - Not checking answer because of $SMALLRESP"
-  fi
-  #LOG " - Test Veredict: $SMALLRESP ($RESP)"
-
-
-  LOG "EXECTIME $FILE $EXECTIME $SMALLRESP"
+  LOG "EXECTIME $FILE $EXECTIME $THISVERDICT"
   LOG " - Execution Time: $EXECTIME"
   LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
-  LOG " - Veredict for this output: $SMALLRESP"
+  LOG " - Verdict for this output: $THISVERDICT"
   LOG ""
-  ((RESPERRO > 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "AC,PE" ]] && LOG " - Will NOT show DIFFS or Courtesy for MORE than 2 errors"
-  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC" ]] && [[ "$SMALLRESP" != "TMT" ]] && [[ "$SMALLRESP" != "TLE" ]] && [[ "$SMALLRESP" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
-  ((RESPERRO <= 2 )) && [[ "$SMALLRESP" != "AC,PE" ]] && [[ "$SMALLRESP" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
-  LOG ""
-  [[ "$RESP" != "Accepted" ]] && [[ "$RESP" != "Accepted,PE" ]] && [[ "$RESP" != "Presentation Error" ]] && [[ "$RUNALL" == "no" ]]  && break
 
+  [[ "$THISVERDICT" =~ "AC" ]] || ((RESPERRO++))
+  [[ "$THISVERDICT" =~ "AC" ]] && ((CORRECT++))
+
+  LOG "### CHECKING SOLUTION THIS IS USUALLY A DIFF OUTPUT"
+
+  ((RESPERRO > 2 )) && [[ "$THISVERDICT" != "AC" ]] && [[ "$THISVERDICT" != "AC,PE" ]] && LOG " - Will NOT show DIFFS or Courtesy for MORE than 2 errors"
+  ((RESPERRO <= 2 )) && [[ "$THISVERDICT" != "AC" ]] && [[ "$THISVERDICT" != "TMT" ]] && [[ "$THISVERDICT" != "TLE" ]] && [[ "$THISVERDICT" != "RE" ]] && LOG "$(< $workdirbase/$FILE-log.compare)"
+  ((RESPERRO <= 2 )) && [[ "$THISVERDICT" != "AC,PE" ]] && [[ "$THISVERDICT" != "AC" ]] && [[ "$INPUT" =~ "sample" || "$INPUT" =~ "example" ]] && LOG "" && LOG "#### INPUT COURTESY [this is the raw input file]" && LOG "\`\`\`" && LOG "$(< $INPUT)" && LOG "\`\`\`" && LOG ""
+  LOG ""
+  ##ORDEM PIOR PARA MELHOR UE -> TLE -> RE -> TMT -> WA -> AC
+  #LOG "SMALLRESP=$SMALLRESP"
+  #LOG "THISVERDICT=$THISVERDICT"
+  #LOG "${VERDICTORDER[$SMALLRESP]} , ${VERDICTORDER[$THISVERDICT]}"
+  (( ${VERDICTORDER[$SMALLRESP]} < ${VERDICTORDER[$THISVERDICT]} )) && SMALLRESP=$THISVERDICT
 done
 
+[[ "$SMALLRESP" =~ "AC" ]] && (( RESPERRO > 0 )) && SMALLRESP=UE
+
+declare -A VERDICTFULLNAME
+VERDICTFULLNAME[UE]="Unknown ERROR"
+VERDICTFULLNAME[TLE]="Time Limit Exceeded"
+VERDICTFULLNAME[RE]="Runtime Error"
+VERDICTFULLNAME[TMT]="Runtime Error, signaled PPDI"
+VERDICTFULLNAME[WA]="Wrong Answer"
+VERDICTFULLNAME[AC]="Accepted"
+VERDICTFULLNAME[AC,PE]="Accepted,PE"
 LOG ""
 LOG ""
-LOG "# FINAL VEREDICT"
-LOG "  - $RESP"
+LOG "# FINAL VERDICT"
+LOG "  - $SMALLRESP - ${VERDICTFULLNAME[$SMALLRESP]}"
 LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
-echo "$RESP,$((CORRECT*100/TOTALTESTS))p"
+FINALRESP="${VERDICTFULLNAME[$SMALLRESP]},$((CORRECT*100/TOTALTESTS))p"
+
+echo $FINALRESP
 exit 0
