@@ -121,7 +121,7 @@ for OTHERSOL in pass slow wrong; do
     echo "${TLs##*/}:"
     LANG="${TLs##*.}"
     mkfifo $TEMP.coproc
-    coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR runnall >$TEMP.coproc
+    coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR y >$TEMP.coproc
     exec 7<$TEMP.coproc
     read -u 7 T
     tail -f --pid=$COPROC_PID $T/build-and-test.log|
@@ -132,6 +132,7 @@ for OTHERSOL in pass slow wrong; do
       done
     echo
     read -u 7 BIGRESP
+    echo "Verdict: $BIGRESP"
     exec 7<&-
     rm -f $TEMP.coproc
     TOREMOVE+=" ${T}"
