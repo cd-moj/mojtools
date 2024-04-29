@@ -84,14 +84,14 @@ if [ "$wd" != "" ]; then
   wdiff \"$1\" \"$2\" >/dev/null 2>/dev/null
   if [ "$?" == "0" ]; then
     echo -e "wdiff \"$1\" \"$2\" # files match"
-    echo -e "diff -c -i -b -B -w \"$1\" \"$2\" # files dont match - see output"
-    diff -c -i -b -B -w "$1" "$2"
+    echo -e "diff -u -i -b -B -w \"$1\" \"$2\" # files dont match - see output"
+    diff -u -i -b -B -w "$1" "$2"
     echo "BUT Files match if we compare word by word, ignoring everything else, using wdiff"
     echo "diff has a bug that, if a line contains a single space, this is not discarded by -w"
     exit 5
   fi
 fi
 echo -e "### files dont match - see output"
-diff -c -i -b -B -w "$1" "$2"
+diff -u -i -b -B -w "$1" "$2"
 echo "Differences found"
 exit 6
