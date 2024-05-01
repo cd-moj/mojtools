@@ -48,8 +48,11 @@ LOG "  - Submission Language: $LANGUAGE"
 LOG "  - Submission SRCFILE: $(basename $SRCCODE)"
 LOG "  - Run all even on critical error: $RUNALL"
 LOG ""
+LOG "- Starting at $(date -R)"
+LOG "- Running on host '$HOSTNAME'"
 LOG ""
 
+STARTTIME=$EPOCHSECONDS
 mkdir -p $workdir
 echo $workdirbase
 
@@ -368,9 +371,11 @@ VERDICTFULLNAME[TMT]="Runtime Error, signaled PPDI"
 VERDICTFULLNAME[WA]="Wrong Answer"
 VERDICTFULLNAME[AC]="Accepted"
 VERDICTFULLNAME[AC,PE]="Accepted,PE"
+TOTALTIME=$EPOCHSECONDS-$STARTTIME
 LOG ""
 LOG ""
 LOG "# FINAL VERDICT"
+LOG "  - Total build-and-test time: $TOTALTIME seconds"
 LOG "  - $SMALLRESP - ${VERDICTFULLNAME[$SMALLRESP]}"
 LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
