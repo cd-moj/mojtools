@@ -234,8 +234,8 @@ function run-testinput()
   elif (( BWRAPEXITCODE == 139 )) ; then
     VERDICT=RE
     ((ERR++))
-  elif (( BWRAPEXITCODE != 0 )) && grep -q signal $workdirbase/$FILE-log.timelog; then
-    VERDICT=TMT
+  elif (( BWRAPEXITCODE != 0 )) ; then
+    VERDICT=RE_NZEC
     ((ERR++))
   else
     $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
@@ -288,6 +288,7 @@ declare -A VERDICTORDER
 VERDICTORDER[UE]=6
 VERDICTORDER[TLE]=5
 VERDICTORDER[RE]=4
+VERDICTORDER[RE_NZEC]=4
 VERDICTORDER[TMT]=3
 VERDICTORDER[WA]=2
 VERDICTORDER[AC]=1
@@ -367,6 +368,7 @@ declare -A VERDICTFULLNAME
 VERDICTFULLNAME[UE]="Unknown ERROR"
 VERDICTFULLNAME[TLE]="Time Limit Exceeded"
 VERDICTFULLNAME[RE]="Runtime Error"
+VERDICTFULLNAME[RE_NZEC]="Possible Runtime Error, non-zero return"
 VERDICTFULLNAME[TMT]="Runtime Error, signaled PPDI"
 VERDICTFULLNAME[WA]="Wrong Answer"
 VERDICTFULLNAME[AC]="Accepted"
