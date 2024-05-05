@@ -231,7 +231,7 @@ function run-testinput()
   if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     VERDICT=TLE
     ((ERR++))
-  elif (( BWRAPEXITCODE == 139 )) ; then
+  elif (( BWRAPEXITCODE >= 127 )) ; then
     VERDICT=RE
     ((ERR++))
   elif (( BWRAPEXITCODE != 0 )) ; then
