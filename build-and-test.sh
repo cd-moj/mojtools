@@ -228,14 +228,14 @@ function run-testinput()
   local EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   local ERR=0
   local VERDICT=""
-  if (( BWRAPEXITCODE > 126 )) ; then
+  if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
+    VERDICT=TLE
+    ((ERR++))
+  elif (( BWRAPEXITCODE == 139 )) ; then
     VERDICT=RE
     ((ERR++))
   elif (( BWRAPEXITCODE != 0 )) ; then
     VERDICT=RE_NZEC
-    ((ERR++))
-  elif echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-    VERDICT=TLE
     ((ERR++))
   else
     $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
