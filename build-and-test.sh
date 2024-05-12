@@ -230,26 +230,28 @@ function run-testinput()
   local VERDICT=""
   if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     VERDICT=TLE
-    ((ERR++))
+    ERR=3
   elif (( BWRAPEXITCODE >= 127 )) ; then
     VERDICT=RE
-    ((ERR++))
+    ERR=127
   elif (( BWRAPEXITCODE != 0 )) ; then
     VERDICT=RE_NZEC
-    ((ERR++))
+    ERR=126
   else
     $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
     COMPAREEXIT=$?
     if (( COMPAREEXIT == 4 )); then
       VERDICT=AC
+      ERR=0
     elif (( COMPAREEXIT == 5 )); then
       VERDICT=AC,PE
+      ERR=0
     elif (( COMPAREEXIT == 6 )); then
       VERDICT=WA
-      ((ERR++))
+      ERR=6
     else
       VERDICT=UE
-      ((ERR++))
+      ERR=7
     fi
   fi
   echo "VERDICT[$FILE]=$VERDICT" >> $workdirbase/log.verdictall
@@ -272,6 +274,9 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   if (( JOBSCOUNT > NPROC-1 )); then
     wait -n
     RET=$?
+    (( RET == 6 )) && [[ "$STOPWHEN_WA" == "y" ]] && break
+    (( RET == 3 )) && [[ "$STOPWHEN_TLE" == "y" ]] && break
+    (( RET >= 126 )) && [[ "$STOPWHEN_RE" == "y" ]] && break
     (( RET != 0 )) && [[ "$RUNALL" != "y" ]] && break
     ((JOBSCOUNT--))
   fi
