@@ -220,7 +220,7 @@ if [[ "$USER" == "root" ]] && [[ -n "$(which cset)" ]]; then
 fi
 
 SAFETLE=$(echo "$TLE + 1"|bc -l)
-(exec /usr/bin/time -p -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD bwrap --ro-bind /usr /usr \
+(exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD bwrap --ro-bind /usr /usr \
   --dir /tmp \
   --dir /var \
   --ro-bind /etc/alternatives /etc/alternatives \
@@ -243,6 +243,6 @@ SAFETLE=$(echo "$TLE + 1"|bc -l)
   --bind $STDERRLOG /tmp/stderrlog $BWRAPPARAM\
   --uid 65534 \
   --gid 65534 \
-  /usr/bin/time -p -o /tmp/timelog timeout $TLE /tmp/script) \
+  /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o /tmp/timelog timeout $TLE /tmp/script) \
   11< <(getent passwd 65534) \
   12< <(getent group 65534)
