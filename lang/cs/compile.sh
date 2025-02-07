@@ -10,7 +10,7 @@ SRC=$(wildcard *.cs)
 all: $(patsubst %.cs,%,${SRC})
 
 %: %.cs
-	@mcs -optimize $^ -o $@
+	@mcs -optimize $^ -out:$@
 	@echo BIN=$@
 EOF
 
