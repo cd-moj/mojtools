@@ -120,7 +120,7 @@ fi
 
 EXTRABINDINGS=
 PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
-[[ -x "$PREPLANGUAGE" ]] && $PREPLANGUAGE $workdir
+[[ -x "$PREPLANGUAGE" ]] && . $PREPLANGUAGE $workdir
 [[ ! -e "$PREPLANGUAGE" ]] && [[ -e "$DEFAULTLANGUAGEDIR/prep.sh" ]] &&
 . $DEFAULTLANGUAGEDIR/prep.sh $workdir
 
