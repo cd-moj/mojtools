@@ -118,10 +118,11 @@ if [[ ! -e "$LANGCOMPILE" ]]; then
   exit 3
 fi
 
+EXTRABINDINGS=
 PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
 [[ -x "$PREPLANGUAGE" ]] && $PREPLANGUAGE $workdir
 [[ ! -e "$PREPLANGUAGE" ]] && [[ -e "$DEFAULTLANGUAGEDIR/prep.sh" ]] &&
-  $DEFAULTLANGUAGEDIR/prep.sh $workdir
+. $DEFAULTLANGUAGEDIR/prep.sh $workdir
 
 if [[ "$USER" == root ]]; then
   SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
@@ -129,7 +130,7 @@ fi
 
 LOG "# Compiling code"
 LOG ""
-bash cage-run.sh -w $workdir -r $LANGCOMPILE $SHIELDPARAMS\
+bash cage-run.sh -w $workdir -r $LANGCOMPILE $SHIELDPARAMS $EXTRABINDINGS\
                     -s $workdirbase/compile.log.stderr \
                     -o $workdirbase/compile.log.stdout \
                     -t $workdirbase/compile.log.time \
@@ -217,7 +218,7 @@ function run-testinput()
 {
   local INPUT=$1
   local FILE=$(basename $INPUT)
-  bash cage-run.sh -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+  bash cage-run.sh $EXTRABINDINGS -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
        -r $LANGRUN \
        -t $workdirbase/$FILE-log.timelog\
