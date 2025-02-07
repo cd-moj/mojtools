@@ -22,6 +22,7 @@ function printhelp()
 {
   cat <<EOF
 Usage: $0 <options>
+-b, --bind                Bind file/dir to the cage
 -d, --directory           Directory with all files to be run
 -r, --run-script-filename Filename of script inside '-d' to run
               this script will actually run a binary file or an interpreter
@@ -42,7 +43,7 @@ Usage: $0 <options>
 EOF
 }
 
-TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:M:' -l 'memlimit:,shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:' -n "$0" -- "$@")
+TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:M:b:' -l 'bind:,memlimit:,shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:' -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 unset TEMP
@@ -74,6 +75,14 @@ while [[ "$1" != "--" ]]; do
       ((ARGS++))
       unset missingparam[0]
       BWRAPPARAM+=" --ro-bind $DIR /tmp/dir"
+      continue
+    ;;
+    '-b'|'--bind')
+      DIR="$2"
+      shift 2
+      ((ARGS++))
+      unset missingparam[0]
+      BWRAPPARAM+=" --ro-bind $DIR $DIR"
       continue
     ;;
     '-i'|'--input-file')
