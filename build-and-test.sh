@@ -263,6 +263,7 @@ function run-testinput()
 JOBSCOUNT=0
 NPROC=$(nproc)
 [[ "$ALLOWPARALLELTEST" == "n" ]] && NPROC=1 && LOG " - Parallel Test not allowed in this problem"
+[[ -n "$MAXPARALLELTESTS" ]] && NPROC=$MAXPARALLELTESTS && LOG " - Setting MAX Parallel Tests to $MAXPARALLELTESTS"
 LOG " - NPROC: $NPROC"
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   if [[ ! -e "$INPUT" ]]; then
