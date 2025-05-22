@@ -11,7 +11,7 @@ HSFLAGS=
 all: $(patsubst %.hs,%,${SRC})
 
 %: %.hs
-	@ghc ${HSFLAGS} $^ -o $@
+	@ghc ${HSFLAGS} $^ -o $@ >&2
 	@echo BIN=$@
 EOF
 
