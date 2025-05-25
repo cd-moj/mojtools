@@ -66,7 +66,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
     read l l ET SMALLRESP <<< "$L"
     printf " $ET"
     [[ "$SMALLRESP" != "AC" ]] && printf "($SMALLRESP)"
-    if [[ "$SMALLRESP" == "AC" ]] && echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
+    if [[ "$SMALLRESP" =~ "AC" ]] && echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
       WORSTTIMEPERLANG[$LANG]=$ET
     fi
   done <<< $(tail -f --pid=$COPROC_PID $T/build-and-test.log)
