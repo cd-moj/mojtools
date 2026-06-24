@@ -68,13 +68,17 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
   done
 done
 
-# 3) monta o JSON final numa passada (TSV -> JSON)
-jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" '
+# 3) monta o JSON final numa passada (TSV -> JSON). Aplica o registro de diretórios
+#    (problem-repos.json): repos migrados/criados dão dono+colaboradores ao problema mesmo
+#    antes do .moj-meta.json chegar ao NFS.
+REG="$CONTESTSDIR/treino/var/problem-repos.json"; reg="$(cat "$REG" 2>/dev/null)"; [[ -n "$reg" ]] || reg='{}'
+jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
   [ inputs | split("\t")
-    | { id:.[0], repo:.[1], prob:.[2], author:.[3], author_norm:.[4], title:.[5],
+    | .[1] as $repo | ($reg[$repo] // {}) as $rr
+    | { id:.[0], repo:$repo, prob:.[2], author:.[3], author_norm:.[4], title:.[5],
         public:(.[6]=="1"), html:(.[6]=="1"),
-        owner:(if (.[7]//"")=="" then null else .[7] end),
-        collaborators:((.[8]//"")|split(",")|map(select(length>0))),
+        owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
+        collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
         collections:((.[9]//"")|split(",")|map(select(length>0))) } ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 
