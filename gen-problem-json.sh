@@ -1,0 +1,124 @@
+#!/bin/bash
+#This file is part of CD-MOJ.
+#
+#CD-MOJ is free software: you can redistribute it and/or modify it under the
+#terms of the GNU General Public License as published by the Free Software
+#Foundation, either version 3 of the License, or (at your option) any later
+#version. See <http://www.gnu.org/licenses/>.
+
+# gen-problem-json.sh — gera o índice servível do treino a partir de um pacote de
+# problema: contests/treino/var/jsons/<id>.json = {id,title,time_limits,tags,
+# statement_html_b64}. Fecha o passo que faltava (o synctreino só fazia git pull + make).
+#
+#   uso:  gen-problem-json.sh <pkgdir> [<id>]
+#         <pkgdir> = .../<repo>/<problema>   (o pai é o repo, com o Makefile)
+#         <id>     = default <repo>#<problema>
+#
+# Reaproveita o Makefile do repo (make <problema>.html). INJETA os exemplos a partir
+# dos testes (tests/input|output), garantindo que fiquem sempre aparentes e batendo
+# com os testes reais. Respeita .moj-meta.json (public/display_title/id_alias).
+set -u
+
+PKG="${1:?uso: gen-problem-json.sh <pkgdir> [id]}"
+PKG="$(cd "$PKG" 2>/dev/null && pwd)" || { echo "gen-problem-json: pkg '$1' inexistente" >&2; exit 1; }
+REPODIR="$(dirname "$PKG")"
+PROB="$(basename "$PKG")"
+REPO="$(basename "$REPODIR")"
+ID="${2:-$REPO#$PROB}"
+
+: "${CONTESTSDIR:=/home/ribas/moj/contests}"
+: "${TREINO_JSONS:=$CONTESTSDIR/treino/var/jsons}"
+: "${SAMPLE_LIMIT:=2}"                 # nº máximo de exemplos a injetar
+HOSTNAME="${HOSTNAME:-$(hostname)}"
+
+esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
+# ----- 1. garante o HTML buildado (Makefile do repo) -----
+HTML="$REPODIR/$PROB.html"
+if [[ ! -s "$HTML" || "$PKG/docs" -nt "$HTML" ]]; then
+  ( cd "$REPODIR" && make "$PROB.html" ) >/dev/null 2>"$PKG/.genjson.makeerr" || {
+    echo "gen-problem-json: make $PROB.html FALHOU (ver $PKG/.genjson.makeerr)" >&2; exit 2; }
+fi
+[[ -s "$HTML" ]] || { echo "gen-problem-json: HTML não gerado p/ $ID" >&2; exit 2; }
+
+# ----- 2. título -----
+title=""
+if [[ -f "$PKG/docs/enunciado.md" ]]; then
+  title="$(grep -m1 '^%' "$PKG/docs/enunciado.md" 2>/dev/null | sed 's/^%[[:space:]]*//')"
+elif [[ -f "$PKG/docs/enunciado.org" ]]; then
+  title="$(grep -m1 -i '^#+title:' "$PKG/docs/enunciado.org" 2>/dev/null | sed 's/^#+[Tt][Ii][Tt][Ll][Ee]:[[:space:]]*//')"
+elif [[ -f "$PKG/docs/enunciado.tex" ]]; then
+  title="$(grep -m1 -E '\\(section|title)\{' "$PKG/docs/enunciado.tex" 2>/dev/null | sed -E 's/.*\\(section|title)\{([^}]*)\}.*/\2/')"
+fi
+# override por .moj-meta.json; fallback p/ o nome do problema
+meta="$PKG/.moj-meta.json"
+dt=""; [[ -f "$meta" ]] && dt="$(jq -r '.display_title // empty' "$meta" 2>/dev/null)"
+[[ -n "$dt" ]] && title="$dt"
+[[ -n "$title" ]] || title="$PROB"
+
+# ----- 3. tags (linhas começando com #, minúsculas) -----
+tags='[]'
+[[ -f "$PKG/tags" ]] && tags="$(grep -E '^#' "$PKG/tags" 2>/dev/null | tr 'A-Z' 'a-z' \
+  | jq -R . | jq -s -c '.' 2>/dev/null)"; [[ -n "$tags" ]] || tags='[]'
+
+# ----- 4. time_limits (do tl.<host> se houver, senão tl) -----
+TLFILE="$PKG/tl"; [[ -f "$PKG/tl.$HOSTNAME" ]] && TLFILE="$PKG/tl.$HOSTNAME"
+tl_json='{}'
+if [[ -f "$TLFILE" ]]; then
+  declare -A TL; declare -A TLMOD
+  source "$TLFILE" 2>/dev/null
+  { for k in "${!TL[@]}"; do printf '%s\t%s\n' "$k" "${TL[$k]}"; done; } \
+    | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")|{(.[0]):.[1]})|add // {}' \
+    > /tmp/.tljson.$$ 2>/dev/null && tl_json="$(cat /tmp/.tljson.$$)"; rm -f /tmp/.tljson.$$
+  unset TL TLMOD
+fi
+
+# ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
+samples_html=""
+declare -a SAMPLES
+if [[ -f "$PKG/samples" ]]; then
+  mapfile -t SAMPLES < <(grep -vE '^[[:space:]]*$' "$PKG/samples")
+else
+  mapfile -t SAMPLES < <(ls -1 "$PKG/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT")
+fi
+n=0
+for s in "${SAMPLES[@]}"; do
+  in="$PKG/tests/input/$s"; out="$PKG/tests/output/$s"
+  [[ -f "$out" ]] || continue
+  (( n++ )); (( n > SAMPLE_LIMIT )) && break
+  samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
+  samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre></div>"
+done
+if [[ -n "$samples_html" ]]; then
+  samples_html="<section class=\"moj-exemplos\"><h2>Exemplos</h2>$samples_html</section>"
+fi
+
+# ----- 6. injeta os exemplos no HTML (antes de </body>) e base64 -----
+tmp_html="$(mktemp)"
+if [[ -n "$samples_html" ]] && grep -qi '</body>' "$HTML"; then
+  awk -v ex="$samples_html" 'BEGIN{IGNORECASE=1} /<\/body>/{print ex} {print}' "$HTML" > "$tmp_html"
+else
+  cat "$HTML" > "$tmp_html"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" >> "$tmp_html"
+fi
+html_b64="$(base64 -w0 < "$tmp_html")"; rm -f "$tmp_html"
+
+# ----- 7. público? (default: não tem PUBLIC=no no conf, e .moj-meta.public != false) -----
+public=true
+grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
+[[ -f "$meta" ]] && [[ "$(jq -r '.public // "unset"' "$meta" 2>/dev/null)" == "false" ]] && public=false
+
+# ----- 8. escreve (ou remove) o índice servível -----
+mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
+out_json="$(jq -cn --arg id "$ID" --arg title "$title" --argjson tl "$tl_json" \
+  --argjson tags "$tags" --arg html "$html_b64" \
+  '{id:$id, title:$title, time_limits:$tl, tags:$tags, statement_html_b64:$html}')"
+priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
+tmpj="$TREINO_JSONS/.$ID.tmp"
+printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"          # cópia sempre (p/ contests privados)
+if [[ "$public" == true ]]; then
+  cp -f "$priv" "$TREINO_JSONS/$ID.json"
+  echo "gen-problem-json: $ID publicado (title='$title', exemplos=$n)"
+else
+  rm -f "$TREINO_JSONS/$ID.json"
+  echo "gen-problem-json: $ID privado (fora do treino; cópia em jsons-private)"
+fi
