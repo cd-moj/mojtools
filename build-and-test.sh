@@ -20,6 +20,39 @@ function LOG()
   echo "$*" >&2
 }
 
+SELFDIR="$(cd "$(dirname "$0")" && pwd)"
+
+# escreve os metadados que o gen-report.sh consome (mapa VERDICT vem de
+# log.verdictall; o resto, daqui). $1 = REPORTMODE (normal|ce)
+function write_report_env()
+{
+  {
+    printf 'PROBLEM=%q\n'            "$(basename "$PROBLEMTEMPLATEDIR")"
+    printf 'LANGUAGE=%q\n'           "$LANGUAGE"
+    printf 'SRCBASENAME=%q\n'        "$(basename "$SRCCODE")"
+    printf 'TL_LANG=%q\n'            "${TL[$LANGUAGE]:-}"
+    printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
+    printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
+    printf 'CORRECT=%q\n'            "${CORRECT:-0}"
+    printf 'TOTALTESTS=%q\n'         "${TOTALTESTS:-0}"
+    printf 'TOTALTIME=%q\n'          "${TOTALTIME:-0}"
+    printf 'PROBLEMTEMPLATEDIR=%q\n' "${PROBLEMTEMPLATEDIR:-}"
+    printf 'HOSTBT=%q\n'             "${HOSTNAME:-}"
+    printf 'STARTDATE=%q\n'          "${STARTDATE:-}"
+    printf 'RUNALL=%q\n'             "${RUNALL:-}"
+    printf 'NPROCINFO=%q\n'          "${NPROC:-}"
+    printf 'REPORTMODE=%q\n'         "${1:-normal}"
+  } > "$workdirbase/report.env"
+}
+
+# gera report.org + report.html (auto-contido). Toda saída vai para o trace —
+# nunca para stdout, que carrega o contrato do veredicto lido pelo root-daemon.
+function gen_report()
+{
+  write_report_env "${1:-normal}"
+  bash "$SELFDIR/gen-report.sh" "$workdirbase" >> "$workdirbase/run-trace.log" 2>&1
+}
+
 if [[ ! -n "$3" ]]; then
   echo "$0 <LANGUAGE> <SRCFILE> <PROBLEMTEMPLATEDIR> [<RUNALL?y:n>]"
   exit 1
@@ -39,7 +72,7 @@ if [[ ! -e "$workdirbase" ]]; then
   exit 1
 fi
 
-exec 2> $workdirbase/build-and-test.log
+exec 2> $workdirbase/run-trace.log
 
 LOG "% Running: $(basename $PROBLEMTEMPLATEDIR)"
 LOG ""
@@ -48,7 +81,8 @@ LOG "  - Submission Language: $LANGUAGE"
 LOG "  - Submission SRCFILE: $(basename $SRCCODE)"
 LOG "  - Run all even on critical error: $RUNALL"
 LOG ""
-LOG "- Starting at $(date -R)"
+STARTDATE="$(date -R)"
+LOG "- Starting at $STARTDATE"
 LOG "- Running on host '$HOSTNAME'"
 LOG ""
 
@@ -148,6 +182,9 @@ if ! grep -q ^BIN= $workdirbase/compile.log.stdout || (( CAGERET != 0 )) ; then
     LOG "$(< $f)"
     LOG ""
   done
+  SMALLRESP=CE
+  FINALRESP="Compilation Error"
+  gen_report ce
   echo "Compilation Error"
   exit 1
 fi
@@ -188,12 +225,17 @@ if [[ ! -e "$LANGCOMPARE" ]]; then
 fi
 
 declare -A TL
-if [[ ! -e "$PROBLEMTEMPLATEDIR/tl" ]]; then
+# TL por host: usa tl.<hostname> se existir (calibração específica da máquina,
+# compartilhada via NFS sem replicar o pacote), senão o tl padrão do pacote.
+TLFILE="$PROBLEMTEMPLATEDIR/tl"
+[[ -e "$PROBLEMTEMPLATEDIR/tl.$HOSTNAME" ]] && TLFILE="$PROBLEMTEMPLATEDIR/tl.$HOSTNAME"
+if [[ ! -e "$TLFILE" ]]; then
   echo "Wrong package format. No TimeLimit found"
   LOG "Timelimit is not set"
   exit 3
 fi
-source $PROBLEMTEMPLATEDIR/tl
+source $TLFILE
+LOG "TL file: $(basename "$TLFILE")"
 
 [[ ! -n "${TL[$LANGUAGE]}" ]] && TL[$LANGUAGE]=${TL[default]}
 
@@ -393,6 +435,8 @@ FINALRESP="${VERDICTFULLNAME[$SMALLRESP]},$((CORRECT*100/TOTALTESTS))p"
 SUMMARY=$PROBLEMTEMPLATEDIR/scripts/summary.sh
 
 [[ -e "$SUMMARY" ]] && source $SUMMARY
+
+gen_report normal
 
 echo $FINALRESP
 exit 0
