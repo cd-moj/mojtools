@@ -1,0 +1,87 @@
+#!/bin/bash
+# gen-problem-owners.sh — índice de DONOS p/ a gestão de problemas (Meus/Compartilhados/
+# Públicos/Coleções). Varre os pacotes (autor, .moj-meta.json) + o índice servível do treino
+# (var/jsons = conjunto público, com títulos) e escreve, atômico:
+#   $CONTESTSDIR/treino/var/problem-owners.json
+#     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
+#                                          owner, collaborators[], collections[], public, html} ] }
+# Fonte da verdade de posse/compart./coleção = .moj-meta.json no pacote (migração/autoria
+# gravam). Pré-migração: owner=null e author é texto livre (o handler /problems/mine faz um
+# casamento difuso pelo nome). Não faz chamada ao Gitea (rápido; leitura de arquivos pequenos).
+set -u
+: "${MOJ_PROBLEMS_DIR:=/home/ribas/moj/moj-problems}"
+: "${CONTESTSDIR:=/home/ribas/moj/contests}"
+JD="$CONTESTSDIR/treino/var/jsons"
+OUT="$CONTESTSDIR/treino/var/problem-owners.json"
+TMP="$OUT.tmp.$$"
+
+# normaliza p/ casamento (minúsculas, sem acento, só [a-z0-9 ])
+norm(){ printf '%s' "$1" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9 ' ' ' | tr -s ' '; }
+
+# 1) títulos do conjunto público, numa passada só (id '#' -> title); chaves = problemas em treino
+declare -A TITLE PUBSET
+if [[ -d "$JD" ]]; then
+  while IFS=$'\t' read -r id t; do
+    [[ -n "$id" ]] || continue
+    TITLE["$id"]="$t"; PUBSET["$id"]=1
+  done < <(set +o noglob; jq -rn '
+      reduce inputs as $x ({}; . + {((input_filename|sub(".*/";"")|sub("\\.json$";""))): ($x.title // "")})
+      | to_entries[] | "\(.key)\t\(.value)"' "$JD"/*.json 2>/dev/null)
+fi
+
+# 2) varre os pacotes -> TSV (uma linha por problema)
+tsv="$(mktemp)"
+skip_re='^(\.|mojtools$|.*\.(tar|bz2|gz|tgz|zip)$|repositorio-template.*|trab-.*)'
+set +o noglob
+for repodir in "$MOJ_PROBLEMS_DIR"/*; do
+  [[ -d "$repodir" ]] || continue
+  repo="$(basename "$repodir")"
+  [[ "$repo" =~ $skip_re ]] && continue
+  [[ -d "$repodir/.git" || -f "$repodir/.git" ]] || [[ -d "$repodir" ]] || continue
+  for pdir in "$repodir"/*/; do
+    pdir="${pdir%/}"; prob="$(basename "$pdir")"
+    # é um problema? tem author|conf|tests|docs
+    [[ -f "$pdir/author" || -f "$pdir/conf" || -d "$pdir/tests" || -d "$pdir/docs" ]] || continue
+    id="$repo#$prob"
+    author="$(head -1 "$pdir/author" 2>/dev/null | tr -d '\t\r')"
+    # público hoje = está no índice do treino (HTML buildado + servível)
+    pub=0; [[ -n "${PUBSET[$id]:-}" ]] && pub=1
+    title="${TITLE[$id]:-}"; [[ -n "$title" ]] || title="$prob"
+    owner=""; collabs=""; colls="$repo"   # default: o repo é uma "coleção" (curso)
+    meta="$pdir/.moj-meta.json"
+    if [[ -f "$meta" ]]; then
+      read -r owner collabs mcolls mtitle mpub < <(jq -r '
+        [ (.owner // .gitea.owner // "")
+        , ((.collaborators // []) | join(","))
+        , ((.collections // []) | join(","))
+        , (.display_title // "")
+        , (if .public==true then "1" elif .public==false then "0" else "" end)
+        ] | @tsv' "$meta" 2>/dev/null)
+      [[ -n "$mcolls" ]] && colls="$mcolls"
+      [[ -n "$mtitle" ]] && title="$mtitle"
+      [[ -n "$mpub" ]] && pub="$mpub"
+    fi
+    an="$(norm "$author")"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" \
+      | tr -d '\r' >> "$tsv"
+  done
+done
+
+# 3) monta o JSON final numa passada (TSV -> JSON)
+jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" '
+  [ inputs | split("\t")
+    | { id:.[0], repo:.[1], prob:.[2], author:.[3], author_norm:.[4], title:.[5],
+        public:(.[6]=="1"), html:(.[6]=="1"),
+        owner:(if (.[7]//"")=="" then null else .[7] end),
+        collaborators:((.[8]//"")|split(",")|map(select(length>0))),
+        collections:((.[9]//"")|split(",")|map(select(length>0))) } ]
+  | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
+
+if jq -e . "$TMP" >/dev/null 2>&1; then
+  mv -f "$TMP" "$OUT"
+  echo "problem-owners: $(jq -r '.count' "$OUT") problemas -> $OUT"
+else
+  echo "!! falha ao gerar $OUT" >&2; rm -f "$TMP" "$tsv"; exit 1
+fi
+rm -f "$tsv"
