@@ -86,5 +86,7 @@ display="$(jq -r --arg p "$MOJ_STATEMENT_LANG" '.name | if type=="object" then (
 jq -n --arg t "$display" '{display_title:$t}' > "$OUT/.moj-meta.json"
 jq -n --argjson y "$y" --argjson side "$side" \
   '($side) + {uuid:($y.uuid), source:($y.source), license:($y.license), problem_type:($y.type // "pass-fail"), original_problem_yaml:$y, format:"2025-09"}' > "$OUT/.kattis.json"
+# mantém o problem.yaml original no pacote MOJ (Kattis-aware; round-trip exato)
+cp "$root/problem.yaml" "$OUT/problem.yaml" 2>/dev/null || true
 
 printf 'import: %s -> %s%s\n' "$root" "$OUT" "$([[ ${#NOTES[@]} -gt 0 ]] && printf '\n  curadoria: %s' "$(IFS='; '; echo "${NOTES[*]}")")"

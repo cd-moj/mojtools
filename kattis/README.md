@@ -25,9 +25,23 @@ Gera um pacote Kattis válido:
 Na plataforma: `GET /problems/export?id=<id>`, botão **⬇ ICPC** na gestão, e `moj export <id>`.
 Opcional: rode `verifyproblem` (problemtools) no pacote gerado p/ certificar rigor ICPC.
 
-## Import (ICPC → MOJ)  🚧 Fase 2
-`kattis/import.sh <pacote> <pkgdir>` + `validator-bridge.sh` (roda o `output_validator/` Kattis
-no juiz do MOJ via `scripts/compare.sh`).
+## Import (ICPC → MOJ)  ✅ pronto
+```bash
+bash kattis/import.sh <pacote (dir|.tar[.gz/.bz2/.zst]|.zip)> <out-pkgdir>
+```
+`problem.yaml`→`conf`+`tl` (restaura TLs por-linguagem do `.kattis.json`), `statement/`→`docs/
+enunciado`, `data/`→`tests/` (achata grupos), `submissions/`→`sols/`. O `output_validator/`
+Kattis vira `scripts/compare.sh` via `validator-bridge.sh` (mapeia exit 42/43 → 4=AC/6=WA),
+rodando no juiz do MOJ **sem mexer no `build-and-test.sh`** (validadores testlib/C++ exigem g++).
+Na plataforma: `POST /problems/import`, botão **⬆ Importar ICPC**, e `moj import <arq> <pasta>`.
+
+## Convergência (Fase 3)  ✅ tools prontas
+- `kattis/sidecar.sh <pkg> <id>` — escreve `problem.yaml`+`.kattis.json` DENTRO do pacote MOJ
+  (Kattis-aware; idempotente, uuid estável). **Chamado no create/edit/upload** → todo problema
+  novo já é um pacote Kattis válido (e o import preserva o `problem.yaml` original).
+- `kattis/normalize.sh <kattis-pkg> <viewdir>` — VIEW efêmera (symlinks) no layout MOJ de um
+  pacote **Kattis-nativo**, p/ o juiz rodar sem importar. (Próximo passo: o juiz resolver pacotes
+  Kattis-nativos via normalize; e o editor web ler/escrever o layout Kattis — incremental.)
 
 ## Não-1:1 (decisões)
 - **TL por linguagem**: o Kattis tem UM `time_limit`; o export usa o máx e preserva os
