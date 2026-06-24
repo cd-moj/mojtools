@@ -29,6 +29,8 @@ ID="${2:-$REPO#$PROB}"
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
 : "${TREINO_JSONS:=$CONTESTSDIR/treino/var/jsons}"
 : "${SAMPLE_LIMIT:=2}"                 # nº máximo de exemplos a injetar
+: "${MOJTOOLS_DIR:=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}"
+: "${MOJ_TL_STORE:=${RUNDIR:-/home/ribas/moj/run}/tl}"   # TLs reportados pelos juízes
 HOSTNAME="${HOSTNAME:-$(hostname)}"
 
 esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
@@ -61,16 +63,32 @@ tags='[]'
 [[ -f "$PKG/tags" ]] && tags="$(grep -E '^#' "$PKG/tags" 2>/dev/null | tr 'A-Z' 'a-z' \
   | jq -R . | jq -s -c '.' 2>/dev/null)"; [[ -n "$tags" ]] || tags='[]'
 
-# ----- 4. time_limits (do tl.<host> se houver, senão tl) -----
-TLFILE="$PKG/tl"; [[ -f "$PKG/tl.$HOSTNAME" ]] && TLFILE="$PKG/tl.$HOSTNAME"
+# ----- 4. time_limits -----
+# Modelo cache: os juízes calibram no cache local e REPORTAM o TL (store por host); o TL
+# servível = MÁX entre hosts p/ o checksum ATUAL do pacote. Se o pacote mudou e ninguém
+# recalibrou ainda, fica {} (o tl antigo é descartado). Fallback legado: tl.<host>/tl no
+# pacote (durante a migração / juízes que ainda escrevem no NFS).
 tl_json='{}'
-if [[ -f "$TLFILE" ]]; then
-  declare -A TL; declare -A TLMOD
-  source "$TLFILE" 2>/dev/null
-  { for k in "${!TL[@]}"; do printf '%s\t%s\n' "$k" "${TL[$k]}"; done; } \
-    | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")|{(.[0]):.[1]})|add // {}' \
-    > /tmp/.tljson.$$ 2>/dev/null && tl_json="$(cat /tmp/.tljson.$$)"; rm -f /tmp/.tljson.$$
-  unset TL TLMOD
+storef="$MOJ_TL_STORE/$ID.json"
+cur_cks="$(bash "$MOJTOOLS_DIR/tl-checksum.sh" "$PKG" 2>/dev/null)"
+if [[ -f "$storef" && -n "$cur_cks" ]]; then
+  tl_json="$(jq -c --arg cks "$cur_cks" '
+    if (.checksum // "")!=$cks or ((.hosts // {})|length)==0 then {}
+    else [ .hosts[].tl // {} ]
+         | reduce (.[]|to_entries[]) as $e ({}; .[$e.key]=([(.[$e.key]//0),($e.value|tonumber? // 0)]|max))
+         | with_entries(.value |= tostring) end
+  ' "$storef" 2>/dev/null)"; [[ -n "$tl_json" ]] || tl_json='{}'
+fi
+if [[ "$tl_json" == '{}' ]]; then
+  TLFILE="$PKG/tl"; [[ -f "$PKG/tl.$HOSTNAME" ]] && TLFILE="$PKG/tl.$HOSTNAME"
+  if [[ -f "$TLFILE" ]]; then
+    declare -A TL; declare -A TLMOD
+    source "$TLFILE" 2>/dev/null
+    { for k in "${!TL[@]}"; do printf '%s\t%s\n' "$k" "${TL[$k]}"; done; } \
+      | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")|{(.[0]):.[1]})|add // {}' \
+      > /tmp/.tljson.$$ 2>/dev/null && tl_json="$(cat /tmp/.tljson.$$)"; rm -f /tmp/.tljson.$$
+    unset TL TLMOD
+  fi
 fi
 
 # ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
