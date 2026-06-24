@@ -55,7 +55,17 @@ git_broker_commit_push(){
       commit -q --author="$login <$email>" -m "$msg" || return 3
   fi
   local branch; branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null)"; : "${branch:=master}"
-  git_broker_run "$login" "$token" "$wt" push -q origin "HEAD:$branch"
+  git_broker_run "$login" "$token" "$wt" push -q origin "HEAD:$branch" || return 4
+  git -C "$wt" rev-parse HEAD   # ecoa o SHA novo (caller usa p/ relatar)
+}
+
+# git_broker_open <login> <owner> <repo> — clona shallow num temp e ecoa o <tmpdir>
+# (worktree = <tmpdir>/wt). O chamador escreve em <tmpdir>/wt, chama git_broker_commit_push
+# e remove o <tmpdir> ao final. Permite editar vários arquivos e commitar num só commit.
+git_broker_open(){
+  local login="$1" owner="$2" repo="$3" tmp; tmp="$(mktemp -d)"
+  if git_broker_clone "$login" "$owner" "$repo" "$tmp/wt" --depth 1; then printf '%s' "$tmp"
+  else rm -rf "$tmp"; return 1; fi
 }
 
 # git_broker_sync_push <login> <owner> <repo> <srcdir> <subpath> <msg> — caso autoria web:
