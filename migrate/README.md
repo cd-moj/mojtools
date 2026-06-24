@@ -62,6 +62,18 @@ converte limpo entra no `migration-report.tsv` como `convert-failed:<fmt>(curar)
 **curadoria manual**. Esperado em `problemas-apc` (79 `.tex`) e nos `.org`. Os **exemplos** são
 sempre injetados dos testes (`tests/.../sample*`), então ficam visíveis mesmo no legado.
 
+## Aposentar o legado (depois de migrado + conferido)
+Quando um repo está no Gitea, com o `origin` repointado e o **webhook** ativo (push → reindex
+automático), o host legado vira **arquivo morto**:
+```bash
+# arquive o remoto antigo (não apague — mantenha como backup/leitura)
+git -C moj-problems/<repo> remote rename origin legado-arquivo   # se ainda apontar p/ o legado
+# no host legado (gitolite/sr.ht/gitlab): marque o repo como read-only/archived
+```
+O `--push` já cria o webhook no Gitea (`gitea_ensure_webhook`); confira em
+*Settings → Webhooks* do repo. A partir daí, editar pela web/CLI ou empurrar pro Gitea
+reindexa sozinho — o gitolite/sr.ht/gitlab não recebem mais escrita.
+
 ## Segurança / idempotência
 - DRY-RUN é o default; `--write` opera num **clone temp** (NFS intacto); reexecutar é seguro.
 - `--push` cria usuário/repo no Gitea (lazy) e faz `push -f` do clone migrado (história + commit

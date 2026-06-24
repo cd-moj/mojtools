@@ -94,6 +94,7 @@ if [[ $PUSH -eq 1 ]]; then
   command -v gitea_ensure_user >/dev/null || { say "lib/gitea.sh ausente — não dá p/ --push"; exit 1; }
   gitea_ensure_user "$OWNER" "$OWNER" "$OWNER@moj.local" || { say "falha ao criar user $OWNER"; exit 1; }
   gitea_ensure_repo "$OWNER" "$REPO" || { say "falha ao criar repo $OWNER/$REPO"; exit 1; }
+  command -v gitea_ensure_webhook >/dev/null && gitea_ensure_webhook "$OWNER" "$REPO" 2>/dev/null || true
   tok="$(gitea_ensure_user_token "$OWNER")"; [[ -n "$tok" ]] || { say "falha no token de $OWNER"; exit 1; }
   url="${GITEA_URL%/}/$OWNER/$REPO.git"; url="${url/http:\/\//http://$OWNER@}"
   br="$(git -C "$PKGROOT" symbolic-ref --short HEAD 2>/dev/null)"; : "${br:=master}"
