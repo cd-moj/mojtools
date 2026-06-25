@@ -47,6 +47,10 @@ TLHOST="$PROBLEMDIR/tl.$HOSTNAME"
 [[ -z "$CALIBRATIONTL" ]] && CALIBRATIONTL=5
 echo "TL[default]=$CALIBRATIONTL" > "$TLHOST"
 
+# coleta o report.html de cada solução (o agente sobe ao MOJ p/ o autor abrir no editor)
+CALIBREPORTS="$PROBLEMDIR/.calib-reports"; rm -rf "$CALIBREPORTS" 2>/dev/null; mkdir -p "$CALIBREPORTS" 2>/dev/null
+save_report(){ [[ -s "$1/report.html" ]] && cp "$1/report.html" "$CALIBREPORTS/$2.html" 2>/dev/null; }
+
 # find -ac solutions
 WORSTTIME=0.01
 declare -A WORSTTIMEPERLANG
@@ -88,6 +92,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   fi
   echo "Verdict: $A"
   echo
+  save_report "$T" "good-${AC##*/}"
   TOREMOVE+=" ${T}"
   exec 7<&-
   rm -f $TEMP.coprocout
@@ -148,6 +153,7 @@ for OTHERSOL in pass slow wrong; do
     echo
     read -u 7 BIGRESP
     echo "Verdict: $BIGRESP"
+    save_report "$T" "$OTHERSOL-${TLs##*/}"
     exec 7<&-
     rm -f $TEMP.coproc
     TOREMOVE+=" ${T}"
