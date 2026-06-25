@@ -486,9 +486,15 @@ LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
 FINALRESP="${VERDICTFULLNAME[$SMALLRESP]},$((CORRECT*100/TOTALTESTS))p"
 
+# Pontuação por grupos (subtasks): se o problema traz um scripts/summary.sh próprio,
+# usa o dele (compat com os problemas OBI legados); senão, se há tests/score, usa o
+# scorer canônico genérico. Qualquer um sobrescreve FINALRESP com a soma dos grupos.
 SUMMARY=$PROBLEMTEMPLATEDIR/scripts/summary.sh
-
-[[ -e "$SUMMARY" ]] && source $SUMMARY
+if [[ -e "$SUMMARY" ]]; then
+  source "$SUMMARY"
+elif [[ -e "$PROBLEMTEMPLATEDIR/tests/score" ]]; then
+  source "$SELFDIR/score-summary.sh"
+fi
 
 gen_report normal
 
