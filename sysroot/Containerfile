@@ -1,0 +1,44 @@
+# mojtools/sysroot/Containerfile — rootfs com os compiladores das linguagens aceitas pelo MOJ.
+# Construído por make-sysroot.sh (podman) e EXPORTADO p/ um diretório, usado como CAGE_ROOT na
+# jaula (cage-run.sh -R / env CAGE_ROOT). Base parametrizável (default Ubuntu 24.04).
+#
+# IMPORTANTE: a jaula roda `/usr/bin/time ... timeout ... /tmp/script` (bash) DENTRO do rootfs,
+# então `time`, `coreutils` (timeout) e `bash` são tão essenciais quanto os compiladores.
+ARG BASE=ubuntu:24.04
+FROM ${BASE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Lista de toolchains "extras" (best-effort: cada um instala se existir). Inclui nomes
+# alternativos p/ robustez entre versões. Override via --build-arg PKGS="..." (vazio = só core).
+ARG PKGS="fp-compiler mono-mcs mono-runtime gccgo gccgo-14 gccgo-13 rustc ghc nodejs ocaml-nox ocaml swi-prolog-nox swi-prolog spim"
+
+# universe ligado (muitos toolchains vivem lá) + update
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+      grep -q universe /etc/apt/sources.list.d/ubuntu.sources || \
+        sed -i '/^Components:/ s/$/ universe multiverse/' /etc/apt/sources.list.d/ubuntu.sources; \
+    else \
+      sed -i 's/\bmain\b/main universe multiverse/g' /etc/apt/sources.list 2>/dev/null || true; \
+    fi; \
+    apt-get update
+
+# CORE (precisa funcionar): runtime da jaula + C/C++ + Java + Python3 + PyPy3
+RUN set -eux; apt-get install -y --no-install-recommends \
+      time coreutils bash make ca-certificates \
+      build-essential \
+      openjdk-21-jdk-headless \
+      python3 pypy3
+
+# EXTRAS (best-effort: um pacote ausente/renomeado não derruba o build do rootfs)
+RUN set -eux; for p in ${PKGS}; do \
+      apt-get install -y --no-install-recommends "$p" || echo "WARN: pacote indisponível, pulado: $p"; \
+    done
+
+# Ajustes finais: PyPy3 como python3 padrão do juiz (precede /usr/bin no PATH; mantém o CPython
+# do sistema em /usr/bin/python3 p/ o apt). Symlinks que os run.sh esperam (prolog, gccgo).
+RUN set -eux; \
+    if [ -x /usr/bin/pypy3 ]; then ln -sf /usr/bin/pypy3 /usr/local/bin/python3; ln -sf /usr/bin/pypy3 /usr/local/bin/python; fi; \
+    if [ ! -e /usr/bin/prolog ] && [ -x /usr/bin/swipl ]; then ln -sf /usr/bin/swipl /usr/local/bin/prolog; fi; \
+    if [ ! -e /usr/bin/gccgo ]; then g="$(ls /usr/bin/gccgo-* 2>/dev/null | head -1 || true)"; [ -n "$g" ] && ln -sf "$g" /usr/local/bin/gccgo || true; fi; \
+    apt-get clean; rm -rf /var/lib/apt/lists/*; \
+    echo "moj-sysroot built" > /etc/moj-sysroot

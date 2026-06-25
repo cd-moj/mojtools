@@ -103,6 +103,11 @@ DEFAULTSHIELDCPU=3
 DEFAULTSHIELDUSER=judge
 DEFAULTMEMLIMIT=600
 
+# Raiz da jaula (default: raiz do sistema). Global via env CAGE_ROOT; o conf do problema pode
+# sobrescrever; e há override por linguagem via CAGE_ROOT_<LANG> (ex.: CAGE_ROOT_JAVA). Aponta
+# p/ um rootfs (ex.: Ubuntu 24.04 com os compiladores) p/ um toolchain reprodutível.
+: "${CAGE_ROOT:=}"
+
 #set default values
 #configurações de variáveis do ulimit
 ## stack
@@ -152,6 +157,14 @@ if [[ ! -e "$LANGCOMPILE" ]]; then
   exit 3
 fi
 
+# override de raiz da jaula por linguagem: CAGE_ROOT_<LANG> (ex.: CAGE_ROOT_PY3, CAGE_ROOT_JAVA)
+LANGUC="${LANGUAGE^^}"; LANGUC="${LANGUC//[^A-Z0-9]/_}"
+CAGEROOTVAR="CAGE_ROOT_$LANGUC"
+[[ -n "${!CAGEROOTVAR:-}" ]] && CAGE_ROOT="${!CAGEROOTVAR}"
+export CAGE_ROOT                                    # p/ os prep.sh enxergarem (ex.: pas/prep.sh)
+CAGEROOTARG=""; [[ -n "$CAGE_ROOT" ]] && CAGEROOTARG="-R $CAGE_ROOT"
+[[ -n "$CAGE_ROOT" ]] && LOG "## CAGE_ROOT=$CAGE_ROOT"
+
 EXTRABINDINGS=
 PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
 [[ -x "$PREPLANGUAGE" ]] && . $PREPLANGUAGE $workdir
@@ -164,7 +177,7 @@ fi
 
 LOG "# Compiling code"
 LOG ""
-bash cage-run.sh -w $workdir -r $LANGCOMPILE $SHIELDPARAMS $EXTRABINDINGS\
+bash cage-run.sh $CAGEROOTARG -w $workdir -r $LANGCOMPILE $SHIELDPARAMS $EXTRABINDINGS\
                     -s $workdirbase/compile.log.stderr \
                     -o $workdirbase/compile.log.stdout \
                     -t $workdirbase/compile.log.time \
@@ -260,7 +273,7 @@ function run-testinput()
 {
   local INPUT=$1
   local FILE=$(basename $INPUT)
-  bash cage-run.sh $EXTRABINDINGS -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+  bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
        -r $LANGRUN \
        -t $workdirbase/$FILE-log.timelog\
