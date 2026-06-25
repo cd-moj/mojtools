@@ -42,12 +42,10 @@ else
   LOG "# score-summary: pacote sem tests/score — considerando grupo único"
 fi
 
-# grupo EXTRA: cobre qualquer teste que não case com um grupo definido e fecha 100 pontos.
+# O VALOR do problema é a soma dos pesos dos grupos (definida pelo autor; pode passar de 100).
+# Não há grupo extra automático: todo teste precisa casar com um grupo (os exemplos entram como
+# "sample* - 0 pontos"); um teste sem grupo é erro de configuração e zera a submissão.
 EXTRAGROUP=""
-if (( TOTAL < 100 )); then
-  GROUP+=( $((100-TOTAL)) ); EXTRAGROUP=$((${#GROUP[@]}-1))
-  SOMA[$EXTRAGROUP,AC]=0; SOMA[$EXTRAGROUP,WRONG]=0
-fi
 
 declare -A VERDICT
 source "$workdirbase/log.verdictall"
@@ -87,10 +85,12 @@ if (( FAILED > 0 )); then
   for k in "${!RESPOSTASCOUNT[@]}"; do QUANT+=" $k(${RESPOSTASCOUNT[$k]})"; done
 fi
 
+# Accepted só quando NENHUM grupo falhou (todos com >=1 teste e todos AC); o valor é a soma
+# total dos pesos. Senão, soma dos pesos dos grupos 100% aceitos (pontuação parcial).
 if [[ -n "$NOGROUP" ]]; then
   FINALRESP="Wrong,0p. teste '$NOGROUP' sem grupo em tests/score"
-elif (( EARNED >= 100 )); then
-  FINALRESP="Accepted,100p. $BREAK"
+elif (( FAILED == 0 )); then
+  FINALRESP="Accepted,${TOTAL}p. $BREAK"
 else
   FINALRESP="Wrong,${EARNED}p. $BREAK$QUANT"
 fi
