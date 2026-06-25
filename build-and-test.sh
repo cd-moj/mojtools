@@ -27,8 +27,12 @@ SELFDIR="$(cd "$(dirname "$0")" && pwd)"
 function write_report_env()
 {
   {
-    printf 'PROBLEM=%q\n'            "$(basename "$PROBLEMTEMPLATEDIR")"
+    # id real do problema (no modelo cache o pacote vive em <id>/pkg, então basename="pkg";
+    # o juiz passa MOJ_PROBLEM_ID com o id correto).
+    printf 'PROBLEM=%q\n'            "${MOJ_PROBLEM_ID:-$(basename "$PROBLEMTEMPLATEDIR")}"
     printf 'LANGUAGE=%q\n'           "$LANGUAGE"
+    printf 'TOOLCHAIN_ROOT=%q\n'     "${CAGE_ROOT:-sistema do host}"
+    printf 'TOOLCHAIN_VER=%q\n'      "${TOOLCHAIN_VER:-}"
     printf 'SRCBASENAME=%q\n'        "$(basename "$SRCCODE")"
     printf 'TL_LANG=%q\n'            "${TL[$LANGUAGE]:-}"
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
@@ -51,6 +55,27 @@ function gen_report()
 {
   write_report_env "${1:-normal}"
   bash "$SELFDIR/gen-report.sh" "$workdirbase" >> "$workdirbase/run-trace.log" 2>&1
+}
+
+# coleta a VERSÃO do toolchain (compilador/interpretador) RODANDO DENTRO DA JAULA — reflete o
+# que de fato compilou/rodou (host ou rootfs via CAGE_ROOT). Só p/ submissões reais (o juiz
+# manda MOJ_PROBLEM_ID); pulado na calibração p/ não pagar uma jaula extra por solução.
+declare -A _VERCMD=(
+  [c]="gcc --version" [cpp]="g++ --version" [java]="javac -version" [py3]="python3 --version"
+  [go]="gccgo --version" [rs]="rustc --version" [hs]="ghc --version" [cs]="mcs --version"
+  [pas]="fpc -iV" [pl]="swipl --version" [js]="node --version" [ml]="ocamlopt -version"
+  [spim]="spim -version" [py2]="python --version" [sh]="bash --version" [riscv]="java -version"
+)
+collect_toolchain()
+{
+  TOOLCHAIN_VER=""
+  [[ -n "${MOJ_PROBLEM_ID:-}" ]] || return 0
+  local vc="${_VERCMD[$LANGUAGE]:-}"; [[ -n "$vc" ]] || return 0
+  local vs="$workdirbase/.ver.sh"
+  printf '#!/bin/bash\n%s 2>&1 | head -2\n' "$vc" > "$vs"; chmod +x "$vs"
+  TOOLCHAIN_VER="$(bash cage-run.sh $CAGEROOTARG -w $workdir -r "$vs" $SHIELDPARAMS $EXTRABINDINGS \
+      -s "$workdirbase/.vers" -t "$workdirbase/.vert" -T 10 -B "$workdirbase/.verb" 2>/dev/null \
+      | tr '\n' ' ' | sed 's/  */ /g')"; TOOLCHAIN_VER="${TOOLCHAIN_VER:0:250}"
 }
 
 if [[ ! -n "$3" ]]; then
@@ -129,6 +154,12 @@ ULIMITS[-u]=1024
 #check if there is conf
 [[ -e $PROBLEMTEMPLATEDIR/conf ]] && source $PROBLEMTEMPLATEDIR/conf
 
+# Limite de memória por RSS MEDIDO (MEMLIMITMB, em MB) — alternativa ao ulimit -v. Quando o
+# conf liga isso, NÃO aplicamos o limite de memória VIRTUAL (que penaliza linguagens que
+# reservam heaps enormes — JVM/Go/etc. — sem usar essa memória de fato). O veredito MLE é dado
+# comparando o pico de RSS (res %M do /usr/bin/time) com MEMLIMITMB.
+[[ -n "${MEMLIMITMB:-}" ]] && unset 'ULIMITS[-v]'
+
 LOG "## LIMITS via ulimits"
 LOG ""
 #set ulimits
@@ -174,6 +205,9 @@ PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
 if [[ "$USER" == root ]]; then
   SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
 fi
+
+collect_toolchain   # versão do compilador/interpretador na jaula (p/ o report; só submissão real)
+[[ -n "${TOOLCHAIN_VER:-}" ]] && LOG "## TOOLCHAIN: $TOOLCHAIN_VER (root=${CAGE_ROOT:-host})"
 
 LOG "# Compiling code"
 LOG ""
@@ -310,6 +344,11 @@ function run-testinput()
       ERR=7
     fi
   fi
+  # limite de memória por RSS medido (res %M) — só se MEMLIMITMB no conf e o teste rodou.
+  if [[ -n "${MEMLIMITMB:-}" && "$VERDICT" != TLE && "$VERDICT" != RE && "$VERDICT" != RE_NZEC ]]; then
+    local RSSKB=$(grep '^res' $workdirbase/$FILE-log.timelog 2>/dev/null|awk '{print $NF}')
+    if [[ "$RSSKB" =~ ^[0-9]+$ ]] && (( RSSKB > MEMLIMITMB*1024 )); then VERDICT=MLE; ERR=9; fi
+  fi
   echo "VERDICT[$FILE]=$VERDICT" >> $workdirbase/log.verdictall
   echo "$VERDICT" > $workdirbase/$FILE-log.verdict
   return $ERR
@@ -348,6 +387,7 @@ declare -A VERDICT
 
 declare -A VERDICTORDER
 VERDICTORDER[UE]=6
+VERDICTORDER[MLE]=5
 VERDICTORDER[TLE]=5
 VERDICTORDER[RE]=4
 VERDICTORDER[RE_NZEC]=4
@@ -428,6 +468,7 @@ done
 
 declare -A VERDICTFULLNAME
 VERDICTFULLNAME[UE]="Unknown ERROR"
+VERDICTFULLNAME[MLE]="Memory Limit Exceeded"
 VERDICTFULLNAME[TLE]="Time Limit Exceeded"
 VERDICTFULLNAME[RE]="Runtime Error"
 VERDICTFULLNAME[RE_NZEC]="Possible Runtime Error, non-zero return"

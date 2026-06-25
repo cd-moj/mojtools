@@ -28,14 +28,14 @@ wb="${1:?uso: gen-report.sh <workdirbase>}"
 # defaults — tolera report.env incompleto (ex.: regeneração manual)
 PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
-RUNALL="" NPROCINFO="" REPORTMODE="normal"
+RUNALL="" NPROCINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 
 declare -A VERDICT
 [[ -e "$wb/log.verdictall" ]] && source "$wb/log.verdictall"
 
 declare -A VERDICTFULLNAME=(
-  [UE]="Unknown ERROR" [TLE]="Time Limit Exceeded" [RE]="Runtime Error"
+  [UE]="Unknown ERROR" [TLE]="Time Limit Exceeded" [MLE]="Memory Limit Exceeded" [RE]="Runtime Error"
   [RE_NZEC]="Possible Runtime Error, non-zero return"
   [TMT]="Runtime Error, signaled PPDI" [WA]="Wrong Answer"
   [AC]="Accepted" [AC,PE]="Accepted (Presentation Error)"
@@ -65,14 +65,19 @@ slugify(){ printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'; }
 fullname(){ printf '%s' "${VERDICTFULLNAME[$1]:-$1}"; }
 
 vcolor(){ case "$1" in
-  AC|AC,PE) echo "#15803d";; WA) echo "#be1241";; TLE) echo "#9a6700";;
+  AC|AC,PE) echo "#15803d";; WA) echo "#be1241";; TLE) echo "#9a6700";; MLE) echo "#b45309";;
   RE|RE_NZEC|TMT) echo "#d94f9a";; CE) echo "#7a5ada";; *) echo "#94a3b8";; esac; }
 vkey(){ case "$1" in
-  AC|AC,PE) echo ac;; WA) echo wa;; TLE) echo tle;;
+  AC|AC,PE) echo ac;; WA) echo wa;; TLE|MLE) echo tle;;
   RE|RE_NZEC|TMT) echo re;; CE) echo ce;; *) echo gray;; esac; }
 
 exectime_of(){ local f="$wb/$1-log.timelog"
   [[ -s "$f" ]] && grep -m1 '^real' "$f" 2>/dev/null | awk '{print $NF}'; }
+# pico de RSS (memória residente real) em KB — res %M do /usr/bin/time. É o uso REAL de
+# memória (não o virtual reservado), melhor p/ linguagens que reservam heaps grandes.
+mem_of(){ local f="$wb/$1-log.timelog"
+  [[ -s "$f" ]] && grep -m1 '^res' "$f" 2>/dev/null | awk '{print $NF}'; }
+mem_fmt(){ awk -v k="${1:-0}" 'BEGIN{ if(k+0<=0){print "—"} else if(k+0<1024){printf "%d KB",k} else {printf "%.1f MB",k/1024} }'; }
 # largura em % do tempo relativo ao TL (entre 2 e 100); vazio -> 0
 pct_of(){ local t="$1" tl="${TL_LANG:-1}"; [[ -z "$t" ]] && { echo 0; return; }
   awk -v t="$t" -v tl="$tl" 'BEGIN{ if(tl+0<=0)tl=1; v=(t+0)/tl*100;
@@ -107,12 +112,15 @@ if (( ${#FILES[@]} == 0 )); then
   mapfile -t FILES < <(cd "$wb" && ls -1 -- *-log.verdict 2>/dev/null | sed 's/-log\.verdict$//')
 fi
 
-declare -A V T
+declare -A V T M
+PEAKMEM=0
 for f in "${FILES[@]}"; do
   v="${VERDICT[$f]:-}"
   [[ -z "$v" && -s "$wb/$f-log.verdict" ]] && v="$(<"$wb/$f-log.verdict")"
   V["$f"]="${v:-NT}"
   T["$f"]="$(exectime_of "$f")"
+  M["$f"]="$(mem_of "$f")"
+  [[ -n "${M[$f]}" ]] && (( ${M[$f]} > PEAKMEM )) && PEAKMEM="${M[$f]}"
 done
 
 # ============================================================ cabeçalho =======
@@ -192,6 +200,7 @@ if (( TOTALTESTS > 0 )); then
   raw "<span class=\"pct\">$CORRECT / $TOTALTESTS testes AC · $(( CORRECT*100/TOTALTESTS ))%</span>"
 fi
 [[ -n "$TOTALTIME" ]] && raw "<span class=\"pct\">⏱ ${TOTALTIME}s no total</span>"
+(( PEAKMEM > 0 )) && raw "<span class=\"pct\">⛁ $(mem_fmt "$PEAKMEM") de pico</span>"
 raw "</div>"$'\n'
 
 if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
@@ -297,6 +306,7 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
     raw "<summary><span class=\"badge\" style=\"background:$(vcolor "$v")\">$(escs "$v")</span> "
     raw "$(escs "$f") <span class=\"tmeta\">"
     [[ -n "$t" ]] && raw "· ${t}s / TL ${TL_LANG}s"
+    [[ -n "${M[$f]}" ]] && raw " · $(mem_fmt "${M[$f]}")"
     raw "</span></summary>"$'\n'
 
     if [[ "$v" == "NT" ]]; then
@@ -350,6 +360,7 @@ o "#+BEGIN_EXPORT html"
 raw '<table class="kv">'$'\n'
 for kv in \
   "Problema:${PROBLEM}" "Linguagem:${LANGUAGE}" "Arquivo:${SRCBASENAME}" \
+  "Toolchain:${TOOLCHAIN_VER}" "Ambiente (raiz da jaula):${TOOLCHAIN_ROOT}" \
   "Limite de tempo:${TL_LANG}s" "Veredicto final:${FINALRESP}" \
   "Rodar tudo (RUNALL):${RUNALL}" "Paralelismo:${NPROCINFO}" \
   "Host:${HOSTBT}" "Início:${STARTDATE}" "Tempo total:${TOTALTIME}s"; do
