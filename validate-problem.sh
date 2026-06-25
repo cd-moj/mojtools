@@ -59,6 +59,15 @@ else
   add html_builds 0 "sem docs/enunciado.{md,org,tex}"
 fi
 
+# --- seções esperadas no enunciado (OBRIGATÓRIAS p/ liberar): ## Entrada e ## Saída ---
+ebody=""; [[ -n "$enunf" ]] && ebody="$(cat "$enunf" 2>/dev/null)"
+if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)' <<<"$ebody"; then add secao_entrada 1; else add secao_entrada 0 "falta a seção '## Entrada'"; fi
+if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|output)' <<<"$ebody"; then add secao_saida 1; else add secao_saida 0 "falta a seção '## Saída'"; fi
+# --- aviso SOFT (não bloqueia): exemplo embutido no texto -> deve vir da lista de exemplos ---
+if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
+  render_leak="${render_leak}exemplo-no-texto? "
+fi
+
 # --- examples / tests pairing ---
 ninput=0; npair=0; unpaired=""
 if [[ -d "$PKG/tests/input" ]]; then

@@ -90,19 +90,30 @@ fi
 
 # ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
 samples_html=""
-declare -a SAMPLES
+declare -a SAMPLES NOTES
 if [[ -f "$PKG/samples" ]]; then
   mapfile -t SAMPLES < <(grep -vE '^[[:space:]]*$' "$PKG/samples")
+elif compgen -G "$PKG/tests/input/sample*" >/dev/null 2>&1; then
+  mapfile -t SAMPLES < <(cd "$PKG/tests/input" && ls -1v sample* 2>/dev/null)   # exemplos = sample* (todos)
 else
   mapfile -t SAMPLES < <(ls -1 "$PKG/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT")
 fi
-n=0
+# explicação por exemplo (na ordem dos exemplos): docs/sample-notes.json = ["nota1", "nota2", ...]
+[[ -f "$PKG/docs/sample-notes.json" ]] && mapfile -t NOTES < <(jq -r '.[]? // ""' "$PKG/docs/sample-notes.json" 2>/dev/null)
+n=0; i=0
 for s in "${SAMPLES[@]}"; do
   in="$PKG/tests/input/$s"; out="$PKG/tests/output/$s"
-  [[ -f "$out" ]] || continue
-  (( n++ )); (( n > SAMPLE_LIMIT )) && break
-  samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
-  samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre></div>"
+  if [[ -f "$in" && -f "$out" ]]; then
+    samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
+    samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre>"
+    note="${NOTES[i]:-}"
+    if [[ -n "$note" ]]; then
+      nh="$(printf '%s' "$note" | pandoc -f markdown -t html 2>/dev/null)"; [[ -n "$nh" ]] || nh="<p>$(printf '%s' "$note" | esc)</p>"
+      samples_html+="<div class=\"moj-exemplo-nota\">$nh</div>"
+    fi
+    samples_html+="</div>"; (( n++ ))
+  fi
+  (( i++ ))
 done
 if [[ -n "$samples_html" ]]; then
   samples_html="<section class=\"moj-exemplos\"><h2>Exemplos</h2>$samples_html</section>"
@@ -111,7 +122,7 @@ fi
 # ----- 6. renderiza (MESMO renderizador do "Pré-visualizar") + injeta exemplos + base64 -----
 exf="$(mktemp)"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" > "$exf"
 tmp_html="$(mktemp)"
-bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" > "$tmp_html" 2>/dev/null
+bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" "$title" > "$tmp_html" 2>/dev/null
 [[ -s "$tmp_html" ]] || { echo "gen-problem-json: render do enunciado FALHOU p/ $ID" >&2; rm -f "$exf" "$tmp_html"; exit 2; }
 html_b64="$(base64 -w0 < "$tmp_html")"; rm -f "$exf" "$tmp_html"
 
