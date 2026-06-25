@@ -257,17 +257,23 @@ if [[ -n "$CAGEROOT" ]]; then
     echo "cage-run: CAGE_ROOT inexistente ou não é diretório: $CAGEROOT" >&2
     exit 4
   fi
-  ROOTBINDS="--ro-bind $CAGEROOT / --dir /tmp --dir /var --symlink ../tmp var/tmp --proc /proc --dev /dev --dir /run/user/$(id -u)"
+  # rootfs inteiro como / (ro). Áreas graváveis via --tmpfs (o rootfs já tem /tmp,/var/tmp,
+  # /run como dirs reais e read-only sob o ro-bind; --dir/--symlink falhariam — "destination
+  # exists"). proc/dev sobrepostos.
+  ROOTBINDS="--ro-bind $CAGEROOT / --proc /proc --dev /dev --tmpfs /tmp --tmpfs /var/tmp --tmpfs /run --dir /run/user/$(id -u)"
+  # o rootfs já tem /etc/passwd+group (com nobody/65534); /etc é ro -> não sobrescreve.
+  PASSWDBINDS=""
 else
   ROOTBINDS="--ro-bind /usr /usr --dir /tmp --dir /var --ro-bind /etc/alternatives /etc/alternatives --ro-bind /etc/localtime /etc/localtime --symlink ../tmp var/tmp --proc /proc --dev /dev --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /bin /bin --ro-bind /sbin /sbin --dir /run/user/$(id -u)"
+  # raiz do host: /etc é tmpfs vazio na jaula -> injeta passwd/group (só nobody) via fd 11/12.
+  PASSWDBINDS="--file 11 /etc/passwd --file 12 /etc/group"
 fi
 
 (exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \
-  --file 11 /etc/passwd \
-  --file 12 /etc/group \
+  $PASSWDBINDS \
   --ro-bind $RUNSCRIPTFILE /tmp/script\
   --bind $TIMELOG /tmp/timelog\
   --bind $STDERRLOG /tmp/stderrlog $BWRAPPARAM\
