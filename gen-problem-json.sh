@@ -14,9 +14,9 @@
 #         <pkgdir> = .../<repo>/<problema>   (o pai é o repo, com o Makefile)
 #         <id>     = default <repo>#<problema>
 #
-# Reaproveita o Makefile do repo (make <problema>.html). INJETA os exemplos a partir
-# dos testes (tests/input|output), garantindo que fiquem sempre aparentes e batendo
-# com os testes reais. Respeita .moj-meta.json (public/display_title/id_alias).
+# Renderiza o enunciado pelo MESMO renderizador do "Pré-visualizar" (render-statement.sh,
+# pandoc standalone — sem Makefile/scaffolding do repo). INJETA os exemplos a partir dos testes
+# (tests/input|output), sempre aparentes e batendo com os testes reais. Respeita .moj-meta.json.
 set -u
 
 PKG="${1:?uso: gen-problem-json.sh <pkgdir> [id]}"
@@ -35,13 +35,10 @@ HOSTNAME="${HOSTNAME:-$(hostname)}"
 
 esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-# ----- 1. garante o HTML buildado (Makefile do repo) -----
-HTML="$REPODIR/$PROB.html"
-if [[ ! -s "$HTML" || "$PKG/docs" -nt "$HTML" ]]; then
-  ( cd "$REPODIR" && make "$PROB.html" ) >/dev/null 2>"$PKG/.genjson.makeerr" || {
-    echo "gen-problem-json: make $PROB.html FALHOU (ver $PKG/.genjson.makeerr)" >&2; exit 2; }
-fi
-[[ -s "$HTML" ]] || { echo "gen-problem-json: HTML não gerado p/ $ID" >&2; exit 2; }
+# ----- 1. detecta o enunciado + formato (o HTML é renderizado no passo 6) -----
+ENUNF=""; FMT=md
+for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && { ENUNF="$PKG/docs/enunciado.$e"; FMT="$e"; break; }; done
+[[ -n "$ENUNF" ]] || { echo "gen-problem-json: sem docs/enunciado.{md,org,tex} p/ $ID" >&2; exit 2; }
 
 # ----- 2. título -----
 title=""
@@ -111,14 +108,12 @@ if [[ -n "$samples_html" ]]; then
   samples_html="<section class=\"moj-exemplos\"><h2>Exemplos</h2>$samples_html</section>"
 fi
 
-# ----- 6. injeta os exemplos no HTML (antes de </body>) e base64 -----
+# ----- 6. renderiza (MESMO renderizador do "Pré-visualizar") + injeta exemplos + base64 -----
+exf="$(mktemp)"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" > "$exf"
 tmp_html="$(mktemp)"
-if [[ -n "$samples_html" ]] && grep -qi '</body>' "$HTML"; then
-  awk -v ex="$samples_html" 'BEGIN{IGNORECASE=1} /<\/body>/{print ex} {print}' "$HTML" > "$tmp_html"
-else
-  cat "$HTML" > "$tmp_html"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" >> "$tmp_html"
-fi
-html_b64="$(base64 -w0 < "$tmp_html")"; rm -f "$tmp_html"
+bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" > "$tmp_html" 2>/dev/null
+[[ -s "$tmp_html" ]] || { echo "gen-problem-json: render do enunciado FALHOU p/ $ID" >&2; rm -f "$exf" "$tmp_html"; exit 2; }
+html_b64="$(base64 -w0 < "$tmp_html")"; rm -f "$exf" "$tmp_html"
 
 # ----- 7. público? (default: não tem PUBLIC=no no conf, e .moj-meta.public != false) -----
 public=true

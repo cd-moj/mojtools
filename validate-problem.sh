@@ -42,15 +42,22 @@ add(){ # add <name> <ok 0|1> [detail]
 stmt=""; for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && stmt="$e" && break; done
 [[ -n "$stmt" ]] && add has_statement 1 "enunciado.$stmt" || add has_statement 0 "sem docs/enunciado.{md,org,tex}"
 
-# --- html_builds ---
-html_built=false
-err="$( cd "$REPODIR" && make -B "$PROB.html" 2>&1 >/dev/null )" && [[ -s "$REPODIR/$PROB.html" ]] \
-  && { html_built=true; add html_builds 1; } \
-  || add html_builds 0 "$(printf '%s' "$err" | tail -3 | tr '\n' ' ')"
-
-# vaza LaTeX de PROSA no HTML? (informativo — sinaliza p/ curadoria; math via mathml é OK)
-render_leak=""
-[[ "$html_built" == true ]] && render_leak="$(grep -oE '\\(textbf|textit|subsection|section|arquivoProblema|begin\{(itemize|enumerate|center)\}|emph|underline)' "$REPODIR/$PROB.html" 2>/dev/null | sort -u | tr '\n' ' ')"
+# --- html_builds (MESMO renderizador do "Pré-visualizar": render-statement.sh — pandoc
+#     standalone, sem o Makefile/scaffolding do repo; funciona p/ legados e problemas do Gitea) ---
+html_built=false; render_leak=""; enunf=""; efmt=md
+for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && { enunf="$PKG/docs/enunciado.$e"; efmt="$e"; break; }; done
+if [[ -n "$enunf" ]]; then
+  rendered="$(bash "$SELF/render-statement.sh" "$enunf" "$efmt" 2>/dev/null)"
+  if printf '%s' "$rendered" | grep -qi '</body>'; then
+    html_built=true; add html_builds 1
+    # vaza LaTeX de PROSA no HTML? (informativo — math via mathml é OK)
+    render_leak="$(printf '%s' "$rendered" | grep -oE '\\(textbf|textit|subsection|section|arquivoProblema|begin\{(itemize|enumerate|center)\}|emph|underline)' | sort -u | tr '\n' ' ')"
+  else
+    add html_builds 0 "pandoc não renderizou o enunciado ($efmt)"
+  fi
+else
+  add html_builds 0 "sem docs/enunciado.{md,org,tex}"
+fi
 
 # --- examples / tests pairing ---
 ninput=0; npair=0; unpaired=""
@@ -72,10 +79,13 @@ fi
 ngood=0; [[ -d "$PKG/sols/good" ]] && ngood="$(find "$PKG/sols/good" -maxdepth 1 -type f 2>/dev/null | wc -l)"
 (( ngood >= 1 )) && add has_good_sol 1 "$ngood" || add has_good_sol 0 "sols/good vazio"
 
-# --- good_sol_accepts (opcional; roda no juiz) ---
-gsa_ran=false
-if [[ "$VALIDATE_RUN_SOLS" != 0 ]] && command -v bwrap >/dev/null 2>&1 && (( ngood >= 1 )); then
-  gsa_ran=true; bad=""
+# --- good_sol_accepts: precisa de um SANDBOX REAL p/ rodar as soluções. Sob fbwrap (o no-op do
+#     firejail, ex.: o servidor de dev) NÃO dá p/ executar de verdade -> DEFERE p/ a calibração,
+#     que roda num juiz real e só gera TL se a good é aceita. (Evita falso "Compilation Error".) ---
+real_sandbox=false
+command -v bwrap >/dev/null 2>&1 && ! bwrap --version 2>&1 | grep -qi fbwrap && real_sandbox=true
+if [[ "$VALIDATE_RUN_SOLS" != 0 ]] && (( ngood >= 1 )) && [[ "$real_sandbox" == true ]]; then
+  bad=""
   for sol in "$PKG/sols/good/"*; do
     [[ -f "$sol" ]] || continue
     lang="${sol##*.}"
@@ -83,6 +93,8 @@ if [[ "$VALIDATE_RUN_SOLS" != 0 ]] && command -v bwrap >/dev/null 2>&1 && (( ngo
     [[ "$verdict" =~ ^Accepted ]] || bad+="$(basename "$sol"):${verdict:-?} "
   done
   [[ -z "$bad" ]] && add good_sol_accepts 1 "todas Accepted" || add good_sol_accepts 0 "$bad"
+elif (( ngood >= 1 )); then
+  add good_sol_accepts 1 "verificado na calibração (juiz)"   # sem sandbox real aqui -> defere
 fi
 
 # --- tl_present (soft: informativo) ---
