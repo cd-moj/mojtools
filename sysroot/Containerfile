@@ -12,8 +12,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 # alternativos p/ robustez entre versões. Override via --build-arg PKGS="..." (vazio = só core).
 ARG PKGS="fp-compiler mono-mcs mono-runtime gccgo gccgo-14 gccgo-13 rustc ghc nodejs ocaml-nox ocaml swi-prolog-nox swi-prolog spim"
 
-# universe ligado (muitos toolchains vivem lá) + update
+# universe ligado (muitos toolchains vivem lá) + update.
+# Rootless podman: o usuário-sandbox do apt (_apt) não consegue setgroups no userns aninhado
+# ("setgroups Operation not permitted") -> desliga o sandbox do apt (roda como root no container).
 RUN set -eux; \
+    echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/00-no-sandbox; \
     if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
       grep -q universe /etc/apt/sources.list.d/ubuntu.sources || \
         sed -i '/^Components:/ s/$/ universe multiverse/' /etc/apt/sources.list.d/ubuntu.sources; \

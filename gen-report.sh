@@ -361,12 +361,43 @@ raw '<p class="muted">Trace bruto da execução: <code>run-trace.log</code> (no 
 o "#+END_EXPORT"
 
 # =============================================================== compila =======
+# pandoc converte o .org -> .html auto-contido. O flag de "embutir recursos" mudou de nome
+# entre versões: --self-contained (<2.19) vs --embed-resources (>=2.19). Detecta p/ não
+# quebrar em pandoc antigo (ex.: 2.17 no Debian) — onde --embed-resources é "Unknown option".
+HTML_OK=0
 if command -v pandoc >/dev/null 2>&1; then
-  pandoc "$ORG" -f org -t html5 -s --toc --toc-depth=2 \
-    --embed-resources --standalone \
-    --metadata title="Report — ${PROBLEM:-?} (${LANGUAGE:-?}) — ${FINALRESP:-}" \
-    -o "$HTML" 2>> "$wb/gen-report.err" \
-    || echo "gen-report: pandoc falhou (ver $wb/gen-report.err)" >&2
-else
-  echo "gen-report: pandoc não encontrado; só o report.org foi gerado" >&2
+  EMBED=(--self-contained)
+  pandoc --help 2>/dev/null | grep -q -- '--embed-resources' && EMBED=(--embed-resources --standalone)
+  if pandoc "$ORG" -f org -t html5 -s --toc --toc-depth=2 "${EMBED[@]}" \
+       --metadata title="Report — ${PROBLEM:-?} (${LANGUAGE:-?}) — ${FINALRESP:-}" \
+       -o "$HTML" 2>> "$wb/gen-report.err" && [[ -s "$HTML" ]]; then
+    HTML_OK=1
+  else
+    echo "gen-report: pandoc falhou (ver $wb/gen-report.err); usando fallback sem pandoc" >&2
+  fi
+fi
+# Fallback (pandoc ausente OU falhou): o .org é ~todo HTML em blocos #+BEGIN_EXPORT html;
+# monta um report.html auto-contido direto, sem depender do pandoc. Garante que SEMPRE
+# exista report.html (o juiz envia este HTML ao MOJ; sem ele, não há log visível).
+if [[ "$HTML_OK" != 1 || ! -s "$HTML" ]]; then
+  {
+    printf '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+    printf '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    printf '<title>Report — %s (%s) — %s</title></head><body>\n' \
+      "${PROBLEM:-?}" "${LANGUAGE:-?}" "${FINALRESP:-}"
+    awk '
+      function flush(){ if(h!=""){ printf "<h%d id=\"%s\">%s</h%d>\n",lv,id,h,lv; h=""; id="" } }
+      /^#\+BEGIN_EXPORT html/{ flush(); x=1; next }
+      /^#\+END_EXPORT/{ x=0; next }
+      x==1{ print; next }
+      /^\*\* /{ flush(); h=substr($0,4); lv=2; next }
+      /^\* /{ flush(); h=substr($0,3); lv=1; next }
+      /^:CUSTOM_ID:/{ id=$2; next }
+      /^:PROPERTIES:|^:END:|^#\+/{ next }
+      /^[[:space:]]*$/{ next }
+      { flush(); print }
+      END{ flush() }
+    ' "$ORG"
+    printf '</body></html>\n'
+  } > "$HTML"
 fi
