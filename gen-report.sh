@@ -375,11 +375,16 @@ o "#+END_EXPORT"
 # pandoc converte o .org -> .html auto-contido. O flag de "embutir recursos" mudou de nome
 # entre versões: --self-contained (<2.19) vs --embed-resources (>=2.19). Detecta p/ não
 # quebrar em pandoc antigo (ex.: 2.17 no Debian) — onde --embed-resources é "Unknown option".
+# CSP no <head>: o report é aberto direto numa aba (p/ as âncoras funcionarem). Sem JS no
+# report (só HTML/CSS estático, conteúdo escapado) — o CSP bloqueia scripts como defesa extra.
+CSPFILE="$wb/.csp.html"
+printf '%s\n' "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:\">" > "$CSPFILE"
 HTML_OK=0
 if command -v pandoc >/dev/null 2>&1; then
   EMBED=(--self-contained)
   pandoc --help 2>/dev/null | grep -q -- '--embed-resources' && EMBED=(--embed-resources --standalone)
   if pandoc "$ORG" -f org -t html5 -s --toc --toc-depth=2 "${EMBED[@]}" \
+       --include-in-header="$CSPFILE" \
        --metadata title="Report — ${PROBLEM:-?} (${LANGUAGE:-?}) — ${FINALRESP:-}" \
        -o "$HTML" 2>> "$wb/gen-report.err" && [[ -s "$HTML" ]]; then
     HTML_OK=1
@@ -393,6 +398,7 @@ fi
 if [[ "$HTML_OK" != 1 || ! -s "$HTML" ]]; then
   {
     printf '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+    printf '%s' "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:\">"
     printf '<meta name="viewport" content="width=device-width,initial-scale=1">'
     printf '<title>Report — %s (%s) — %s</title></head><body>\n' \
       "${PROBLEM:-?}" "${LANGUAGE:-?}" "${FINALRESP:-}"
