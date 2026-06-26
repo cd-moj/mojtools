@@ -45,10 +45,21 @@ git_broker_clone(){
 
 # git_broker_commit_push <login> <owner> <repo> <worktree> <msg> [email] — commita TODO o
 # worktree como o autor (--author) e dá push p/ o branch atual. Idempotente: nada a commitar => push só.
+# _gb_ensure_lfs <worktree> : LFS por PADRÃO p/ os arquivos de teste (que costumam ser grandes).
+# Instala os filtros do LFS no worktree e garante a regra `**/tests/**` no .gitattributes — assim os
+# tests/ de cada problema vão p/ o LFS e o repo git não incha. Sem git-lfs instalado: no-op.
+_gb_ensure_lfs(){
+  local wt="$1" ga="$wt/.gitattributes"
+  command -v git-lfs >/dev/null 2>&1 || return 0
+  git -C "$wt" lfs install --local >/dev/null 2>&1 || return 0
+  grep -qsF 'tests/** filter=lfs' "$ga" 2>/dev/null \
+    || printf '%s\n' '**/tests/** filter=lfs diff=lfs merge=lfs -text' >> "$ga"
+}
 git_broker_commit_push(){
   local login="$1" owner="$2" repo="$3" wt="$4" msg="$5" email="${6:-$login@moj.local}"
   [[ -d "$wt/.git" ]] || return 2
   local token; token="$(_gb_token "$login")" || return 2; [[ -n "$token" ]] || return 2
+  _gb_ensure_lfs "$wt"   # tests/ -> LFS (padrão); cada problema migra no próximo save
   git -C "$wt" add -A
   if ! git -C "$wt" diff --cached --quiet; then
     git -C "$wt" -c "user.name=$login" -c "user.email=$email" \
