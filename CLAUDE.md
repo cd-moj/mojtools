@@ -37,3 +37,4 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 - Exemplos do enunciado vêm **sempre** de `tests/input|output/sample*` (na ordem), nunca do texto.
 - `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita.
 - `bash -n` antes de commitar. **Não commitar `lang/apl/run.sh`** (mod local pré-existente).
+- Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
