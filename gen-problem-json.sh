@@ -90,7 +90,7 @@ fi
 
 # ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
 samples_html=""
-declare -a SAMPLES NOTES
+declare -a SAMPLES
 if [[ -f "$PKG/samples" ]]; then
   mapfile -t SAMPLES < <(grep -vE '^[[:space:]]*$' "$PKG/samples")
 elif compgen -G "$PKG/tests/input/sample*" >/dev/null 2>&1; then
@@ -99,14 +99,15 @@ else
   mapfile -t SAMPLES < <(ls -1 "$PKG/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT")
 fi
 # explicação por exemplo (na ordem dos exemplos): docs/sample-notes.json = ["nota1", "nota2", ...]
-[[ -f "$PKG/docs/sample-notes.json" ]] && mapfile -t NOTES < <(jq -r '.[]? // ""' "$PKG/docs/sample-notes.json" 2>/dev/null)
+# Lidas por ÍNDICE com jq (não 'mapfile', que quebraria notas multi-linha em várias entradas).
+NOTESF="$PKG/docs/sample-notes.json"
 n=0; i=0
 for s in "${SAMPLES[@]}"; do
   in="$PKG/tests/input/$s"; out="$PKG/tests/output/$s"
   if [[ -f "$in" && -f "$out" ]]; then
     samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
     samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre>"
-    note="${NOTES[i]:-}"
+    note=""; [[ -f "$NOTESF" ]] && note="$(jq -r --argjson k "$i" '.[$k] // ""' "$NOTESF" 2>/dev/null)"
     if [[ -n "$note" ]]; then
       nh="$(printf '%s' "$note" | pandoc -f markdown -t html 2>/dev/null)"; [[ -n "$nh" ]] || nh="<p>$(printf '%s' "$note" | esc)</p>"
       samples_html+="<div class=\"moj-exemplo-nota\">$nh</div>"
