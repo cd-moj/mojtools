@@ -38,3 +38,5 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 - `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita.
 - `bash -n` antes de commitar. **Não commitar `lang/apl/run.sh`** (mod local pré-existente).
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
+- **Doc junto com o código** (doc atrasada = bug): mudou render/formato de pacote/validação/cálculo de TL?
+  atualize `cdmoj/docs/API.md` (+ `cdmoj/web/api/openapi.json` se for contrato) e os `CLAUDE.md` no mesmo commit.
