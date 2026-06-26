@@ -75,10 +75,15 @@ for pdir in "$PKGROOT"/*/; do
       if bash "$MOJTOOLS_DIR/convert-enunciado.sh" "$pdir" --write >/dev/null 2>&1; then nconv=$((nconv+1)); note="converted:$fmt"; fmt=md
       else nflag=$((nflag+1)); note="convert-failed:$fmt(curar)"; fi
     fi
-    # .moj-meta.json (dono/gitea/público/coleção/título)
-    jq -n --arg o "$OWNER" --arg r "$REPO" --argjson pub "$pub" --arg t "$(title_of "$pdir")" '
-      {owner:$o, gitea:{owner:$o, repo:$r}, public:$pub, collections:[$r],
-       display_title:$t, migrated_at:'"$EPOCHSECONDS"'}' > "$pdir/.moj-meta.json"
+    # .moj-meta.json — PRESERVA o que já existe (coleções/público/título curados NÃO somem ao re-rodar);
+    # só preenche o que falta. collections padrão = [<repo>] apenas quando ainda não há nenhuma.
+    old='{}'; [[ -f "$pdir/.moj-meta.json" ]] && old="$(cat "$pdir/.moj-meta.json" 2>/dev/null)"; [[ -n "$old" ]] || old='{}'
+    jq -n --argjson old "$old" --arg o "$OWNER" --arg r "$REPO" --argjson pub "$pub" --arg t "$(title_of "$pdir")" '
+      $old + { owner:($old.owner // $o), gitea:{owner:$o, repo:$r},
+               public:(if ($old|has("public")) then $old.public else $pub end),   # // trata false como vazio
+               collections:(if (($old.collections|type)=="array") and (($old.collections|length)>0)
+                            then $old.collections else [$r] end),
+               display_title:($old.display_title // $t), migrated_at:'"$EPOCHSECONDS"' }' > "$pdir/.moj-meta.json"
     action=written
   fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$REPO" "$prob" "$OWNER" "$pub" "$fmt" "$action" "$note" >> "$REPORT"
@@ -99,6 +104,14 @@ if [[ $PUSH -eq 1 ]]; then
   url="${GITEA_URL%/}/$OWNER/$REPO.git"; url="${url/http:\/\//http://$OWNER@}"
   br="$(git -C "$PKGROOT" symbolic-ref --short HEAD 2>/dev/null)"; : "${br:=master}"
   ( cd "$PKGROOT" && git remote remove gitea 2>/dev/null; git remote add gitea "$url" )
+  # LFS por padrão: move os arquivos de teste (grandes) p/ o LFS REESCREVENDO a história — o repo
+  # encolhe de verdade e segue versionado. Em repos grandes (1GB+) pode demorar (reescreve cada commit).
+  if command -v git-lfs >/dev/null 2>&1; then
+    if ( cd "$PKGROOT" && git lfs install --local >/dev/null 2>&1 \
+         && git lfs migrate import --yes --include='**/tests/**' --everything >/dev/null 2>&1 ); then
+      say "  tests/ -> LFS (história reescrita)"
+    else say "  (git lfs migrate falhou — push segue SEM LFS; verifique git-lfs)"; fi
+  else say "  (git-lfs ausente — push SEM LFS)"; fi
   if git_broker_run "$OWNER" "$tok" "$PKGROOT" push -f gitea "HEAD:master" >/dev/null 2>&1; then
     say "  push OK -> $OWNER/$REPO (história preservada)"
     # registra o diretório no índice de donos (p/ a UI/CLI)
