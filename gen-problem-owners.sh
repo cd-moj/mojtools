@@ -50,13 +50,16 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     owner=""; collabs=""; colls="$repo"   # default: o repo é uma "coleção" (curso)
     meta="$pdir/.moj-meta.json"
     if [[ -f "$meta" ]]; then
-      read -r owner collabs mcolls mtitle mpub < <(jq -r '
-        [ (.owner // .gitea.owner // "")
-        , ((.collaborators // []) | join(","))
-        , ((.collections // []) | join(","))
-        , (.display_title // "")
-        , (if .public==true then "1" elif .public==false then "0" else "" end)
-        ] | @tsv' "$meta" 2>/dev/null)
+      # uma LINHA por campo + mapfile: preserva os campos VAZIOS por POSIÇÃO. (read/@tsv NÃO serve:
+      # tab é caractere de espaço no IFS, então `read` colapsa campos vazios — o public(0/1) ou uma
+      # palavra do título caía em `collections`, criando coleções "estragadas" tipo "0"/"1".)
+      mapfile -t _M < <(jq -r '
+        (.owner // .gitea.owner // ""),
+        ((.collaborators // []) | join(",")),
+        ((.collections // []) | join(",")),
+        (.display_title // ""),
+        (if .public==true then "1" elif .public==false then "0" else "" end)' "$meta" 2>/dev/null)
+      owner="${_M[0]:-}"; collabs="${_M[1]:-}"; mcolls="${_M[2]:-}"; mtitle="${_M[3]:-}"; mpub="${_M[4]:-}"
       [[ -n "$mcolls" ]] && colls="$mcolls"
       [[ -n "$mtitle" ]] && title="$mtitle"
       [[ -n "$mpub" ]] && pub="$mpub"
