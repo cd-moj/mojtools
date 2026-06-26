@@ -2,11 +2,14 @@
 
 A jaula `bwrap` (`cage-run.sh`) que isola cada compilação/execução pode usar **duas raízes**:
 
-- **Raiz do sistema (default)** — como sempre: a jaula monta `/usr`, `/lib`, `/bin`, … do **host**.
-  Zero configuração, zero regressão. O conjunto de compiladores é o do host.
-- **Rootfs específico** — a jaula monta um **rootfs inteiro como `/`** (ex.: Ubuntu 24.04 com
-  todos os compiladores das linguagens aceitas). Toolchain **reprodutível e igual em todo juiz**,
-  independente do SO do host. Liga-se com a variável **`CAGE_ROOT`** (ou o flag `-R` do cage-run).
+- **Rootfs reprodutível (padrão no juiz)** — a jaula monta um **rootfs inteiro como `/`** (ex.:
+  Ubuntu 24.04 com todos os compiladores das linguagens aceitas). Toolchain **reprodutível e igual
+  em todo juiz**, independente do SO do host. O `moj-agent` já aponta **`CAGE_ROOT`** p/
+  `$MOJTOOLS_DIR/sysroot/rootfs` e o **provisiona na 1ª vez** (`make-sysroot.sh`); também dá p/ ligar
+  pelo flag `-R` do cage-run.
+- **Raiz do sistema (host) — opt-out** — a jaula monta `/usr`, `/lib`, `/bin`, … do **host**. O
+  toolchain é o do host (não reprodutível); use só p/ depurar ou onde não dá p/ construir o rootfs.
+  No juiz: `CAGE_ROOT=host`. (`cage-run.sh` puro, sem o agente, ainda usa o host com `CAGE_ROOT` vazio.)
 
 Só o **userland** (`/usr`,`/lib`,`/etc/…`,compiladores) vem da raiz escolhida; o **IO** (submissão,
 testes, script, logs) e os mounts dinâmicos (`/proc`,`/dev`,`/tmp`,`/var`,`/run`) são sempre
@@ -16,13 +19,16 @@ sobrepostos do host. ulimits/shield/uid 65534/`--unshare-all`/verdito: inalterad
 
 | Onde | Como | Efeito |
 |---|---|---|
-| Global do juiz | `CAGE_ROOT=/srv/moj-sysroot` no `agent.env` (ou ambiente) | toda jaula usa o rootfs |
+| Global do juiz (**padrão**) | nada — o `moj-agent` usa `$MOJTOOLS_DIR/sysroot/rootfs` e o constrói na 1ª vez | toda jaula usa o rootfs |
+| Forçar o host (opt-out) | `CAGE_ROOT=host` no `agent.env` | toda jaula usa o toolchain do host |
+| Caminho fixo do rootfs | `CAGE_ROOT=/srv/moj-sysroot` no `agent.env` | aponta p/ um rootfs já pronto |
 | Por linguagem | `CAGE_ROOT_<LANG>=…` (ex.: `CAGE_ROOT_JAVA`, `CAGE_ROOT_PY3`) | sobrescreve só aquela linguagem |
 | Por problema | `CAGE_ROOT=…` no `conf` do problema | sobrescreve só aquele problema |
 | Manual | `cage-run.sh -R /srv/moj-sysroot …` | uso direto/avulso |
 
 Precedência (em `build-and-test.sh`): `CAGE_ROOT_<LANG>` > `conf` do problema > `CAGE_ROOT` global
-> (vazio = raiz do host). Vazio em qualquer ponto = comportamento atual.
+> (vazio = raiz do host). No **juiz**, o `moj-agent` (`ensure_rootfs`) já define `CAGE_ROOT` = rootfs
+por padrão e o provisiona; `CAGE_ROOT=host` força o host. Fora do agente, vazio = host (inalterado).
 
 ## Construir o rootfs (`make-sysroot.sh`)
 
