@@ -5,9 +5,9 @@
 #   $CONTESTSDIR/treino/var/problem-owners.json
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
 #                                          owner, collaborators[], collections[], public, html} ] }
-# Fonte da verdade de posse/compart./coleção = .moj-meta.json no pacote (migração/autoria
-# gravam). Pré-migração: owner=null e author é texto livre (o handler /problems/mine faz um
-# casamento difuso pelo nome). Não faz chamada ao Gitea (rápido; leitura de arquivos pequenos).
+# Fonte da verdade de posse/compart./coleção = .moj-meta.json no pacote + registro de donos.
+# Gitea é a FONTE ÚNICA: problemas SEM dono (legado pré-migração) são IGNORADOS no índice.
+# Não chama o Gitea (rápido; leitura de arquivos pequenos do cache de pacotes).
 set -u
 : "${MOJ_PROBLEMS_DIR:=/home/ribas/moj/moj-problems}"
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
@@ -82,7 +82,8 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         public:(.[6]=="1"), html:(.[6]=="1"),
         owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
         collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
-        collections:((.[9]//"")|split(",")|map(select(length>0))) } ]
+        collections:((.[9]//"")|split(",")|map(select(length>0))) }
+    | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 
 if jq -e . "$TMP" >/dev/null 2>&1; then
