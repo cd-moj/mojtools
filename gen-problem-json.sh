@@ -125,7 +125,9 @@ exf="$(mktemp)"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" > "$exf
 tmp_html="$(mktemp)"
 bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" "$title" > "$tmp_html" 2>/dev/null
 [[ -s "$tmp_html" ]] || { echo "gen-problem-json: render do enunciado FALHOU p/ $ID" >&2; rm -f "$exf" "$tmp_html"; exit 2; }
-html_b64="$(base64 -w0 < "$tmp_html")"; rm -f "$exf" "$tmp_html"
+# b64 do HTML em ARQUIVO (entra no jq por --rawfile): statement grande estourava o ARG_MAX no
+# --arg -> jq falhava -> json VAZIO -> o problema sumia do treino (jq -s pula arquivo vazio).
+b64f="$(mktemp)"; base64 -w0 < "$tmp_html" | tr -d '\n' > "$b64f"; rm -f "$exf" "$tmp_html"
 
 # ----- 7. público? (default: não tem PUBLIC=no no conf, e .moj-meta.public != false) -----
 public=true
@@ -135,8 +137,9 @@ grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
 # ----- 8. escreve (ou remove) o índice servível -----
 mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --argjson tl "$tl_json" \
-  --argjson tags "$tags" --arg html "$html_b64" \
+  --argjson tags "$tags" --rawfile html "$b64f" \
   '{id:$id, title:$title, time_limits:$tl, tags:$tags, statement_html_b64:$html}')"
+rm -f "$b64f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$TREINO_JSONS/.$ID.tmp"
 printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"          # cópia sempre (p/ contests privados)
