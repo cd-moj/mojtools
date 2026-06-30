@@ -8,7 +8,7 @@
 
 # gen-problem-json.sh — gera o índice servível do treino a partir de um pacote de
 # problema: contests/treino/var/jsons/<id>.json = {id,title,time_limits,tags,
-# statement_html_b64}. Fecha o passo que faltava (o synctreino só fazia git pull + make).
+# statement_html_b64,author}. Fecha o passo que faltava (o synctreino só fazia git pull + make).
 #
 #   uso:  gen-problem-json.sh <pkgdir> [<id>]
 #         <pkgdir> = .../<repo>/<problema>   (o pai é o repo, com o Makefile)
@@ -59,6 +59,11 @@ dt=""; [[ -f "$meta" ]] && dt="$(jq -r '.display_title // empty' "$meta" 2>/dev/
 tags='[]'
 [[ -f "$PKG/tags" ]] && tags="$(grep -E '^#' "$PKG/tags" 2>/dev/null | tr 'A-Z' 'a-z' \
   | jq -R . | jq -s -c '.' 2>/dev/null)"; [[ -n "$tags" ]] || tags='[]'
+
+# ----- 3b. autor (atribuição; pode ter vários, 1 por linha; texto livre — exibido verbatim) -----
+# NÃO dividir por vírgula: ela já aparece DENTRO da linha ("adaptado por…", "Nome, versão…").
+author=""
+[[ -f "$PKG/author" ]] && author="$(grep -vE '^[[:space:]]*$' "$PKG/author" | paste -sd', ' -)"
 
 # ----- 4. time_limits -----
 # Modelo cache: os juízes calibram no cache local e REPORTAM o TL (store por host); o TL
@@ -136,9 +141,9 @@ grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
 
 # ----- 8. escreve (ou remove) o índice servível -----
 mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
-out_json="$(jq -cn --arg id "$ID" --arg title "$title" --argjson tl "$tl_json" \
+out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --rawfile html "$b64f" \
-  '{id:$id, title:$title, time_limits:$tl, tags:$tags, statement_html_b64:$html}')"
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, statement_html_b64:$html}')"
 rm -f "$b64f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$TREINO_JSONS/.$ID.tmp"

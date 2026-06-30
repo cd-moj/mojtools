@@ -19,8 +19,9 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   enunciado (pandoc standalone, `--mathml --embed-resources`). **= o "Pré-visualizar" do editor
   = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado.
 - `gen-problem-json.sh <pkg> [id]` — gera o índice servível do treino
-  (`contests/treino/var/jsons/<id>.json`): título + TL + tags + HTML (via render-statement) +
-  exemplos (de `tests/*`, ordem `sample*`) + explicações (`docs/sample-notes.json`).
+  (`contests/treino/var/jsons/<id>.json`): título + autor (arquivo `author`, verbatim) + TL +
+  tags + HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
+  (`docs/sample-notes.json`).
   **Ignora `docs/solucao.md`** (editorial não vai ao aluno).
 - `validate-problem.sh <pkg> [id]` — **portão de qualidade** (relatório em
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
