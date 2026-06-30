@@ -11,7 +11,13 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   rootfs via `CAGE_ROOT`. `make-sysroot.sh` monta um rootfs Ubuntu com os compiladores. O
   default de `python3` é **PyPy3**.
 - `build-and-test.sh <lang> <sol> <pkg> [y]` — compila + roda contra os testes; o veredicto é a
-  **última linha** da saída. Usa `lang/<lang>/run.sh` (um por linguagem, mesmo contrato).
+  **última linha** da saída (`FINALRESP`, ex.: `Accepted,100p` — nome + score embutido). Usa
+  `lang/<lang>/run.sh` (um por linguagem, mesmo contrato). Além do stdout, grava `report.env`
+  (`KEY=%q`, lido por `gen-report.sh` e pelos backends de juiz) com o veredicto **estruturado**:
+  `SMALLRESP` (código curto), `FINALRESP` (display c/ score), **`VERDICT_CANON`** (nome canônico
+  **limpo**, sem score — `Accepted`/`Wrong Answer`/… — p/ o backend casar o auto-veredicto),
+  **`SCORE`/`SCORE_MAX`/`SCORE_KIND`** (`tests`=% de testes, `points`=soma de grupos) e
+  `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout **não muda** (compat).
 - `gen-report.sh` — gera o `report.html` por submissão.
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** e reporta
   (`ensure_cached <id> [force] [full]`; `full` roda todas as soluções).

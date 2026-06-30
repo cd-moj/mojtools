@@ -37,6 +37,11 @@ function write_report_env()
     printf 'TL_LANG=%q\n'            "${TL[$LANGUAGE]:-}"
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
     printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
+    # veredicto CANÔNICO limpo (sem score) + score estruturado, p/ o backend casar/montar strings
+    printf 'VERDICT_CANON=%q\n'      "${VERDICT_CANON:-}"
+    printf 'SCORE=%q\n'              "${SCORE:-0}"
+    printf 'SCORE_MAX=%q\n'          "${SCORE_MAX:-100}"
+    printf 'SCORE_KIND=%q\n'         "${SCORE_KIND:-tests}"
     printf 'CORRECT=%q\n'            "${CORRECT:-0}"
     printf 'TOTALTESTS=%q\n'         "${TOTALTESTS:-0}"
     printf 'TOTALTIME=%q\n'          "${TOTALTIME:-0}"
@@ -231,6 +236,7 @@ if ! grep -q ^BIN= $workdirbase/compile.log.stdout || (( CAGERET != 0 )) ; then
   done
   SMALLRESP=CE
   FINALRESP="Compilation Error"
+  VERDICT_CANON="Compilation Error"; SCORE=0; SCORE_MAX=100; SCORE_KIND=tests
   gen_report ce
   echo "Compilation Error"
   exit 1
@@ -485,6 +491,15 @@ LOG "  - $SMALLRESP - ${VERDICTFULLNAME[$SMALLRESP]}"
 LOG "  - $CORRECT correct in $TOTALTESTS , $((CORRECT*100/TOTALTESTS))%"
 
 FINALRESP="${VERDICTFULLNAME[$SMALLRESP]},$((CORRECT*100/TOTALTESTS))p"
+
+# Veredicto CANÔNICO (sem score) + score estruturado, p/ o backend casar o auto-veredicto e o
+# treino montar o resumo. O mapa colapsa variações de erro nos rótulos do vocabulário oficial.
+declare -A VERDICTCANON=(
+  [AC]="Accepted" [AC,PE]="Accepted" [WA]="Wrong Answer" [TLE]="Time Limit Exceeded"
+  [MLE]="Memory Limit Exceeded" [RE]="Runtime Error" [RE_NZEC]="Runtime Error"
+  [TMT]="Runtime Error" [UE]="Runtime Error" [CE]="Compilation Error" )
+VERDICT_CANON="${VERDICTCANON[$SMALLRESP]:-${VERDICTFULLNAME[$SMALLRESP]}}"
+SCORE=$(( TOTALTESTS>0 ? CORRECT*100/TOTALTESTS : 0 )); SCORE_MAX=100; SCORE_KIND=tests
 
 # Pontuação por grupos (subtasks): se o problema traz um scripts/summary.sh próprio,
 # usa o dele (compat com os problemas OBI legados); senão, se há tests/score, usa o

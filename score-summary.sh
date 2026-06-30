@@ -87,12 +87,17 @@ fi
 
 # Accepted só quando NENHUM grupo falhou (todos com >=1 teste e todos AC); o valor é a soma
 # total dos pesos. Senão, soma dos pesos dos grupos 100% aceitos (pontuação parcial).
+# score estruturado por pontos (subtask): o backend casa pelo VERDICT_CANON e o treino mostra E/T pontos
+SCORE_KIND=points; SCORE_MAX=$TOTAL
 if [[ -n "$NOGROUP" ]]; then
   FINALRESP="Wrong,0p. teste '$NOGROUP' sem grupo em tests/score"
+  VERDICT_CANON="Wrong Answer"; SCORE=0
 elif (( FAILED == 0 )); then
   FINALRESP="Accepted,${TOTAL}p. $BREAK"
+  VERDICT_CANON="Accepted"; SCORE=$TOTAL
 else
   FINALRESP="Wrong,${EARNED}p. $BREAK$QUANT"
+  VERDICT_CANON="Wrong Answer"; SCORE=$EARNED
 fi
 LOG ""
 LOG "- score-summary FINALRESP: $FINALRESP"
