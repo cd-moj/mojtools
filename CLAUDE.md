@@ -47,3 +47,7 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
 - **Doc junto com o código** (doc atrasada = bug): mudou render/formato de pacote/validação/cálculo de TL?
   atualize `cdmoj/docs/API.md` (+ `cdmoj/web/api/openapi.json` se for contrato) e os `CLAUDE.md` no mesmo commit.
+  **Formato do pacote** é descrito em 4 lugares (repos diferentes) que têm de ficar em sincronia:
+  `cdmoj/docs/API.md`, `cdmoj/CLAUDE.md` ("Pacote canônico"), `moj-cli/README.md` ("Pacote do problema") e
+  este arquivo. Lembre: o **título** vem do campo `display_title` (o `% Título` do enunciado é legado — o
+  `render-statement.sh` o remove e injeta o `<h1>` a partir do campo).
