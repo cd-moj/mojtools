@@ -7,7 +7,7 @@
 #version. See <http://www.gnu.org/licenses/>.
 
 # gen-problem-json.sh — gera o índice servível do treino a partir de um pacote de
-# problema: contests/treino/var/jsons/<id>.json = {id,title,time_limits,tags,
+# problema: contests/treino/var/jsons/<id>.json = {id,title,time_limits,tags,collections,
 # statement_html_b64,author}. Fecha o passo que faltava (o synctreino só fazia git pull + make).
 #
 #   uso:  gen-problem-json.sh <pkgdir> [<id>]
@@ -54,6 +54,11 @@ meta="$PKG/.moj-meta.json"
 dt=""; [[ -f "$meta" ]] && dt="$(jq -r '.display_title // empty' "$meta" 2>/dev/null)"
 [[ -n "$dt" ]] && title="$dt"
 [[ -n "$title" ]] || title="$PROB"
+
+# ----- 2b. coleções (do .moj-meta.json; um problema pode estar em várias) -----
+# Verbatim do meta (como o editor via read_problem_source); sem inventar default de nome-de-repo.
+colls='[]'
+[[ -f "$meta" ]] && colls="$(jq -c '(.collections // [])' "$meta" 2>/dev/null)"; [[ -n "$colls" ]] || colls='[]'
 
 # ----- 3. tags (linhas começando com #, minúsculas) -----
 tags='[]'
@@ -142,8 +147,8 @@ grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
 # ----- 8. escreve (ou remove) o índice servível -----
 mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
-  --argjson tags "$tags" --rawfile html "$b64f" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, statement_html_b64:$html}')"
+  --argjson tags "$tags" --argjson colls "$colls" --rawfile html "$b64f" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, statement_html_b64:$html}')"
 rm -f "$b64f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$TREINO_JSONS/.$ID.tmp"

@@ -26,7 +26,8 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado.
 - `gen-problem-json.sh <pkg> [id]` — gera o índice servível do treino
   (`contests/treino/var/jsons/<id>.json`): título + autor (arquivo `author`, verbatim) + TL +
-  tags + HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
+  tags + **coleções** (`.moj-meta.json` `collections`, verbatim — um problema pode estar em várias) +
+  HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
   (`docs/sample-notes.json`).
   **Ignora `docs/solucao.md`** (editorial não vai ao aluno).
 - `validate-problem.sh <pkg> [id]` — **portão de qualidade** (relatório em
