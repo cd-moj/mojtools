@@ -35,13 +35,16 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
 - `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. `git-broker.sh` —
-  commit/push no Gitea (token efêmero via `GIT_ASKPASS`). O **clone usa `GIT_LFS_SKIP_SMUDGE=1`**:
-  os write-ops (set-public/edit/tags/collections/upload/delete/import) só mexem em metadados ou
-  ADICIONAM arquivos — nenhum lê o CONTEÚDO de `tests/` do clone, então baixar os blobs LFS só serviria
-  p/ travar. O `commit_push` continua fazendo LFS-track (`_gb_ensure_lfs`) e o pre-push envia os objetos
-  NOVOS. Sem isso, `git-lfs filter-process` trava/serializa no clone e um lote (ex.: script martelando
-  `set-public`) exauria os workers do fcgiwrap → **502 em toda a API**. Se algum dia um write-op
-  precisar do conteúdo de `tests/`, buscar sob demanda (`git lfs pull -I …`), não re-smudgear tudo.
+  commit/push no Gitea (token efêmero via `GIT_ASKPASS`). **LFS por caminho:** o `git_broker_clone`
+  "pelado" faz **smudge completo** (baixa os blobs de `tests/`) porque `ensure_repo_materialized`
+  (cdmoj `lib/problems.sh`) o usa p/ servir o **pacote ao juiz/treino** — o juiz PRECISA dos arquivos
+  de teste p/ calibrar/rodar. Já os **write-ops** (`git_broker_open`/`git_broker_sync_push`, usados por
+  set-public/edit/tags/collections/upload/delete/import) exportam **`GIT_LFS_SKIP_SMUDGE=1`** no clone
+  (só mexem em metadados ou substituem arquivos; não leem `tests/` do clone) → clone ~1 s em vez de
+  travar. Sem esse skip, `git-lfs filter-process` serializa/trava e um lote (ex.: script martelando
+  set-public) exauria os workers do fcgiwrap → **502 em toda a API**. O `commit_push` sempre faz
+  LFS-track (`_gb_ensure_lfs`) + pre-push dos objetos novos. NUNCA por o skip no clone pelado (quebra o
+  pacote servido ao juiz → sem TL).
   `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode passar de 100).
 
 ## Regras

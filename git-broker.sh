@@ -38,12 +38,11 @@ git_broker_clone(){
   local url; url="$(_gb_repo_url "$owner" "$repo")"
   url="${url/http:\/\//http://$login@}"; url="${url/https:\/\//https://$login@}"
   local ap; ap="$(mktemp)"; printf '#!/bin/sh\nprintf %%s "$MOJ_GIT_TOKEN"\n' > "$ap"; chmod 700 "$ap"
-  # GIT_LFS_SKIP_SMUDGE=1: NÃO baixa os blobs LFS (tests/, grandes) no clone. Os write-ops
-  # (set-public/edit/tags/collections/upload/delete/…) só mexem em metadados ou ADICIONAM arquivos —
-  # nenhum lê o CONTEÚDO de tests/ do clone; o commit_push ainda faz LFS-track e o pre-push envia os
-  # objetos NOVOS. Sem isto, `git-lfs filter-process` trava/serializa no clone e, sob lote (ex.: script
-  # martelando set-public), exaure os workers do fcgiwrap → 502 em toda a API.
-  MOJ_GIT_TOKEN="$token" GIT_ASKPASS="$ap" GIT_TERMINAL_PROMPT=0 GIT_LFS_SKIP_SMUDGE=1 \
+  # LFS: por PADRÃO faz smudge completo (baixa os blobs de tests/) — ensure_repo_materialized
+  # depende disso para servir o PACOTE ao juiz/treino (o juiz precisa dos arquivos de teste p/
+  # calibrar/rodar). Os WRITE-ops (git_broker_open/sync_push) exportam GIT_LFS_SKIP_SMUDGE=1 p/ pular
+  # o smudge (só mexem em metadados ou substituem arquivos) e não travar em lote — git respeita o env.
+  MOJ_GIT_TOKEN="$token" GIT_ASKPASS="$ap" GIT_TERMINAL_PROMPT=0 \
     git -c credential.helper= clone -q "$@" "$url" "$dest"
   local rc=$?; rm -f "$ap"; return $rc
 }
@@ -80,7 +79,9 @@ git_broker_commit_push(){
 # e remove o <tmpdir> ao final. Permite editar vários arquivos e commitar num só commit.
 git_broker_open(){
   local login="$1" owner="$2" repo="$3" tmp; tmp="$(mktemp -d)"
-  if git_broker_clone "$login" "$owner" "$repo" "$tmp/wt" --depth 1; then printf '%s' "$tmp"
+  # write-op: pula o smudge LFS (só edita metadados/ADICIONA; não lê o conteúdo de tests/ do clone).
+  # Subshell + export: o git-clone-neto herda o env; sem vazar p/ o resto do handler.
+  if ( export GIT_LFS_SKIP_SMUDGE=1; git_broker_clone "$login" "$owner" "$repo" "$tmp/wt" --depth 1 ); then printf '%s' "$tmp"
   else rm -rf "$tmp"; return 1; fi
 }
 
@@ -92,7 +93,8 @@ git_broker_sync_push(){
   [[ -d "$src" ]] || return 2
   local tmp; tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
-  git_broker_clone "$login" "$owner" "$repo" "$tmp/wt" --depth 1 || return 4
+  # write-op: o pacote é substituído por rsync abaixo; pular smudge (rápido, sem travar em lote).
+  ( export GIT_LFS_SKIP_SMUDGE=1; git_broker_clone "$login" "$owner" "$repo" "$tmp/wt" --depth 1 ) || return 4
   local target="$tmp/wt${sub:+/$sub}"
   mkdir -p "$target"
   # espelha o pacote (remove o que sumiu), preservando o .git do worktree
