@@ -38,7 +38,12 @@ git_broker_clone(){
   local url; url="$(_gb_repo_url "$owner" "$repo")"
   url="${url/http:\/\//http://$login@}"; url="${url/https:\/\//https://$login@}"
   local ap; ap="$(mktemp)"; printf '#!/bin/sh\nprintf %%s "$MOJ_GIT_TOKEN"\n' > "$ap"; chmod 700 "$ap"
-  MOJ_GIT_TOKEN="$token" GIT_ASKPASS="$ap" GIT_TERMINAL_PROMPT=0 \
+  # GIT_LFS_SKIP_SMUDGE=1: NÃO baixa os blobs LFS (tests/, grandes) no clone. Os write-ops
+  # (set-public/edit/tags/collections/upload/delete/…) só mexem em metadados ou ADICIONAM arquivos —
+  # nenhum lê o CONTEÚDO de tests/ do clone; o commit_push ainda faz LFS-track e o pre-push envia os
+  # objetos NOVOS. Sem isto, `git-lfs filter-process` trava/serializa no clone e, sob lote (ex.: script
+  # martelando set-public), exaure os workers do fcgiwrap → 502 em toda a API.
+  MOJ_GIT_TOKEN="$token" GIT_ASKPASS="$ap" GIT_TERMINAL_PROMPT=0 GIT_LFS_SKIP_SMUDGE=1 \
     git -c credential.helper= clone -q "$@" "$url" "$dest"
   local rc=$?; rm -f "$ap"; return $rc
 }

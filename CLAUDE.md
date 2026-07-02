@@ -35,8 +35,14 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
 - `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. `git-broker.sh` —
-  commit/push no Gitea (token efêmero via `GIT_ASKPASS`). `score-summary.sh` — pontuação por
-  grupos (o valor do problema é a **soma dos pesos**; pode passar de 100).
+  commit/push no Gitea (token efêmero via `GIT_ASKPASS`). O **clone usa `GIT_LFS_SKIP_SMUDGE=1`**:
+  os write-ops (set-public/edit/tags/collections/upload/delete/import) só mexem em metadados ou
+  ADICIONAM arquivos — nenhum lê o CONTEÚDO de `tests/` do clone, então baixar os blobs LFS só serviria
+  p/ travar. O `commit_push` continua fazendo LFS-track (`_gb_ensure_lfs`) e o pre-push envia os objetos
+  NOVOS. Sem isso, `git-lfs filter-process` trava/serializa no clone e um lote (ex.: script martelando
+  `set-public`) exauria os workers do fcgiwrap → **502 em toda a API**. Se algum dia um write-op
+  precisar do conteúdo de `tests/`, buscar sob demanda (`git lfs pull -I …`), não re-smudgear tudo.
+  `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode passar de 100).
 
 ## Regras
 
