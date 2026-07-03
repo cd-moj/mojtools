@@ -4,13 +4,20 @@
 # (var/jsons = conjunto público, com títulos) e escreve, atômico:
 #   $CONTESTSDIR/treino/var/problem-owners.json
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
-#                                          owner, collaborators[], collections[], public, html} ] }
+#                                          owner, collaborators[], collections[], public, html,
+#                                          tl_checksum, public_at} ] }
+# public_at = epoch da 1ª publicação (meta.public_at // seed do backfill); null se privado/desconhecido.
+# tl_checksum = checksum do pacote (tl-checksum.sh) SÓ p/ problemas já calibrados (têm
+# run/tl/<id>.json); a gestão o compara com o checksum calibrado em run/tl p/ marcar "precisa
+# recalibrar". "" = não calibrado (staleness não se aplica) ou ainda não carimbado.
 # Fonte da verdade de posse/compart./coleção = .moj-meta.json no pacote + registro de donos.
 # Gitea é a FONTE ÚNICA: problemas SEM dono (legado pré-migração) são IGNORADOS no índice.
 # Não chama o Gitea (rápido; leitura de arquivos pequenos do cache de pacotes).
 set -u
 : "${MOJ_PROBLEMS_DIR:=/home/ribas/moj/moj-problems}"
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
+: "${RUNDIR:=/home/ribas/moj/run}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"   # p/ achar tl-checksum.sh (irmão)
 JD="$CONTESTSDIR/treino/var/jsons"
 OUT="$CONTESTSDIR/treino/var/problem-owners.json"
 TMP="$OUT.tmp.$$"
@@ -31,6 +38,26 @@ fi
 
 # 2) varre os pacotes -> TSV (uma linha por problema)
 tsv="$(mktemp)"
+# cache de tl_checksum p/ NÃO re-hashear pacote sem commit: id -> {head(commit do repo), cks}.
+# Repo sem commit desde o último carimbo => reusa o checksum (regen em regime fica barato: só
+# stat/git-rev-parse, sem LER o conteúdo dos testes — o custo O(bytes) só volta quando o repo muda).
+# Repo sem git (head vazio) sempre recomputa. Auto-poda: grava só entradas calibradas desta passada.
+CKSCACHE="$CONTESTSDIR/treino/var/tl-checksum-cache.json"
+declare -A CKS_HEAD CKS_CKS
+if [[ -f "$CKSCACHE" ]]; then
+  while IFS=$'\t' read -r _cid _chead _ccks; do
+    [[ -n "$_cid" ]] && { CKS_HEAD["$_cid"]="$_chead"; CKS_CKS["$_cid"]="$_ccks"; }
+  done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.head // "")\t\(.value.cks // "")"' "$CKSCACHE" 2>/dev/null)
+fi
+newcache="$(mktemp)"
+# seed lateral de public_at p/ o histórico (backfill; a migração não gravou a data). meta.public_at
+# (Gitea, daqui pra frente) tem prioridade; o seed cobre os antigos. Ver server/bin/backfill-public-at.sh.
+PUBSEED_F="$CONTESTSDIR/treino/var/public-at-seed.json"
+declare -A PUBSEED
+if [[ -f "$PUBSEED_F" ]]; then
+  while IFS=$'\t' read -r _pid _pat; do [[ -n "$_pid" ]] && PUBSEED["$_pid"]="$_pat"; done \
+    < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$PUBSEED_F" 2>/dev/null)
+fi
 skip_re='^(\.|mojtools$|.*\.(tar|bz2|gz|tgz|zip)$|repositorio-template.*|trab-.*)'
 set +o noglob
 for repodir in "$MOJ_PROBLEMS_DIR"/*; do
@@ -38,6 +65,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
   repo="$(basename "$repodir")"
   [[ "$repo" =~ $skip_re ]] && continue
   [[ -d "$repodir/.git" || -f "$repodir/.git" ]] || [[ -d "$repodir" ]] || continue
+  rhead="$(git -C "$repodir" rev-parse HEAD 2>/dev/null)"   # 1x por repo; assina o cache do checksum
   for pdir in "$repodir"/*/; do
     pdir="${pdir%/}"; prob="$(basename "$pdir")"
     # é um problema? tem author|conf|tests|docs
@@ -47,7 +75,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # público hoje = está no índice do treino (HTML buildado + servível)
     pub=0; [[ -n "${PUBSET[$id]:-}" ]] && pub=1
     title="${TITLE[$id]:-}"; [[ -n "$title" ]] || title="$prob"
-    owner=""; collabs=""; colls="$repo"   # default: o repo é uma "coleção" (curso)
+    owner=""; collabs=""; colls="$repo"; mpat=""   # default: o repo é uma "coleção" (curso)
     meta="$pdir/.moj-meta.json"
     if [[ -f "$meta" ]]; then
       # uma LINHA por campo + mapfile: preserva os campos VAZIOS por POSIÇÃO. (read/@tsv NÃO serve:
@@ -58,18 +86,38 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
         ((.collaborators // []) | join(",")),
         ((.collections // []) | join(",")),
         (.display_title // ""),
-        (if .public==true then "1" elif .public==false then "0" else "" end)' "$meta" 2>/dev/null)
-      owner="${_M[0]:-}"; collabs="${_M[1]:-}"; mcolls="${_M[2]:-}"; mtitle="${_M[3]:-}"; mpub="${_M[4]:-}"
+        (if .public==true then "1" elif .public==false then "0" else "" end),
+        (.public_at // "")' "$meta" 2>/dev/null)
+      owner="${_M[0]:-}"; collabs="${_M[1]:-}"; mcolls="${_M[2]:-}"; mtitle="${_M[3]:-}"; mpub="${_M[4]:-}"; mpat="${_M[5]:-}"
       [[ -n "$mcolls" ]] && colls="$mcolls"
       [[ -n "$mtitle" ]] && title="$mtitle"
       [[ -n "$mpub" ]] && pub="$mpub"
     fi
+    # public_at: meta (autoritativo) senão o seed do backfill (só faz sentido p/ público)
+    pat="$mpat"; [[ -n "$pat" ]] || pat="${PUBSEED[$id]:-}"; pat="${pat//[^0-9]/}"
     an="$(norm "$author")"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" \
+    # checksum do pacote SÓ p/ problemas já calibrados (é onde "precisa recalibrar" faz sentido).
+    # Reusa do cache se o repo não teve commit (head igual); senão recomputa (lê o conteúdo). Casa
+    # com o checksum guardado em run/tl/<id>.json (juiz e servidor usam o MESMO tl-checksum.sh).
+    cks=""
+    if [[ -f "$RUNDIR/tl/$id.json" ]]; then
+      if [[ -n "$rhead" && "${CKS_HEAD[$id]:-}" == "$rhead" && -n "${CKS_CKS[$id]:-}" ]]; then
+        cks="${CKS_CKS[$id]}"
+      else
+        cks="$(bash "$HERE/tl-checksum.sh" "$pdir" 2>/dev/null)"; cks="${cks//[^0-9a-f]/}"
+      fi
+      [[ -n "$rhead" ]] && printf '%s\t%s\t%s\n' "$id" "$rhead" "$cks" >> "$newcache"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" \
       | tr -d '\r' >> "$tsv"
   done
 done
+# grava o cache de checksums (atômico). Só as entradas desta passada -> some quem deixou de ser
+# calibrado. Falha do jq não derruba a geração do índice (cache é best-effort).
+jq -Rn '[inputs|split("\t")|select(length>=3)|{key:.[0], value:{head:.[1], cks:.[2]}}]|from_entries' \
+  "$newcache" > "$CKSCACHE.tmp.$$" 2>/dev/null && mv -f "$CKSCACHE.tmp.$$" "$CKSCACHE" || rm -f "$CKSCACHE.tmp.$$"
+rm -f "$newcache"
 
 # 3) monta o JSON final numa passada (TSV -> JSON). Aplica o registro de diretórios
 #    (problem-repos.json): repos migrados/criados dão dono+colaboradores ao problema mesmo
@@ -82,7 +130,9 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         public:(.[6]=="1"), html:(.[6]=="1"),
         owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
         collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
-        collections:((.[9]//"")|split(",")|map(select(length>0))) }
+        collections:((.[9]//"")|split(",")|map(select(length>0))),
+        tl_checksum:(.[10] // ""),
+        public_at:((.[11] // "")|if .=="" then null else tonumber end) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 

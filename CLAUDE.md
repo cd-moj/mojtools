@@ -34,7 +34,12 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
-- `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. `git-broker.sh` —
+- `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. Também é **carimbado no
+  índice de donos** por `gen-problem-owners.sh` (campo `tl_checksum`, SÓ p/ problemas já calibrados
+  — têm `run/tl/<id>.json`) p/ a gestão comparar com o checksum calibrado e marcar "precisa
+  recalibrar" sem re-hashear pacote a cada request. O `gen-problem-owners.sh` também carimba
+  **`public_at`** (epoch da 1ª publicação; do `.moj-meta.json` ou do seed
+  `contests/treino/var/public-at-seed.json`) p/ o mapa de calor de entrada de públicos. `git-broker.sh` —
   commit/push no Gitea (token efêmero via `GIT_ASKPASS`). **LFS por caminho:** o `git_broker_clone`
   "pelado" faz **smudge completo** (baixa os blobs de `tests/`) porque `ensure_repo_materialized`
   (cdmoj `lib/problems.sh`) o usa p/ servir o **pacote ao juiz/treino** — o juiz PRECISA dos arquivos
