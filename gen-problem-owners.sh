@@ -5,7 +5,9 @@
 #   $CONTESTSDIR/treino/var/problem-owners.json
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
 #                                          owner, collaborators[], collections[], public, html,
-#                                          tl_checksum, public_at} ] }
+#                                          tl_checksum, public_at, good_langs} ] }
+# good_langs = extensões das soluções sols/good/* (= linguagens); a gestão marca "revisar" se alguma
+# não tem TL calibrado (solução good que não rodou/passou em nenhum juiz).
 # public_at = epoch da 1ª publicação (meta.public_at // seed do backfill); null se privado/desconhecido.
 # tl_checksum = checksum do pacote (tl-checksum.sh) SÓ p/ problemas já calibrados (têm
 # run/tl/<id>.json); a gestão o compara com o checksum calibrado em run/tl p/ marcar "precisa
@@ -108,8 +110,12 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
       fi
       [[ -n "$rhead" ]] && printf '%s\t%s\t%s\n' "$id" "$rhead" "$cks" >> "$newcache"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" \
+    # linguagens das soluções good (extensão = a linguagem que o calibreitor keya). A gestão compara
+    # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
+    gl=""
+    [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -132,7 +138,8 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
         collections:((.[9]//"")|split(",")|map(select(length>0))),
         tl_checksum:(.[10] // ""),
-        public_at:((.[11] // "")|if .=="" then null else tonumber end) }
+        public_at:((.[11] // "")|if .=="" then null else tonumber end),
+        good_langs:((.[12] // "")|split(",")|map(select(length>0))) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 

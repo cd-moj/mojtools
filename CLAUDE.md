@@ -39,7 +39,9 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   — têm `run/tl/<id>.json`) p/ a gestão comparar com o checksum calibrado e marcar "precisa
   recalibrar" sem re-hashear pacote a cada request. O `gen-problem-owners.sh` também carimba
   **`public_at`** (epoch da 1ª publicação; do `.moj-meta.json` ou do seed
-  `contests/treino/var/public-at-seed.json`) p/ o mapa de calor de entrada de públicos. `git-broker.sh` —
+  `contests/treino/var/public-at-seed.json`) p/ o mapa de calor de entrada de públicos, e
+  **`good_langs`** (extensões de `sols/good/*` = linguagens) p/ a gestão marcar "revisar" quando uma
+  linguagem good não tem TL calibrado (solução good que não rodou/passou em juiz nenhum). `git-broker.sh` —
   commit/push no Gitea (token efêmero via `GIT_ASKPASS`). **LFS por caminho:** o `git_broker_clone`
   "pelado" faz **smudge completo** (baixa os blobs de `tests/`) porque `ensure_repo_materialized`
   (cdmoj `lib/problems.sh`) o usa p/ servir o **pacote ao juiz/treino** — o juiz PRECISA dos arquivos
