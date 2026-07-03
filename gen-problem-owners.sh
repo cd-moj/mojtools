@@ -66,13 +66,13 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
   [[ -d "$repodir" ]] || continue
   repo="$(basename "$repodir")"
   [[ "$repo" =~ $skip_re ]] && continue
-  [[ -d "$repodir/.git" || -f "$repodir/.git" ]] || [[ -d "$repodir" ]] || continue
-  rhead="$(git -C "$repodir" rev-parse HEAD 2>/dev/null)"   # 1x por repo; assina o cache do checksum
+  [[ -d "$repodir" ]] || continue          # <org> é só um diretório (não mais um repo git)
   for pdir in "$repodir"/*/; do
     pdir="${pdir%/}"; prob="$(basename "$pdir")"
     # é um problema? tem author|conf|tests|docs
     [[ -f "$pdir/author" || -f "$pdir/conf" || -d "$pdir/tests" || -d "$pdir/docs" ]] || continue
     id="$repo#$prob"
+    rhead="$(git -C "$pdir" rev-parse HEAD 2>/dev/null)"   # HEAD do repo do PROBLEMA; assina o cache do checksum
     author="$(head -1 "$pdir/author" 2>/dev/null | tr -d '\t\r')"
     # público hoje = está no índice do treino (HTML buildado + servível)
     pub=0; [[ -n "${PUBSET[$id]:-}" ]] && pub=1
