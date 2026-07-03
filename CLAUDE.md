@@ -41,17 +41,11 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   **`public_at`** (epoch da 1ª publicação; do `.moj-meta.json` ou do seed
   `contests/treino/var/public-at-seed.json`) p/ o mapa de calor de entrada de públicos, e
   **`good_langs`** (extensões de `sols/good/*` = linguagens) p/ a gestão marcar "revisar" quando uma
-  linguagem good não tem TL calibrado (solução good que não rodou/passou em juiz nenhum). `git-broker.sh` —
-  commit/push no Gitea (token efêmero via `GIT_ASKPASS`). **LFS por caminho:** o `git_broker_clone`
-  "pelado" faz **smudge completo** (baixa os blobs de `tests/`) porque `ensure_repo_materialized`
-  (cdmoj `lib/problems.sh`) o usa p/ servir o **pacote ao juiz/treino** — o juiz PRECISA dos arquivos
-  de teste p/ calibrar/rodar. Já os **write-ops** (`git_broker_open`/`git_broker_sync_push`, usados por
-  set-public/edit/tags/collections/upload/delete/import) exportam **`GIT_LFS_SKIP_SMUDGE=1`** no clone
-  (só mexem em metadados ou substituem arquivos; não leem `tests/` do clone) → clone ~1 s em vez de
-  travar. Sem esse skip, `git-lfs filter-process` serializa/trava e um lote (ex.: script martelando
-  set-public) exauria os workers do fcgiwrap → **502 em toda a API**. O `commit_push` sempre faz
-  LFS-track (`_gb_ensure_lfs`) + pre-push dos objetos novos. NUNCA por o skip no clone pelado (quebra o
-  pacote servido ao juiz → sem TL).
+  linguagem good não tem TL calibrado (solução good que não rodou/passou em juiz nenhum).
+  **Storage MOJ-nativo (sem Gitea/LFS):** cada problema é um repo git LOCAL em
+  `MOJ_PROBLEMS_DIR/<org>/<prob>`; o servidor commita direto (`problem_commit` em `cdmoj/lib/problems.sh`,
+  flock por-problema). `gen-problem-owners.sh` lê o HEAD **por problema** p/ assinar o cache de
+  `tl_checksum`. (O antigo `git-broker.sh`/LFS/Gitea foi removido no cut-over — ver `cdmoj`.)
   `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode passar de 100).
 
 ## Regras
