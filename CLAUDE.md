@@ -16,8 +16,12 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   (`KEY=%q`, lido por `gen-report.sh` e pelos backends de juiz) com o veredicto **estruturado**:
   `SMALLRESP` (código curto), `FINALRESP` (display c/ score), **`VERDICT_CANON`** (nome canônico
   **limpo**, sem score — `Accepted`/`Wrong Answer`/… — p/ o backend casar o auto-veredicto),
-  **`SCORE`/`SCORE_MAX`/`SCORE_KIND`** (`tests`=% de testes, `points`=soma de grupos) e
-  `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout **não muda** (compat).
+  **`SCORE`/`SCORE_MAX`/`SCORE_KIND`** (`tests`=% de testes, `points`=soma de grupos),
+  **`SCORE_GROUPS`** (grupos estruturados: JSON `[{"earned":N|null,"max":N},…]` na ordem do
+  `tests/score`, só grupos de peso>0 — `earned`=peso (passou) | `0` (falhou) | `null` (não
+  executado); vazio = sem grupos) e `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout
+  **não muda** (compat). O banner do `report.html` mostra o **`VERDICT_CANON`** + detalhe
+  (pct de testes ou pontos/grupos).
 - `gen-report.sh` — gera o `report.html` por submissão.
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** e reporta
   (`ensure_cached <id> [force] [full]`; `full` roda todas as soluções).
@@ -46,7 +50,9 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `MOJ_PROBLEMS_DIR/<org>/<prob>`; o servidor commita direto (`problem_commit` em `cdmoj/lib/problems.sh`,
   flock por-problema). `gen-problem-owners.sh` lê o HEAD **por problema** p/ assinar o cache de
   `tl_checksum`. (O antigo `git-broker.sh`/LFS/Gitea foi removido no cut-over — ver `cdmoj`.)
-  `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode passar de 100).
+  `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode
+  passar de 100). Além do `FINALRESP` legado (`Wrong,60p. Pontos | 30 | 0 |…`), emite o
+  **`SCORE_GROUPS`** estruturado (acima) p/ o backend servir grupos por submissão.
 
 ## Regras
 

@@ -65,18 +65,21 @@ for INPUT in "${!VERDICT[@]}"; do
   (( RESPOSTASCOUNT[${VERDICT[$INPUT]}]++ ))
 done
 
-# soma os pontos: grupo vale o peso só se 0 WRONG e >=1 AC.
-EARNED=0; FAILED=0; BREAK="Pontos |"
+# soma os pontos: grupo vale o peso só se 0 WRONG e >=1 AC. Além do BREAK (string de
+# display legada), acumula o dado ESTRUTURADO por grupo (GJSON -> SCORE_GROUPS): só
+# grupos de peso>0 (peso 0 = exemplos), earned = peso | 0 (falhou) | null (não executado).
+EARNED=0; FAILED=0; BREAK="Pontos |"; GJSON=""
 for (( g=0; g<${#GROUP[@]}; g++ )); do
   if (( ${SOMA[$g,WRONG]:-0} == 0 && ${SOMA[$g,AC]:-0} > 0 )); then
     (( EARNED += ${GROUP[$g]} ))
-    (( ${GROUP[$g]} == 0 )) && continue                    # grupo de 0 ponto (público) não entra no detalhe
-    BREAK+=" ${GROUP[$g]} |"
+    GEARNED=${GROUP[$g]}
+    (( ${GROUP[$g]} > 0 )) && BREAK+=" ${GROUP[$g]} |"     # grupo de 0 ponto (público) não entra no detalhe
   elif (( ${SOMA[$g,WRONG]:-0} > 0 )); then
-    (( FAILED++ )); BREAK+=" 0 |"
+    (( FAILED++ )); BREAK+=" 0 |"; GEARNED=0
   else
-    (( FAILED++ )); BREAK+=" -1 |"                          # grupo sem nenhum teste executado
+    (( FAILED++ )); BREAK+=" -1 |"; GEARNED=null            # grupo sem nenhum teste executado
   fi
+  (( ${GROUP[$g]} > 0 )) && GJSON+="${GJSON:+,}{\"earned\":$GEARNED,\"max\":${GROUP[$g]}}"
 done
 
 QUANT=""
@@ -89,6 +92,7 @@ fi
 # total dos pesos. Senão, soma dos pesos dos grupos 100% aceitos (pontuação parcial).
 # score estruturado por pontos (subtask): o backend casa pelo VERDICT_CANON e o treino mostra E/T pontos
 SCORE_KIND=points; SCORE_MAX=$TOTAL
+SCORE_GROUPS="[$GJSON]"; [[ -n "$NOGROUP" ]] && SCORE_GROUPS=""   # NOGROUP = erro de config, sem grupos
 if [[ -n "$NOGROUP" ]]; then
   FINALRESP="Wrong,0p. teste '$NOGROUP' sem grupo em tests/score"
   VERDICT_CANON="Wrong Answer"; SCORE=0

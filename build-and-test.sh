@@ -42,6 +42,9 @@ function write_report_env()
     printf 'SCORE=%q\n'              "${SCORE:-0}"
     printf 'SCORE_MAX=%q\n'          "${SCORE_MAX:-100}"
     printf 'SCORE_KIND=%q\n'         "${SCORE_KIND:-tests}"
+    # grupos (subtasks) estruturados: JSON [{"earned":N|null,"max":N},...] na ordem do
+    # tests/score, só grupos de peso>0; vazio = sem grupos (score-summary.sh)
+    printf 'SCORE_GROUPS=%q\n'       "${SCORE_GROUPS:-}"
     printf 'CORRECT=%q\n'            "${CORRECT:-0}"
     printf 'TOTALTESTS=%q\n'         "${TOTALTESTS:-0}"
     printf 'TOTALTIME=%q\n'          "${TOTALTIME:-0}"
@@ -500,6 +503,7 @@ declare -A VERDICTCANON=(
   [TMT]="Runtime Error" [UE]="Runtime Error" [CE]="Compilation Error" )
 VERDICT_CANON="${VERDICTCANON[$SMALLRESP]:-${VERDICTFULLNAME[$SMALLRESP]}}"
 SCORE=$(( TOTALTESTS>0 ? CORRECT*100/TOTALTESTS : 0 )); SCORE_MAX=100; SCORE_KIND=tests
+SCORE_GROUPS=""
 
 # Pontuação por grupos (subtasks): se o problema traz um scripts/summary.sh próprio,
 # usa o dele (compat com os problemas OBI legados); senão, se há tests/score, usa o

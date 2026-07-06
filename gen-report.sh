@@ -29,6 +29,7 @@ wb="${1:?uso: gen-report.sh <workdirbase>}"
 PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
+VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS=""
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 
 declare -A VERDICT
@@ -195,8 +196,18 @@ o "#+BEGIN_EXPORT html"
 
 bkey="$(vkey "${SMALLRESP:-NT}")"
 raw "<div class=\"banner $bkey\">"
-raw "<span class=\"big\">$(escs "${FINALRESP:-$(fullname "${SMALLRESP:-NT}")}")</span>"
-if (( TOTALTESTS > 0 )); then
+# banner mostra o veredicto CANÔNICO (o FINALRESP completo segue na tabela Ambiente & limites)
+raw "<span class=\"big\">$(escs "${VERDICT_CANON:-${FINALRESP:-$(fullname "${SMALLRESP:-NT}")}}")</span>"
+if [[ "$SCORE_KIND" == points ]]; then
+  raw "<span class=\"pct\">${SCORE:-0} / ${SCORE_MAX:-?} pontos</span>"
+  gtxt=""
+  if [[ -n "$SCORE_GROUPS" ]] && command -v jq >/dev/null 2>&1; then
+    gtxt="$(jq -r 'if type=="array" and length>0
+      then to_entries | map("Grupo \(.key+1): \(if .value.earned==null then "—" else (.value.earned|tostring) end)/\(.value.max)") | join(" · ")
+      else empty end' <<<"$SCORE_GROUPS" 2>/dev/null)"
+  fi
+  [[ -n "$gtxt" ]] && raw "<span class=\"pct\">$(escs "$gtxt")</span>"
+elif (( TOTALTESTS > 0 )); then
   raw "<span class=\"pct\">$CORRECT / $TOTALTESTS testes AC · $(( CORRECT*100/TOTALTESTS ))%</span>"
 fi
 [[ -n "$TOTALTIME" ]] && raw "<span class=\"pct\">⏱ ${TOTALTIME}s no total</span>"
