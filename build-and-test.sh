@@ -73,6 +73,7 @@ declare -A _VERCMD=(
   [go]="gccgo --version" [rs]="rustc --version" [hs]="ghc --version" [cs]="mcs --version"
   [pas]="fpc -iV" [pl]="swipl --version" [js]="node --version" [ml]="ocamlopt -version"
   [spim]="spim -version" [py2]="python --version" [sh]="bash --version" [riscv]="java -version"
+  [kt]="kotlinc -version"
 )
 collect_toolchain()
 {
@@ -196,6 +197,14 @@ if [[ ! -e "$LANGCOMPILE" ]]; then
   exit 3
 fi
 
+# tempo-limite de COMPILAÇÃO (segundos): default 30; linguagens de compilador lento (JVM
+# fria do kotlinc) sobem via arquivo `compile-tl` no lang-dir (problema pode sobrescrever).
+COMPILETL=30
+if   [[ -f "$PROBLEMLANGUAGEDIR/compile-tl" ]]; then COMPILETL="$(< "$PROBLEMLANGUAGEDIR/compile-tl")"
+elif [[ -f "$DEFAULTLANGUAGEDIR/compile-tl" ]]; then COMPILETL="$(< "$DEFAULTLANGUAGEDIR/compile-tl")"
+fi
+[[ "$COMPILETL" =~ ^[0-9]+$ ]] || COMPILETL=30
+
 # override de raiz da jaula por linguagem: CAGE_ROOT_<LANG> (ex.: CAGE_ROOT_PY3, CAGE_ROOT_JAVA)
 LANGUC="${LANGUAGE^^}"; LANGUC="${LANGUC//[^A-Z0-9]/_}"
 CAGEROOTVAR="CAGE_ROOT_$LANGUC"
@@ -212,6 +221,16 @@ PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
 
 if [[ "$USER" == root ]]; then
   SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
+  COMPILESHIELDPARAMS="$SHIELDPARAMS"
+else
+  # SEM root: limite de memória DURO por cgroup v2 (systemd-run --user no cage-run; degrada
+  # p/ o MLE-por-RSS clássico se não houver user manager). Execução = max(default, MEMLIMITMB
+  # do problema + folga) p/ não matar solução legítima de problema com limite alto; a
+  # COMPILAÇÃO ganha teto próprio maior (kotlinc/JVM passam de 600MB — COMPILEMEMLIMIT).
+  HARDMEM=$DEFAULTMEMLIMIT
+  [[ "${MEMLIMITMB:-}" =~ ^[0-9]+$ ]] && (( MEMLIMITMB + 64 > HARDMEM )) && HARDMEM=$(( MEMLIMITMB + 64 ))
+  SHIELDPARAMS="-M $HARDMEM"
+  COMPILESHIELDPARAMS="-M ${COMPILEMEMLIMIT:-2048}"
 fi
 
 collect_toolchain   # versão do compilador/interpretador na jaula (p/ o report; só submissão real)
@@ -219,11 +238,11 @@ collect_toolchain   # versão do compilador/interpretador na jaula (p/ o report;
 
 LOG "# Compiling code"
 LOG ""
-bash cage-run.sh $CAGEROOTARG -w $workdir -r $LANGCOMPILE $SHIELDPARAMS $EXTRABINDINGS\
+bash cage-run.sh $CAGEROOTARG -w $workdir -r $LANGCOMPILE ${COMPILESHIELDPARAMS:-$SHIELDPARAMS} $EXTRABINDINGS\
                     -s $workdirbase/compile.log.stderr \
                     -o $workdirbase/compile.log.stdout \
                     -t $workdirbase/compile.log.time \
-                    -T 30\
+                    -T $COMPILETL\
                     -B $workdirbase/compile.log.bwraptime &> $workdirbase/compile.log.cage-run
 
 CAGERET=$?

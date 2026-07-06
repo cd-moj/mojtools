@@ -46,7 +46,9 @@ Usage: $0 <options>
               this option will reserve a CPU, the program will not be able to
               run outside this group (must be invoked as root)
 -U, --shield-user         User to be used to run inside the shield (must be invoked as root)
--M, --memlimit            Memory limit, in MB, to be allowed inside the shield (must be invoked as root)
+-M, --memlimit            Memory limit, in MB. As root: cgroup v1 do shield (cset). Sem
+              root: cgroup v2 via systemd-run --user (MemoryMax; degrada com
+              aviso se não houver user manager)
 EOF
 }
 
@@ -246,6 +248,20 @@ if [[ "$USER" == "root" ]] && [[ -n "$(which cset)" ]]; then
 
 fi
 
+# Limite de memória SEM root (hardening p/ prova): cgroup v2 DELEGADO via
+# `systemd-run --user --scope` envolvendo o bwrap — MemoryMax mata alocação
+# desenfreada na hora (antes só havia o MLE por RSS medido DEPOIS da execução, que não
+# contém um estouro rápido). Sem user manager (CI/containers), degrada com aviso p/ o
+# comportamento clássico. Root continua no caminho cset/cgroup v1 acima.
+SCOPE=""
+if [[ "$USER" != root && -n "$MEMLIMIT" ]] && command -v systemd-run >/dev/null 2>&1; then
+  if systemd-run --user --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
+    SCOPE="systemd-run --user --scope --quiet -p MemoryMax=${MEMLIMIT}M -p MemorySwapMax=0 --"
+  else
+    echo "cage-run: sem user manager p/ cgroup v2 (systemd-run --user falhou); MLE fica só por RSS medido" >&2
+  fi
+fi
+
 SAFETLE=$(echo "$TLE + 1"|bc -l)
 
 # Montagem da RAIZ da jaula + mounts dinâmicos/IO. Default (CAGEROOT vazio) = userland do
@@ -269,7 +285,7 @@ else
   PASSWDBINDS="--file 11 /etc/passwd --file 12 /etc/group"
 fi
 
-(exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD bwrap $ROOTBINDS \
+(exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $SCOPE bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \

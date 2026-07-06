@@ -55,6 +55,24 @@ python3/pypy3) — submissões py2 só rodam no modo host (legado).
 > O **runtime da jaula** (`/usr/bin/time`, `timeout`, `bash`) roda **dentro** do rootfs — por isso o
 > core inclui `time`/`coreutils`/`bash` além dos compiladores.
 
+## Hardening para prova (competidores adversários)
+
+- **Limite de memória DURO sem root (cgroup v2):** com `-M <MB>` e agente rodando como usuário
+  comum, o `cage-run.sh` envolve o bwrap num scope `systemd-run --user --scope -p MemoryMax=<MB>M
+  -p MemorySwapMax=0` — alocação desenfreada morre NA HORA (antes só existia o MLE por RSS medido
+  **depois** da execução, que não contém um estouro rápido). Sem user manager (CI/containers), o
+  cage degrada com aviso no stderr p/ o comportamento clássico. O `build-and-test.sh` passa
+  `-M max(600, MEMLIMITMB+64)` p/ a execução e `-M ${COMPILEMEMLIMIT:-2048}` p/ a **compilação**
+  (kotlinc/JVM passam de 600MB). Como root, vale o caminho cset/cgroup v1 de sempre.
+- **Bateria de estresse (`stress-cage.sh`):** rode **num juiz real** antes de prova hostil —
+  fork-bomb, OOM, escrita em massa, rede, leitura do `$HOME`. Qualquer FAIL = não use a máquina.
+  `bash stress-cage.sh [MEM_MB]` (usa `CAGE_ROOT` se setado).
+- **seccomp (pendente):** o bwrap aceita `--seccomp <fd>` mas exige um **programa BPF compilado**
+  (não há DSL embutida) — gerar/manter esse filtro é trabalho à parte e um filtro errado derruba
+  TODO o julgamento. Mitigação atual: `--unshare-all` (sem rede/pid/ipc), uid 65534, rootfs RO,
+  ulimits + cgroup acima. Se um perfil seccomp for adotado no futuro, valide com a bateria acima
+  e uma rodada completa de calibração antes de qualquer prova.
+
 ## Notas
 
 - **Tamanho/tempo:** o rootfs completo (com GHC etc.) tem alguns GB e o build baixa bastante; rode

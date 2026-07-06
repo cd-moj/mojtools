@@ -9,7 +9,9 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 
 - `cage-run.sh` — sandbox **bubblewrap** (`bwrap`). Roda do **root do host** (default) ou de um
   rootfs via `CAGE_ROOT`. `make-sysroot.sh` monta um rootfs Ubuntu com os compiladores. O
-  default de `python3` é **PyPy3**.
+  default de `python3` é **PyPy3**. Limite de memória `-M`: root = cgroup v1 (cset); **sem root
+  = cgroup v2 via `systemd-run --user --scope` (MemoryMax; degrada com aviso sem user manager)**.
+  Antes de prova hostil, rode **`stress-cage.sh`** num juiz real (ver `SANDBOX.md` §Hardening).
 - `build-and-test.sh <lang> <sol> <pkg> [y]` — compila + roda contra os testes; o veredicto é a
   **última linha** da saída (`FINALRESP`, ex.: `Accepted,100p` — nome + score embutido). Usa
   `lang/<lang>/run.sh` (um por linguagem, mesmo contrato). Além do stdout, grava `report.env`
@@ -59,7 +61,12 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 - **Um renderizador só.** Mexeu no enunciado? é em `render-statement.sh` — o preview, o servido
   e a validação acompanham juntos. Não criar um pandoc paralelo.
 - Exemplos do enunciado vêm **sempre** de `tests/input|output/sample*` (na ordem), nunca do texto.
-- `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita.
+- `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita. O tempo-limite de **compilação**
+  é 30s por default; linguagem de compilador lento sobe via arquivo **`lang/<lang>/compile-tl`**
+  (segundos; o problema pode sobrescrever com `scripts/<lang>/compile-tl`) — ex.: `kt` (Kotlin,
+  JVM fria do kotlinc) usa 120. Kotlin no rootfs: camada própria no `sysroot/Containerfile`
+  (zip da JetBrains em `/opt/kotlin`, `ARG KOTLIN_VER`); em modo host o `lang/kt/prep.sh` binda
+  `/opt/kotlin` na jaula.
 - `bash -n` antes de commitar. **Não commitar `lang/apl/run.sh`** (mod local pré-existente).
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
 - **Doc junto com o código** (doc atrasada = bug): mudou render/formato de pacote/validação/cálculo de TL?

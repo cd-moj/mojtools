@@ -37,6 +37,20 @@ RUN set -eux; for p in ${PKGS}; do \
       apt-get install -y --no-install-recommends "$p" || echo "WARN: pacote indisponível, pulado: $p"; \
     done
 
+# Kotlin (linguagem oficial ICPC; sem pacote apt no Ubuntu) — zip da JetBrains em /opt/kotlin
+# + symlinks em /usr/local/bin. Best-effort (sem rede no build = rootfs sem Kotlin, com WARN;
+# o pre-flight/route-by-language do juiz acusa a ausência). Versão via --build-arg KOTLIN_VER.
+ARG KOTLIN_VER=2.1.20
+RUN set -eux; \
+    apt-get install -y --no-install-recommends curl unzip || true; \
+    if curl -fsSL -o /tmp/kotlin.zip \
+         "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VER}/kotlin-compiler-${KOTLIN_VER}.zip"; then \
+      unzip -q /tmp/kotlin.zip -d /opt; mv /opt/kotlinc /opt/kotlin; rm -f /tmp/kotlin.zip; \
+      ln -sf /opt/kotlin/bin/kotlinc /usr/local/bin/kotlinc; \
+      ln -sf /opt/kotlin/bin/kotlin  /usr/local/bin/kotlin; \
+      /usr/local/bin/kotlinc -version 2>&1 | head -1; \
+    else echo "WARN: download do kotlin-compiler falhou; rootfs SEM Kotlin"; fi
+
 # Ajustes finais: PyPy3 como python3 padrão do juiz (precede /usr/bin no PATH; mantém o CPython
 # do sistema em /usr/bin/python3 p/ o apt). Symlinks que os run.sh esperam (prolog, gccgo).
 RUN set -eux; \
