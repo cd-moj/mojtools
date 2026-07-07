@@ -60,6 +60,8 @@ echo "AC solutions:"
 for AC in $PROBLEMDIR/sols/good/*; do
   echo "${AC##*/}:"
   LANG=${AC##*.}
+  # python unificado: sols .py2/.py3 legadas contam como 'py' (chave única na tabela de TL)
+  case "$LANG" in py2|py3) LANG=py;; esac
   [[ ! -n "${WORSTTIMEPERLANG[$LANG]}" ]] && WORSTTIMEPERLANG[$LANG]=0.01
 
   mkfifo $TEMP.coprocout
@@ -140,6 +142,7 @@ for OTHERSOL in pass slow wrong; do
     if [[ ! -e $TLs ]]; then echo none; continue;fi
     echo "${TLs##*/}:"
     LANG="${TLs##*.}"
+    case "$LANG" in py2|py3) LANG=py;; esac
     mkfifo $TEMP.coproc
     coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR y >$TEMP.coproc
     exec 7<$TEMP.coproc

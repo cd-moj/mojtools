@@ -69,10 +69,10 @@ function gen_report()
 # que de fato compilou/rodou (host ou rootfs via CAGE_ROOT). Só p/ submissões reais (o juiz
 # manda MOJ_PROBLEM_ID); pulado na calibração p/ não pagar uma jaula extra por solução.
 declare -A _VERCMD=(
-  [c]="gcc --version" [cpp]="g++ --version" [java]="javac -version" [py3]="python3 --version"
+  [c]="gcc --version" [cpp]="g++ --version" [java]="javac -version" [py]="python3 --version"
   [go]="gccgo --version" [rs]="rustc --version" [hs]="ghc --version" [cs]="mcs --version"
   [pas]="fpc -iV" [pl]="swipl --version" [js]="node --version" [ml]="ocamlopt -version"
-  [spim]="spim -version" [py2]="python --version" [sh]="bash --version" [riscv]="java -version"
+  [spim]="spim -version" [sh]="bash --version" [riscv]="java -version"
   [kt]="kotlinc -version"
 )
 collect_toolchain()
@@ -93,6 +93,9 @@ if [[ ! -n "$3" ]]; then
 fi
 
 LANGUAGE=$1
+# python unificado: 'py' (pypy3). py2/py3 são extensões LEGADAS (submissões antigas,
+# sols de pacotes) — normaliza aqui p/ o lang-dir, o TL e o _VERCMD verem só 'py'.
+case "$LANGUAGE" in py2|py3) LANGUAGE=py;; esac
 SRCCODE=$(realpath $2)
 PROBLEMTEMPLATEDIR=$(realpath $3)
 RUNALL=$4
@@ -205,7 +208,7 @@ elif [[ -f "$DEFAULTLANGUAGEDIR/compile-tl" ]]; then COMPILETL="$(< "$DEFAULTLAN
 fi
 [[ "$COMPILETL" =~ ^[0-9]+$ ]] || COMPILETL=30
 
-# override de raiz da jaula por linguagem: CAGE_ROOT_<LANG> (ex.: CAGE_ROOT_PY3, CAGE_ROOT_JAVA)
+# override de raiz da jaula por linguagem: CAGE_ROOT_<LANG> (ex.: CAGE_ROOT_PY, CAGE_ROOT_JAVA)
 LANGUC="${LANGUAGE^^}"; LANGUC="${LANGUC//[^A-Z0-9]/_}"
 CAGEROOTVAR="CAGE_ROOT_$LANGUC"
 [[ -n "${!CAGEROOTVAR:-}" ]] && CAGE_ROOT="${!CAGEROOTVAR}"
@@ -311,6 +314,11 @@ if [[ ! -e "$TLFILE" ]]; then
 fi
 source $TLFILE
 LOG "TL file: $(basename "$TLFILE")"
+
+# shim de compat: tl calibrado antes da unificação do python tem chave py3 (às vezes py2);
+# sem isto TL[py] cairia no TL[default] (o MENOR) => falso TLE até recalibrar.
+[[ -z "${TL[py]:-}" && -n "${TL[py3]:-}" ]] && TL[py]="${TL[py3]}"
+[[ -z "${TL[py]:-}" && -n "${TL[py2]:-}" ]] && TL[py]="${TL[py2]}"
 
 [[ ! -n "${TL[$LANGUAGE]}" ]] && TL[$LANGUAGE]=${TL[default]}
 

@@ -49,8 +49,10 @@ O `Containerfile` instala o **core** (sempre: `time`,`coreutils`,`bash`,`make`, 
 `openjdk-21`, `python3`+`pypy3`) e os **extras** best-effort (Pascal, Mono/C#, Go/gccgo, Rust, GHC,
 Node, OCaml, SWI-Prolog, SPIM). **PyPy3 é o `python3` padrão** do juiz (symlink em `/usr/local/bin`,
 mantendo o CPython do sistema p/ o apt). Casos especiais: **APL** (Dyalog proprietário, via `--apl`),
-**RISC-V** (só precisa do JDK; o `rars.jar` é baixado pelo `prep`). **py2 não é provisionado** (só
-python3/pypy3) — submissões py2 só rodam no modo host (legado).
+**RISC-V** (só precisa do JDK; o `rars.jar` é baixado pelo `prep`). **Python é UMA linguagem: `py`**
+(interpretador **pypy3**, com fallback `python3` no modo host; o `compile.sh` faz **check de sintaxe**
+via `py_compile` — erro de sintaxe = Compilation Error). `py2` foi **removido**; `.py2`/`.py3` são
+extensões legadas normalizadas p/ `py` (o lang-dir `py3` é só um symlink de compat).
 
 > O **runtime da jaula** (`/usr/bin/time`, `timeout`, `bash`) roda **dentro** do rootfs — por isso o
 > core inclui `time`/`coreutils`/`bash` além dos compiladores.

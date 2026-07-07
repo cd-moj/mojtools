@@ -113,7 +113,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # linguagens das soluções good (extensão = a linguagem que o calibreitor keya). A gestão compara
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
     gl=""
-    [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
+    [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; case "$e" in py2|py3) e=py;; esac; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" \
       | tr -d '\r' >> "$tsv"

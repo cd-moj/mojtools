@@ -67,6 +67,12 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   JVM fria do kotlinc) usa 120. Kotlin no rootfs: camada própria no `sysroot/Containerfile`
   (zip da JetBrains em `/opt/kotlin`, `ARG KOTLIN_VER`); em modo host o `lang/kt/prep.sh` binda
   `/opt/kotlin` na jaula.
+- **Python é UMA linguagem: `py`** (interpretador **pypy3**, fallback `python3` no modo host).
+  O `lang/py/compile.sh` faz **check de sintaxe** (`py_compile`) — erro de sintaxe vira
+  **Compilation Error**. `py2` foi extinto; `.py2`/`.py3` são extensões LEGADAS: `build-and-test.sh`
+  e `calibreitor.sh` normalizam `py2|py3 → py` (lang-dir, chave de TL, _VERCMD), `lang/py3` é
+  symlink de compat p/ `scripts/py3/` de pacotes, e o `build-and-test.sh` tem shim
+  `TL[py]=TL[py3]` p/ caches `tl.<host>` calibrados antes da unificação.
 - `bash -n` antes de commitar. **Não commitar `lang/apl/run.sh`** (mod local pré-existente).
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
 - **Doc junto com o código** (doc atrasada = bug): mudou render/formato de pacote/validação/cálculo de TL?

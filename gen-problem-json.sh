@@ -78,11 +78,14 @@ author=""
 tl_json='{}'
 storef="$MOJ_TL_STORE/$ID.json"
 cur_cks="$(bash "$MOJTOOLS_DIR/tl-checksum.sh" "$PKG" 2>/dev/null)"
+# chaves py3/py2 são LEGADAS (calibração pré-unificação do python): fundem em 'py' por MAX.
 if [[ -f "$storef" && -n "$cur_cks" ]]; then
   tl_json="$(jq -c --arg cks "$cur_cks" '
     if (.checksum // "")!=$cks or ((.hosts // {})|length)==0 then {}
     else [ .hosts[].tl // {} ]
-         | reduce (.[]|to_entries[]) as $e ({}; .[$e.key]=([(.[$e.key]//0),($e.value|tonumber? // 0)]|max))
+         | reduce (.[]|to_entries[]) as $e ({};
+             ($e.key | if .=="py3" or .=="py2" then "py" else . end) as $k
+             | .[$k]=([(.[$k]//0),($e.value|tonumber? // 0)]|max))
          | with_entries(.value |= tostring) end
   ' "$storef" 2>/dev/null)"; [[ -n "$tl_json" ]] || tl_json='{}'
 fi
@@ -92,7 +95,8 @@ if [[ "$tl_json" == '{}' ]]; then
     declare -A TL; declare -A TLMOD
     source "$TLFILE" 2>/dev/null
     { for k in "${!TL[@]}"; do printf '%s\t%s\n' "$k" "${TL[$k]}"; done; } \
-      | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")|{(.[0]):.[1]})|add // {}' \
+      | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")
+          |{((.[0]) | if .=="py3" or .=="py2" then "py" else . end):.[1]})|add // {}' \
       > /tmp/.tljson.$$ 2>/dev/null && tl_json="$(cat /tmp/.tljson.$$)"; rm -f /tmp/.tljson.$$
     unset TL TLMOD
   fi
