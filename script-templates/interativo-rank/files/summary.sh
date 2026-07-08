@@ -1,0 +1,1 @@
+../../../interactive/summary-score.sh

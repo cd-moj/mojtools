@@ -148,8 +148,9 @@ DEFAULTMEMLIMIT=600
 #set default values
 #configurações de variáveis do ulimit
 ## stack
-### default to 200MB
-ULIMITS[-s]=204800
+### default: 128MB p/ TODAS as linguagens (rlimit herdado através do bwrap; a JVM espelha
+### em -Xss via binfile.sh). Override por conf: STACKLIMITMB (MB) ou ULIMITS[-s] (KB).
+ULIMITS[-s]=131072
 
 ## file size
 ### default to 100MB
@@ -165,6 +166,10 @@ ULIMITS[-u]=1024
 
 #check if there is conf
 [[ -e $PROBLEMTEMPLATEDIR/conf ]] && source $PROBLEMTEMPLATEDIR/conf
+
+# STACKLIMITMB (MB, simétrico ao MEMLIMITMB) é a forma preferida de mudar a stack no conf;
+# vence o ULIMITS[-s] (KB), que segue aceito p/ ajuste fino quando STACKLIMITMB ausente.
+[[ "${STACKLIMITMB:-}" =~ ^[0-9]+$ ]] && ULIMITS[-s]=$((STACKLIMITMB*1024))
 
 # Limite de memória por RSS MEDIDO (MEMLIMITMB, em MB) — alternativa ao ulimit -v. Quando o
 # conf liga isso, NÃO aplicamos o limite de memória VIRTUAL (que penaliza linguagens que
@@ -222,16 +227,17 @@ PREPLANGUAGE="$PROBLEMLANGUAGEDIR/prep.sh"
 [[ ! -e "$PREPLANGUAGE" ]] && [[ -e "$DEFAULTLANGUAGEDIR/prep.sh" ]] &&
 . $DEFAULTLANGUAGEDIR/prep.sh $workdir
 
+# teto DURO de memória (cgroup): max(default, MEMLIMITMB do problema + folga) — a folga de
+# 64MB deixa o overhead de runtime (metaspace/threads da JVM) fora do OOM; quem manda no
+# veredito MLE continua sendo o RSS medido vs MEMLIMITMB. Vale p/ root (cgroup v1) e sem
+# root (cgroup v2 via systemd-run; degrada p/ MLE-por-RSS sem user manager).
+HARDMEM=$DEFAULTMEMLIMIT
+[[ "${MEMLIMITMB:-}" =~ ^[0-9]+$ ]] && (( MEMLIMITMB + 64 > HARDMEM )) && HARDMEM=$(( MEMLIMITMB + 64 ))
 if [[ "$USER" == root ]]; then
-  SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $DEFAULTMEMLIMIT"
-  COMPILESHIELDPARAMS="$SHIELDPARAMS"
+  SHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M $HARDMEM"
+  COMPILESHIELDPARAMS="--shield-cpu $DEFAULTSHIELDCPU --shield-user $DEFAULTSHIELDUSER -M ${COMPILEMEMLIMIT:-2048}"
 else
-  # SEM root: limite de memória DURO por cgroup v2 (systemd-run --user no cage-run; degrada
-  # p/ o MLE-por-RSS clássico se não houver user manager). Execução = max(default, MEMLIMITMB
-  # do problema + folga) p/ não matar solução legítima de problema com limite alto; a
-  # COMPILAÇÃO ganha teto próprio maior (kotlinc/JVM passam de 600MB — COMPILEMEMLIMIT).
-  HARDMEM=$DEFAULTMEMLIMIT
-  [[ "${MEMLIMITMB:-}" =~ ^[0-9]+$ ]] && (( MEMLIMITMB + 64 > HARDMEM )) && HARDMEM=$(( MEMLIMITMB + 64 ))
+  # a COMPILAÇÃO ganha teto próprio maior (kotlinc/JVM passam de 600MB — COMPILEMEMLIMIT)
   SHIELDPARAMS="-M $HARDMEM"
   COMPILESHIELDPARAMS="-M ${COMPILEMEMLIMIT:-2048}"
 fi
@@ -268,7 +274,12 @@ if ! grep -q ^BIN= $workdirbase/compile.log.stdout || (( CAGERET != 0 )) ; then
 fi
 #cut -d'=' -f2 < $workdir/log.stdout
 BIN+=( $(cut -d'=' -f2 < $workdirbase/compile.log.stdout) )
-echo BIN=${BIN[0]} > $workdir/binfile.sh
+# binfile.sh é o canal p/ DENTRO da jaula (todo run.sh faz `source binfile.sh`): além do BIN,
+# carrega os limites do problema — a JVM dimensiona -Xmx/-Xss por eles (java/kt/interactive).
+{ echo "BIN=${BIN[0]}"
+  echo "MOJ_MEMLIMITMB=${MEMLIMITMB:-}"
+  echo "MOJ_STACKKB=${ULIMITS[-s]}"
+} > $workdir/binfile.sh
 
 LOG ""
 LOG ""

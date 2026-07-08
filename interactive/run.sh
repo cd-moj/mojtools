@@ -43,7 +43,7 @@ case "$BIN" in
   *.sh)             CMD=(bash /tmp/dir/$BIN) ;;
   *.js)             CMD=(node /tmp/dir/$BIN) ;;
   *.class)          export CLASSPATH=/tmp/dir
-                    CMD=(java -Xms10m -Xmx500m -Xss10m "$(basename "$BIN" .class)") ;;
+                    CMD=(java -Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k "$(basename "$BIN" .class)") ;;
 esac
 
 mkfifo /tmp/fifo.in /tmp/fifo.out

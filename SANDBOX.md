@@ -64,8 +64,19 @@ extensões legadas normalizadas p/ `py` (o lang-dir `py3` é só um symlink de c
   -p MemorySwapMax=0` — alocação desenfreada morre NA HORA (antes só existia o MLE por RSS medido
   **depois** da execução, que não contém um estouro rápido). Sem user manager (CI/containers), o
   cage degrada com aviso no stderr p/ o comportamento clássico. O `build-and-test.sh` passa
-  `-M max(600, MEMLIMITMB+64)` p/ a execução e `-M ${COMPILEMEMLIMIT:-2048}` p/ a **compilação**
-  (kotlinc/JVM passam de 600MB). Como root, vale o caminho cset/cgroup v1 de sempre.
+  `-M max(600, MEMLIMITMB+64)` p/ a execução (root e sem root — o cgroup v1 do root também
+  respeita) e `-M ${COMPILEMEMLIMIT:-2048}` p/ a **compilação** (kotlinc/JVM passam de 600MB).
+- **JVM respeita o MEMLIMITMB:** o `binfile.sh` (que todo `run.sh` sourceia) carrega
+  `MOJ_MEMLIMITMB`/`MOJ_STACKKB` p/ dentro da jaula; `lang/java`, `lang/kt` e o driver
+  interativo dimensionam **`-Xmx = MEMLIMITMB`** (heap tão grande quanto o limite; 500m sem
+  limite definido) e **`-Xss = stack do problema`** (threads da JVM não obedecem o `ulimit -s`).
+  O veredito MLE continua sendo o RSS medido vs MEMLIMITMB; a folga de +64MB no cgroup evita
+  que o overhead da JVM vire RE por OOM. Pacotes interativos com driver COPIADO antes desta
+  mudança mantêm `-Xmx500m` até reinstalar o driver (`install-interactive.sh`).
+- **Stack: default 128MB p/ TODAS as linguagens** (`ULIMITS[-s]=131072`, rlimit herdado através
+  do bwrap). Override por conf: **`STACKLIMITMB=<MB>`** (preferido, simétrico ao MEMLIMITMB;
+  vence) ou `ULIMITS[-s]=<KB>` (ajuste fino). Nota: o `node` (js) tem stack própria da V8,
+  independente do rlimit — fora do escopo por ora.
 - **Bateria de estresse (`stress-cage.sh`):** rode **num juiz real** antes de prova hostil —
   fork-bomb, OOM, escrita em massa, rede, leitura do `$HOME`. Qualquer FAIL = não use a máquina.
   `bash stress-cage.sh [MEM_MB]` (usa `CAGE_ROOT` se setado).

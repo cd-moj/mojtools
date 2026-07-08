@@ -1,0 +1,1 @@
+../../../testlib/checker-bridge.sh

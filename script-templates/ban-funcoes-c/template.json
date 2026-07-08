@@ -1,0 +1,5 @@
+{
+  "name": "Banir funções (C/C++)",
+  "description": "compile.sh de C e C++ que REPROVA (Compilation Error) fontes que usam funções proibidas (grep na fonte antes de compilar) — padrão dos problemas de string do APC. Edite a lista BANNED no topo dos dois arquivos.",
+  "conf_hints": "Inclua uma sols/wrong/cheat-*.c que USA a função banida — a calibração confirma que o ban rejeita. Só C/C++ são banidos; nas demais linguagens o aluno resolve idiomaticamente (diga isso no enunciado)."
+}

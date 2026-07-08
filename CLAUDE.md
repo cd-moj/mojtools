@@ -78,6 +78,11 @@ Workspace multi-repo: ver `../CLAUDE.md`.
 - **Um renderizador só.** Mexeu no enunciado? é em `render-statement.sh` — o preview, o servido
   e a validação acompanham juntos. Não criar um pandoc paralelo.
 - Exemplos do enunciado vêm **sempre** de `tests/input|output/sample*` (na ordem), nunca do texto.
+- **Limites de memória/stack**: `MEMLIMITMB` (conf) decide o MLE por RSS e a **JVM dimensiona
+  `-Xmx = MEMLIMITMB`** (java/kt/interativo leem `MOJ_MEMLIMITMB`/`MOJ_STACKKB` do `binfile.sh`,
+  o canal p/ dentro da jaula); cgroup duro = `max(600, MEMLIMITMB+64)` (root e sem root). Stack:
+  **default 128MB p/ todas as linguagens** (`ULIMITS[-s]=131072`, herdado através do bwrap);
+  override por conf `STACKLIMITMB=<MB>` (vence) ou `ULIMITS[-s]=<KB>`; a JVM espelha em `-Xss`.
 - `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita. O tempo-limite de **compilação**
   é 30s por default; linguagem de compilador lento sobe via arquivo **`lang/<lang>/compile-tl`**
   (segundos; o problema pode sobrescrever com `scripts/<lang>/compile-tl`) — ex.: `kt` (Kotlin,

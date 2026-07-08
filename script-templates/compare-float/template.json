@@ -1,0 +1,5 @@
+{
+  "name": "Comparador float com tolerância",
+  "description": "compare.sh com tolerância ε por token (awk, independente de locale) — para saída em ponto flutuante onde cada linguagem acumula erro de um jeito. Edite EPS (e EPS_REL) no topo.",
+  "conf_hints": "ε absoluto default 1e-3; para valores de magnitudes muito diferentes ligue também o relativo (EPS_REL)."
+}
