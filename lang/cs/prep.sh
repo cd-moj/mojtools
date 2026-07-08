@@ -1,2 +1,2 @@
 #!/bin/bash
-EXTRABINDINGS+="-b /etc/mono"
+# Sem binds: /etc/mono já vem no /etc inteiro montado pelo cage-run (host ou rootfs).

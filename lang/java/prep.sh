@@ -1,10 +1,4 @@
 #!/bin/bash
-
-# Binds de config do java valem SÓ em modo HOST (trazem o /etc/java* do host p/ a jaula).
-# No ROOTFS a jaula já tem o próprio /etc/java-21-openjdk — e bindar um /etc/java que só
-# existe no host quebra o bwrap (mkdir em /etc read-only: "Can't mkdir /etc/java").
-if [[ -z "${CAGE_ROOT:-}" || "$CAGE_ROOT" == host ]]; then
-  [[ -e /etc/java-21-openjdk/ ]] && EXTRABINDINGS+="-b /etc/java-21-openjdk/"
-  [[ -e /etc/java ]] && EXTRABINDINGS+=" -b /etc/java"
-fi
-
+# Sem binds: o cage-run monta o /etc INTEIRO da raiz escolhida (host ou rootfs) com máscaras —
+# java.security & cia. (/etc/java*) já vêm de lá. (Os binds pontuais de /etc quebravam quando
+# o mountpoint não existia na outra raiz: "Can't mkdir /etc/java" => CE.)

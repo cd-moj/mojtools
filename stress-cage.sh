@@ -18,6 +18,8 @@ pass=0; fail=0
 run(){ # run <nome> <script-body> <check: recebe stdout-file stderr-file rc>
   local name="$1" body="$2" check="$3" rc
   printf '#!/bin/bash\n%s\n' "$body" > "$W/script.sh"
+  chmod +x "$W/script.sh"   # o cage exige -r executável (sem isso TODO caso falhava rc=2 e
+                            # checks lenientes davam falso PASS com saída vazia)
   : > "$W/out"; : > "$W/err"; : > "$W/tl"; : > "$W/bt"
   bash "$SELF/cage-run.sh" ${CAGE_ROOT:+-R "$CAGE_ROOT"} \
     -d "$W/dir" -i "$W/in" -o "$W/out" -r "$W/script.sh" \
@@ -54,6 +56,18 @@ run "sem rede" \
 # 5. leitura fora da jaula: $HOME do operador não pode estar visível
 run "home invisível" \
   "if ls '$HOME' >/dev/null 2>&1; then echo LEAK > /tmp/out; else echo OK > /tmp/out; fi" \
+  '[[ "$(cat "$W/out" 2>/dev/null | tr -d "[:space:]")" == OK ]]'
+
+# 6. segredos de /etc mascarados: shadow vazio/ilegível, passwd só com a linha do 65534,
+#    sudoers.d e /etc/ssh vazios (o /etc entra INTEIRO na jaula, com máscaras por cima)
+run "segredos de /etc invisíveis" \
+  'bad=""
+   [[ -s /etc/shadow ]] && bad+="shadow "
+   n=$(grep -c . /etc/passwd 2>/dev/null); [[ "${n:-0}" -gt 1 ]] && bad+="passwd($n) "
+   [[ -n "$(ls -A /etc/sudoers.d 2>/dev/null)" ]] && bad+="sudoers.d "
+   [[ -n "$(ls -A /etc/ssh 2>/dev/null)" ]] && bad+="ssh "
+   [[ -s /etc/sudoers ]] && bad+="sudoers "
+   if [[ -n "$bad" ]]; then echo "LEAK $bad" > /tmp/out; else echo OK > /tmp/out; fi' \
   '[[ "$(cat "$W/out" 2>/dev/null | tr -d "[:space:]")" == OK ]]'
 
 echo

@@ -11,7 +11,10 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   rootfs via `CAGE_ROOT`. `make-sysroot.sh` monta um rootfs Ubuntu com os compiladores. O
   default de `python3` é **PyPy3**. Limite de memória `-M`: root = cgroup v1 (cset); **sem root
   = cgroup v2 via `systemd-run --user --scope` (MemoryMax; degrada com aviso sem user manager)**.
-  Antes de prova hostil, rode **`stress-cage.sh`** num juiz real (ver `SANDBOX.md` §Hardening).
+  **/etc entra INTEIRO da raiz escolhida, com MÁSCARAS** (shadow/sudoers/ssh/… zerados; passwd/
+  group sintéticos no host) — `prep.sh` NÃO binda nada de /etc (só /opt/kotlin, /opt/mdyalog,
+  /var/lib/ghc); ver SANDBOX.md. Antes de prova hostil, rode **`stress-cage.sh`** num juiz real
+  (ver `SANDBOX.md` §Hardening).
 - `build-and-test.sh <lang> <sol> <pkg> [y]` — compila + roda contra os testes; o veredicto é a
   **última linha** da saída (`FINALRESP`, ex.: `Accepted,100p` — nome + score embutido). Usa
   `lang/<lang>/run.sh` (um por linguagem, mesmo contrato). Além do stdout, grava `report.env`

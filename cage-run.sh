@@ -277,19 +277,37 @@ if [[ -n "$CAGEROOT" ]]; then
   # /run como dirs reais e read-only sob o ro-bind; --dir/--symlink falhariam — "destination
   # exists"). proc/dev sobrepostos.
   ROOTBINDS="--ro-bind $CAGEROOT / --proc /proc --dev /dev --tmpfs /tmp --tmpfs /var/tmp --tmpfs /run --dir /run/user/$(id -u)"
-  # o rootfs já tem /etc/passwd+group (com nobody/65534); /etc é ro -> não sobrescreve.
-  PASSWDBINDS=""
+  ETCSRC="$CAGEROOT"
 else
-  ROOTBINDS="--ro-bind /usr /usr --dir /tmp --dir /var --ro-bind /etc/alternatives /etc/alternatives --ro-bind /etc/localtime /etc/localtime --symlink ../tmp var/tmp --proc /proc --dev /dev --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /bin /bin --ro-bind /sbin /sbin --dir /run/user/$(id -u)"
-  # raiz do host: /etc é tmpfs vazio na jaula -> injeta passwd/group (só nobody) via fd 11/12.
-  PASSWDBINDS="--file 11 /etc/passwd --file 12 /etc/group"
+  # raiz do host: /etc entra INTEIRO (ro) — toolchains precisam de muito mais que fragmentos
+  # (alternatives, ld.so.conf.d, java.security, mono, fpc.cfg, localtime, …) e binds pontuais
+  # por prep.sh quebravam quando o mountpoint não existia na outra raiz ("Can't mkdir /etc/…").
+  # O sensível é MASCARADO logo abaixo; passwd/group são SOBREPOSTOS pelos sintéticos (fd 11/12).
+  ROOTBINDS="--ro-bind /usr /usr --dir /tmp --dir /var --ro-bind /etc /etc --symlink ../tmp var/tmp --proc /proc --dev /dev --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /bin /bin --ro-bind /sbin /sbin --dir /run/user/$(id -u)"
+  ETCSRC=""
 fi
+# passwd/group SINTÉTICOS (1 linha, uid 65534) nos DOIS modos — a jaula não lista usuário
+# nenhum (nem os de sistema do rootfs). --ro-bind-data (não --file): com /etc ro-bindado o
+# --file tentaria CRIAR o arquivo num fs read-only; o bind-data MONTA o conteúdo do fd.
+PASSWDBINDS="--ro-bind-data 11 /etc/passwd --ro-bind-data 12 /etc/group"
+
+# Máscaras sobre o /etc (host E rootfs, por uniformidade): a jaula não deve nem ENXERGAR
+# segredos/identidade — /dev/null sobre arquivos, tmpfs sobre diretórios. Só mascara o que
+# EXISTE na raiz escolhida (bind de mountpoint inexistente = o "Can't mkdir" que já nos mordeu).
+# As perms já bloqueiam a maioria p/ o uid 65534; isto é defesa em profundidade.
+ETCMASKS=""
+for _m in /etc/shadow /etc/gshadow /etc/shadow- /etc/gshadow- /etc/passwd- /etc/group- /etc/sudoers /etc/machine-id /etc/krb5.keytab; do
+  [[ -e "$ETCSRC$_m" ]] && ETCMASKS+=" --ro-bind /dev/null $_m"
+done
+for _m in /etc/sudoers.d /etc/ssh /etc/ssl/private; do
+  [[ -d "$ETCSRC$_m" ]] && ETCMASKS+=" --tmpfs $_m"
+done
 
 (exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $SCOPE bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \
-  $PASSWDBINDS \
+  $PASSWDBINDS $ETCMASKS \
   --ro-bind $RUNSCRIPTFILE /tmp/script\
   --bind $TIMELOG /tmp/timelog\
   --bind $STDERRLOG /tmp/stderrlog $BWRAPPARAM\
