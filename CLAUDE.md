@@ -40,6 +40,13 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
+- `testlib/` — **checkers testlib normalizados**: `testlib.h` vendorada + `checker-bridge.sh`
+  (vai p/ o pacote como `scripts/compare.sh`; compila `scripts/checker.cpp` no juiz sob demanda,
+  cache FORA de `scripts/` p/ não poluir o tl-checksum) + `install-checker.sh <pkg> <checker.cpp>`.
+  Checker é testlib PADRÃO (sem `-DBOCA_SUPPORT`); mapa: `_ok`⇒AC, `_wa`/`_pe`/eof⇒WA (o `_pe`
+  da testlib é "formato inválido" = errado, NÃO é o AC,PE do MOJ), `_fail`/`quitp`⇒UE. **Nunca
+  commitar binário de checker** (padrão antigo deprecado; o validate avisa). Guia de autoria:
+  `docs/checker-testlib.md`; técnico: `testlib/README.md`.
 - `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. Também é **carimbado no
   índice de donos** por `gen-problem-owners.sh` (campo `tl_checksum`, SÓ p/ problemas já calibrados
   — têm `run/tl/<id>.json`) p/ a gestão comparar com o checksum calibrado e marcar "precisa

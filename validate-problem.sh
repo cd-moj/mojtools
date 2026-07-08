@@ -67,6 +67,11 @@ if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|output)' <<<"$ebody";
 if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
   render_leak="${render_leak}exemplo-no-texto? "
 fi
+# --- aviso SOFT: checker BINÁRIO commitado como compare.sh (padrão antigo/deprecado) ---
+# normalize p/ fonte + bridge: scripts/checker.cpp via mojtools/testlib/install-checker.sh
+if [[ -f "$PKG/scripts/compare.sh" ]] && file -b "$PKG/scripts/compare.sh" 2>/dev/null | grep -q ELF; then
+  render_leak="${render_leak}compare.sh-binário(use-testlib/install-checker.sh) "
+fi
 
 # --- examples / tests pairing ---
 ninput=0; npair=0; unpaired=""
