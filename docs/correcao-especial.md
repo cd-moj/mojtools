@@ -9,8 +9,10 @@ explica a **ideia da solução**; aqui fica a mecânica.
 | Arquivo no pacote | Sobrepõe | Papel |
 |---|---|---|
 | `scripts/<lang>/compile.sh` | `lang/<lang>/compile.sh` | compilação/empacotamento; deve ecoar `BIN=<algo>` |
-| `scripts/<lang>/run.sh`     | `lang/<lang>/run.sh`     | execução (raro customizar) |
+| `scripts/<lang>/run.sh`     | `lang/<lang>/run.sh`     | execução (raro customizar; base do INTERATIVO) |
+| `scripts/<lang>/prep.sh`    | `lang/<lang>/prep.sh`    | **sourced NO HOST** antes de compilar, com `$1=$workdir`: pode `cp` arquivos p/ o workdir (aparecem em `/tmp/dir` na run) e/ou somar `EXTRABINDINGS+=" -b <path>"`. Exige bit **+x**; nunca `exit` (use `return`) |
 | `scripts/compare.sh` (ou `scripts/<lang>/compare.sh`) | `lang/compare.sh` | comparador de saída |
+| `scripts/summary.sh` | scorer padrão (`tests/score`/% de testes) | sourced no FIM do julgamento; pode sobrescrever `FINALRESP`/`SCORE`/`SCORE_KIND` (base do ranking interativo) |
 
 Regras gerais:
 
@@ -61,6 +63,22 @@ calibração confirmar que o ban a rejeita.
 para problemas de saída real em que linguagens diferentes acumulam erro de ponto flutuante de
 formas distintas (comparação exata falharia entre linguagens). Ver o usado em
 `exponencial_natural` (ε = 10⁻³).
+
+## Problema interativo (normalizado)
+
+Solução conversa com um **árbitro** por stdin/stdout dentro da jaula. O pacote leva o
+árbitro (`scripts/arbitro.{cpp,py,sh}`) e o **driver comum** do mojtools
+(`scripts/c/{prep,run}.sh` + symlinks p/ as demais linguagens), instalados por:
+
+```sh
+bash mojtools/interactive/install-interactive.sh <pacote> arbitro.cpp [--score]
+```
+
+Protocolo: árbitro recebe o teste em `argv[1]`; a ÚLTIMA linha do stderr dele é o
+RESULTADO (`WRONG <motivo>` ⇒ WA; score/info ⇒ AC, somável com `--score` p/ ranking);
+sem resultado ⇒ RTE (jogador morreu) ou UE. Guia completo com exemplos:
+**[`problema-interativo.md`](problema-interativo.md)**; técnico:
+`mojtools/interactive/README.md`.
 
 ## Checker testlib (normalizado)
 

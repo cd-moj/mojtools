@@ -40,6 +40,12 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
+- `interactive/` — **problemas INTERATIVOS normalizados**: driver comum entre linguagens
+  (`run.sh` roda árbitro+jogador por FIFOs; `prep.sh` materializa o árbitro — C++ compilado
+  no host com `-static` e cache FORA de `scripts/`; `compare.sh` genérico 13/6/4;
+  `summary-score.sh` p/ ranking) + `install-interactive.sh <pkg> <arbitro> [--score]`.
+  Protocolo: árbitro lê o teste de `argv[1]`; ÚLTIMA linha do stderr = resultado
+  (`WRONG <motivo>` ⇒ WA). Guia: `docs/problema-interativo.md`; técnico: `interactive/README.md`.
 - `testlib/` — **checkers testlib normalizados**: `testlib.h` vendorada + `checker-bridge.sh`
   (vai p/ o pacote como `scripts/compare.sh`; compila `scripts/checker.cpp` no juiz sob demanda,
   cache FORA de `scripts/` p/ não poluir o tl-checksum) + `install-checker.sh <pkg> <checker.cpp>`.
