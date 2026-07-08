@@ -190,6 +190,14 @@ LOG ""
 #default locations
 LANGUAGEDIR=lang/$LANGUAGE
 PROBLEMLANGUAGEDIR="$PROBLEMTEMPLATEDIR/scripts/$LANGUAGE"
+# compat da unificação do python: LANGUAGE já virou 'py' (linha ~98), mas pacote legado tem a
+# correção especial em scripts/py3 (ou py2) — sem este fallback o compile/run/compare CUSTOM
+# era silenciosamente IGNORADO (function-submission do APC rodava a solução pelada => WA vazio).
+if [[ "$LANGUAGE" == py && ! -d "$PROBLEMLANGUAGEDIR" ]]; then
+  for _pl in py3 py2; do
+    [[ -d "$PROBLEMTEMPLATEDIR/scripts/$_pl" ]] && { PROBLEMLANGUAGEDIR="$PROBLEMTEMPLATEDIR/scripts/$_pl"; break; }
+  done
+fi
 DEFAULTLANGUAGEDIR=$(realpath $LANGUAGEDIR)
 #LANGCOMPILE=$(realpath $LANGCOMPILE)
 
