@@ -154,11 +154,16 @@ bash mojtools/interactive/install-interactive.sh <pacote> arbitro.py --score   #
 #    ALLOWPARALLELTEST=n            # (recomendado) sem contenção entre árbitros
 #    STOPWHEN_WA=y                  # (rank) para no primeiro WRONG
 
-# 4. teste com as suas soluções (num juiz real; no dev a jaula é fake):
-bash mojtools/build-and-test.sh py <pacote>/sols/good/sol.py <pacote> y
+# 2b. atalho equivalente pela CLI (localiza o mojtools sozinho; MOJTOOLS_DIR aponta):
+moj interactive <pacote> arbitro.cpp [--score]
 
-# 5. transporte: 'moj push' NÃO carrega scripts/ — suba o pacote inteiro:
-tar -czf pacote.tar.gz -C <pacote> . && moj upload <org>#<id> pacote.tar.gz
+# 4. teste com as suas soluções (num juiz real ou máquina com bwrap; no dev a jaula é fake):
+bash mojtools/build-and-test.sh py <pacote>/sols/good/sol.py <pacote> y
+moj test <pacote> --run          # equivalente pela CLI (todas as good)
+
+# 5. transporte: 'moj push' agora CARREGA scripts/ (round-trip completo — symlinks do driver
+#    incluídos); 'moj upload <id> <pacote>' (aceita o DIRETÓRIO) segue valendo p/ o tar inteiro:
+moj push <pacote>
 ```
 
 ## Ranking (score contínuo)
@@ -185,4 +190,5 @@ calcule `SCORE=<referência>/<obtido>` — o resto do driver continua igual (é 
   (os problemas reais usam de `"10+1.5"` a `"20+1"`).
 - **Testar score parcial via checker**: não existe — parcial por teste é binário; rank é
   o `summary.sh`, e pontuação por grupos é `tests/score` (não misture os dois).
-- **Esquecer o `moj upload`** (push ignora `scripts/`).
+- **CLI antiga** (push que ignora `scripts/`): o `moj push` atual faz round-trip completo de
+  `scripts/` (com os symlinks do driver); atualize a CLI ou use `moj upload <id> <dir>`.

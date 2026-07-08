@@ -40,6 +40,10 @@ Workspace multi-repo: ver `../CLAUDE.md`.
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
   `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
+- **Transporte de `scripts/`**: o `moj push`/`clone` fazem round-trip COMPLETO da correção
+  especial (conteúdo+`+x`+symlinks, campo `scripts_files` da API) — `moj upload <id> <dir>`
+  (aceita diretório) segue como via do tar inteiro. Atalhos da CLI: `moj checker`,
+  `moj interactive`, `moj test --run` (julga local via build-and-test; exige bwrap real).
 - `interactive/` — **problemas INTERATIVOS normalizados**: driver comum entre linguagens
   (`run.sh` roda árbitro+jogador por FIFOs; `prep.sh` materializa o árbitro — C++ compilado
   no host com `-static` e cache FORA de `scripts/`; `compare.sh` genérico 13/6/4;

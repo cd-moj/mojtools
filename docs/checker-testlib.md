@@ -147,14 +147,17 @@ bash mojtools/testlib/install-checker.sh <pacote> checker.cpp
 #    -> cria scripts/checker.cpp + scripts/compare.sh (a bridge) e roda um smoke
 #       (gabarito x gabarito tem de dar Accepted)
 
+# 1b. atalho equivalente pela CLI (localiza o mojtools sozinho; MOJTOOLS_DIR aponta):
+moj checker <pacote> checker.cpp
+
 # 2. teste com as suas soluções (good => Accepted, wrong => Wrong Answer):
 bash mojtools/build-and-test.sh cpp <pacote>/sols/good/sol.cpp <pacote> y
-bash mojtools/build-and-test.sh cpp <pacote>/sols/wrong/wa.cpp <pacote> y
+moj test <pacote> --run          # equivalente pela CLI (todas as good; exige bwrap real)
 #    a mensagem do checker aparece no log .compare de cada teste (e no report.html)
 
-# 3. transporte: 'moj push' NÃO carrega scripts/ — use o upload do pacote inteiro:
-tar -czf pacote.tar.gz -C <pacote> .
-moj upload <org>#<id> pacote.tar.gz
+# 3. transporte: 'moj push' agora CARREGA scripts/ (round-trip completo — conteúdo, +x e
+#    symlinks); 'moj upload <id> <pacote>' (aceita o DIRETÓRIO) segue valendo p/ o tar inteiro:
+moj push <pacote>
 #    (publique por último; confira depois com 'moj check <id>')
 ```
 
@@ -176,8 +179,9 @@ muda o checksum do pacote e dispara recalibração, como qualquer mudança de `s
   ao depurar.
 - **Usar `_wa` para gabarito quebrado**: gabarito inválido é `_fail` (erro de juiz),
   nunca WA — o aluno não tem culpa.
-- **Esquecer o `moj upload`**: `moj push` ignora `scripts/`; sem upload o problema fica
-  com o comparador default silenciosamente.
+- **Cliente antigo sem round-trip**: o `moj push` ATUAL carrega `scripts/`; numa CLI antiga o
+  push não envia scripts e o problema fica com o comparador default silenciosamente — atualize
+  a CLI ou use `moj upload <id> <dir>`.
 - **Trocar a ordem dos streams**: no MOJ a bridge chama a ordem PADRÃO testlib
   (`inf`=entrada, `ouf`=participante, `ans`=gabarito). Não compile com `-DBOCA_SUPPORT`
   nem reordene nada — isso é assunto da bridge.
