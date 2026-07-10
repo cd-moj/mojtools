@@ -1,31 +1,58 @@
 #!/bin/bash
+# check-deps.sh — doctor de dependências do MOJ (host de juiz + sandbox).
+# Chamado pelo judge/install.sh (fase "doctor") e útil à mão. Lista o que falta.
+#
+# Uso: check-deps.sh [--rootfs DIR] [--quiet]
+#   sem --rootfs  => modo HOST: os compiladores têm de estar no PATH do host.
+#   --rootfs DIR  => modo ROOTFS: os compiladores moram no rootfs (jaula); o host
+#                    só precisa das ferramentas de RUNTIME. Checa os compiladores
+#                    dentro de DIR/usr/{,local/}bin em vez do PATH.
+set -u
 
-HARDDEPS='bash awk getopt /usr/bin/time timeout bwrap diff make bc'
+ROOTFS=""; QUIET=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --rootfs) ROOTFS="${2:-}"; shift 2;;
+    --quiet)  QUIET=1; shift;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0;;
+    *) echo "check-deps: opção desconhecida: $1" >&2; exit 2;;
+  esac
+done
 
-SOFTDEPS='cset'
+# Ferramentas de RUNTIME do host (fora da jaula ou dirigindo-a). SEMPRE no host.
+HOST_HARD='bash jq curl bwrap timeout taskset flock getopt bc make diff awk sed grep
+           tar gzip getent sha256sum nproc base64 mktemp pkill'
+# Só no /usr/bin/time (GNU) — o cage-run chama por caminho absoluto.
+HOST_HARD_PATHS='/usr/bin/time'
+# Opcionais (degradam com aviso): cset (cgroup root), systemd-run (memlimit sem root),
+# podman+unzip (construir rootfs), wget (lang/riscv baixa rars), nvidia-smi/rocm-smi (gpu).
+HOST_SOFT='cset systemd-run podman unzip wget'
 
-COMPILERS='gcc g++ fpc javac gccgo python2 python3 bash spim ocamlopt rustc node'
+# Binário principal de cada linguagem aceita (basta UMA alternativa existir por grupo).
+# Espelha judge/agent/inventory.sh _LANGBIN.
+COMPILERS='gcc g++ javac java pypy3 python3 fpc mcs mono gccgo rustc ghc node swipl kotlinc spim'
 
-function checkdeps()
-{
-  local err=0
-  for arg; do
-    if ! which $arg &> /dev/null; then
-      echo "$arg"
-      ((err++))
-    fi
-  done
-  return $err
+_have_host()   { command -v "$1" >/dev/null 2>&1; }
+_have_rootfs() { local b="$1"; [[ -x "$ROOTFS/usr/bin/$b" || -x "$ROOTFS/usr/local/bin/$b" ]]; }
+_have_lang()   { if [[ -n "$ROOTFS" ]]; then _have_rootfs "$1"; else _have_host "$1"; fi; }
 
-}
+miss_hard=0 miss_soft=0 miss_lang=0
+report() { (( QUIET )) || echo "$@"; }
 
-echo "Checking HARDDEPS"
-checkdeps $HARDDEPS && echo 'OK.'
+report "== deps duros do HOST (runtime da jaula) =="
+for d in $HOST_HARD; do _have_host "$d" || { report "  FALTA: $d"; ((miss_hard++)); }; done
+for p in $HOST_HARD_PATHS; do [[ -x "$p" ]] || { report "  FALTA: $p"; ((miss_hard++)); }; done
+(( miss_hard == 0 )) && report "  OK."
 
-echo
-echo 'Checking SOFTDEPS'
-checkdeps $SOFTDEPS && echo 'OK.'
+report "== deps opcionais do HOST =="
+for d in $HOST_SOFT; do _have_host "$d" || { report "  ausente (opcional): $d"; ((miss_soft++)); }; done
+(( miss_soft == 0 )) && report "  OK."
 
-echo
-echo 'Checking Compilers/runtime'
-checkdeps $COMPILERS && echo 'OK.'
+report "== compiladores/runtimes (${ROOTFS:+rootfs=$ROOTFS}${ROOTFS:-host}) =="
+for c in $COMPILERS; do _have_lang "$c" || { report "  ausente: $c"; ((miss_lang++)); }; done
+(( miss_lang == 0 )) && report "  OK (todos presentes)."
+
+report ""
+report "resumo: duros_faltando=$miss_hard opcionais_ausentes=$miss_soft linguagens_ausentes=$miss_lang"
+# exit != 0 SÓ se faltar dep DURO (o que impede o juiz de funcionar).
+exit "$miss_hard"

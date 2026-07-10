@@ -31,7 +31,7 @@ de bug "Can't mkdir /etc/... (read-only)" (mountpoint inexistente na outra raiz)
 | Forçar o host (opt-out) | `CAGE_ROOT=host` no `agent.env` | toda jaula usa o toolchain do host |
 | Caminho fixo do rootfs | `CAGE_ROOT=/srv/moj-sysroot` no `agent.env` | aponta p/ outro rootfs já pronto |
 | Construir se faltar | `AGENT_BUILD_ROOTFS=1` no `agent.env` (precisa podman) | o agente roda `make-sysroot.sh` |
-| Por linguagem | `CAGE_ROOT_<LANG>=…` (ex.: `CAGE_ROOT_JAVA`, `CAGE_ROOT_PY3`) | sobrescreve só aquela linguagem |
+| Por linguagem | `CAGE_ROOT_<LANG>=…` (ex.: `CAGE_ROOT_JAVA`, `CAGE_ROOT_PY`) | sobrescreve só aquela linguagem |
 | Por problema | `CAGE_ROOT=…` no `conf` do problema | sobrescreve só aquele problema |
 | Manual | `cage-run.sh -R /srv/moj-sysroot …` | uso direto/avulso |
 

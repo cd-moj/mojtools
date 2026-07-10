@@ -43,7 +43,7 @@ stmt=""; for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && stmt="$e" 
 [[ -n "$stmt" ]] && add has_statement 1 "enunciado.$stmt" || add has_statement 0 "sem docs/enunciado.{md,org,tex}"
 
 # --- html_builds (MESMO renderizador do "Pré-visualizar": render-statement.sh — pandoc
-#     standalone, sem o Makefile/scaffolding do repo; funciona p/ legados e problemas do Gitea) ---
+#     standalone, sem o Makefile/scaffolding do repo; funciona p/ legados e problemas atuais) ---
 html_built=false; render_leak=""; enunf=""; efmt=md
 for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && { enunf="$PKG/docs/enunciado.$e"; efmt="$e"; break; }; done
 if [[ -n "$enunf" ]]; then

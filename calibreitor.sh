@@ -121,7 +121,7 @@ done
 # nenhuma linguagem calibrou (todas faltaram/falharam) -> fallback sensato, não 10000
 [[ "$BESTTIME" == 10000 ]] && BESTTIME="$CALIBRATIONTL"
 echo "TL[default]=$BESTTIME" >> "$TLHOST"
-# tl genérico = fallback p/ hosts sem calibração própria (NFS compartilhado)
+# tl genérico = fallback p/ hosts sem calibração própria
 cp -f "$TLHOST" "$PROBLEMDIR/tl"
 
 echo "Calibrated TL ($HOSTNAME):"

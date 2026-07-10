@@ -80,7 +80,7 @@ author=""
 # Modelo cache: os juízes calibram no cache local e REPORTAM o TL (store por host); o TL
 # servível = MÁX entre hosts p/ o checksum ATUAL do pacote. Se o pacote mudou e ninguém
 # recalibrou ainda, fica {} (o tl antigo é descartado). Fallback legado: tl.<host>/tl no
-# pacote (durante a migração / juízes que ainda escrevem no NFS).
+# pacote (fallback p/ pacotes antigos sem o campo).
 tl_json='{}'
 storef="$MOJ_TL_STORE/$ID.json"
 cur_cks="$(bash "$MOJTOOLS_DIR/tl-checksum.sh" "$PKG" 2>/dev/null)"

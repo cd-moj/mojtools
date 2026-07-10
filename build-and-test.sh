@@ -58,7 +58,7 @@ function write_report_env()
 }
 
 # gera report.org + report.html (auto-contido). Toda saída vai para o trace —
-# nunca para stdout, que carrega o contrato do veredicto lido pelo root-daemon.
+# nunca para stdout, que carrega o contrato do veredicto lido pelo agente do juiz.
 function gen_report()
 {
   write_report_env "${1:-normal}"
@@ -323,7 +323,7 @@ fi
 
 declare -A TL
 # TL por host: usa tl.<hostname> se existir (calibração específica da máquina,
-# compartilhada via NFS sem replicar o pacote), senão o tl padrão do pacote.
+# calibrada neste host), senão o tl padrão do pacote.
 TLFILE="$PROBLEMTEMPLATEDIR/tl"
 [[ -e "$PROBLEMTEMPLATEDIR/tl.$HOSTNAME" ]] && TLFILE="$PROBLEMTEMPLATEDIR/tl.$HOSTNAME"
 if [[ ! -e "$TLFILE" ]]; then

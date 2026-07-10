@@ -13,8 +13,8 @@
 # run/tl/<id>.json); a gestão o compara com o checksum calibrado em run/tl p/ marcar "precisa
 # recalibrar". "" = não calibrado (staleness não se aplica) ou ainda não carimbado.
 # Fonte da verdade de posse/compart./coleção = .moj-meta.json no pacote + registro de donos.
-# Gitea é a FONTE ÚNICA: problemas SEM dono (legado pré-migração) são IGNORADOS no índice.
-# Não chama o Gitea (rápido; leitura de arquivos pequenos do cache de pacotes).
+# O índice é a FONTE ÚNICA: problemas SEM dono (legado pré-migração) são IGNORADOS.
+# Sem serviço externo (rápido; leitura de arquivos pequenos do repo git local de cada problema).
 set -u
 : "${MOJ_PROBLEMS_DIR:=/home/ribas/moj/moj-problems}"
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
@@ -53,7 +53,7 @@ if [[ -f "$CKSCACHE" ]]; then
 fi
 newcache="$(mktemp)"
 # seed lateral de public_at p/ o histórico (backfill; a migração não gravou a data). meta.public_at
-# (Gitea, daqui pra frente) tem prioridade; o seed cobre os antigos. Ver server/bin/backfill-public-at.sh.
+# (do .moj-meta.json, daqui pra frente) tem prioridade; o seed cobre os antigos. Ver server/bin/backfill-public-at.sh.
 PUBSEED_F="$CONTESTSDIR/treino/var/public-at-seed.json"
 declare -A PUBSEED
 if [[ -f "$PUBSEED_F" ]]; then
@@ -127,7 +127,7 @@ rm -f "$newcache"
 
 # 3) monta o JSON final numa passada (TSV -> JSON). Aplica o registro de diretórios
 #    (problem-repos.json): repos migrados/criados dão dono+colaboradores ao problema mesmo
-#    antes do .moj-meta.json chegar ao NFS.
+#    antes do .moj-meta.json ser commitado no repo do problema.
 REG="$CONTESTSDIR/treino/var/problem-repos.json"; reg="$(cat "$REG" 2>/dev/null)"; [[ -n "$reg" ]] || reg='{}'
 jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
   [ inputs | split("\t")
