@@ -60,6 +60,12 @@ dt=""; [[ -f "$meta" ]] && dt="$(jq -r '.display_title // empty' "$meta" 2>/dev/
 colls='[]'
 [[ -f "$meta" ]] && colls="$(jq -c '(.collections // [])' "$meta" 2>/dev/null)"; [[ -n "$colls" ]] || colls='[]'
 
+# ----- 2c. linguagens de submissão (restrição por-problema; []/ausente = todas) -----
+# Servido no json do treino p/ o dropdown filtrar (web/treino/problema) e p/ ser o último elo
+# da cadeia de fallback de contest (handlers/contest/problems.sh).
+langs='[]'
+[[ -f "$meta" ]] && langs="$(jq -c '(.languages // [])' "$meta" 2>/dev/null)"; [[ -n "$langs" ]] || langs='[]'
+
 # ----- 3. tags (linhas começando com #, minúsculas) -----
 tags='[]'
 [[ -f "$PKG/tags" ]] && tags="$(grep -E '^#' "$PKG/tags" 2>/dev/null | tr 'A-Z' 'a-z' \
@@ -151,8 +157,8 @@ grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
 # ----- 8. escreve (ou remove) o índice servível -----
 mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
-  --argjson tags "$tags" --argjson colls "$colls" --rawfile html "$b64f" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, statement_html_b64:$html}')"
+  --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, statement_html_b64:$html}')"
 rm -f "$b64f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$TREINO_JSONS/.$ID.tmp"
