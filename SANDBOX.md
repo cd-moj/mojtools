@@ -6,6 +6,9 @@ A jaula `bwrap` (`cage-run.sh`) que isola cada compilação/execução pode usar
   Ubuntu 24.04 com todos os compiladores das linguagens aceitas). Toolchain **reprodutível e igual
   em todo juiz**, independente do SO do host. O `moj-agent` usa o **`$HOME/moj-sysroot` já montado**
   (o operador provisiona/monta; o agente **não recria**); também dá p/ ligar pelo flag `-R` do cage-run.
+  **Como provisionar** (o `judge/install.sh` faz por você): `make sysroot` (build+export local),
+  ou `make sysroot-tar` → tarball zstd p/ máquinas **sem podman** (C3SL), ou `make sysroot-push` →
+  imagem OCI `ghcr.io/cd-moj/moj-sysroot` que o juiz puxa (`install.sh --sysroot pull`). Ver o `Makefile`.
   Se faltar, `AGENT_BUILD_ROOTFS=1` manda construir com `make-sysroot.sh` (precisa podman).
 - **Raiz do sistema (host) — opt-out** — a jaula monta `/usr`, `/lib`, `/bin`, … do **host**. O
   toolchain é o do host (não reprodutível); use só p/ depurar ou onde não dá p/ construir o rootfs.

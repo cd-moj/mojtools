@@ -1,0 +1,56 @@
+# mojtools/Makefile — sandbox: constrói/publica o rootfs da jaula (moj-sysroot) e checa deps.
+# O rootfs (sysroot/Containerfile) traz os compiladores das linguagens aceitas. O judge o
+# consome por `--sysroot pull` (imagem OCI) ou `--sysroot tar` (tarball, p/ o C3SL sem podman).
+#
+#   make sysroot                 # build + EXPORTA p/ um diretório (uso local direto)
+#   make sysroot-image           # só constrói a imagem OCI (tag moj-sysroot)
+#   make sysroot-tar             # imagem -> tarball zstd (artefato p/ máquinas sem podman)
+#   make sysroot-push            # publica em ghcr.io/cd-moj/moj-sysroot:<TAG>
+
+SHELL      := /bin/bash
+TAG        ?= $(shell date +%Y-%m-%d)
+IMAGE      ?= moj-sysroot
+REGISTRY   ?= ghcr.io/cd-moj/moj-sysroot
+BASE       ?= ubuntu:24.04
+OUT        ?= $(HOME)/moj-sysroot
+TARFILE    ?= moj-sysroot-$(TAG).tar.zst
+# .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
+APL        ?=
+
+.PHONY: help check deps sysroot sysroot-image sysroot-tar sysroot-push
+
+help:
+	@sed -n '1,12p' Makefile
+
+## check — bash -n em todos os .sh do repo
+check:
+	@find . -name '*.sh' -not -path './sysroot/rootfs/*' -print0 | xargs -0 -n1 bash -n \
+	  && echo "sintaxe ok"
+
+## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
+deps:
+	bash check-deps.sh $(if $(ROOTFS),--rootfs $(ROOTFS),)
+
+## sysroot — build da imagem + EXPORTA p/ $(OUT) (make-sysroot.sh)
+sysroot:
+	bash make-sysroot.sh --base $(BASE) --tag $(IMAGE) --out $(OUT) $(if $(APL),--apl $(APL),)
+
+## sysroot-image — só constrói a imagem OCI (sem exportar)
+sysroot-image:
+	bash make-sysroot.sh --base $(BASE) --tag $(IMAGE) --no-export $(if $(APL),--apl $(APL),)
+
+## sysroot-tar — imagem -> tarball zstd (para máquinas SEM podman: judge --sysroot tar)
+sysroot-tar: sysroot-image
+	@command -v zstd >/dev/null || { echo "preciso de zstd"; exit 1; }
+	cid=$$(podman create $(IMAGE) true); \
+	podman export "$$cid" | zstd -q -o $(TARFILE); \
+	podman rm "$$cid" >/dev/null 2>&1 || true; \
+	echo ">> $(TARFILE) pronto (use: judge/install.sh --sysroot tar --sysroot-tar $(TARFILE))"
+
+## sysroot-push — publica a imagem no registry (precisa `podman login $(REGISTRY)`)
+sysroot-push: sysroot-image
+	podman tag $(IMAGE) $(REGISTRY):$(TAG)
+	podman tag $(IMAGE) $(REGISTRY):latest
+	podman push $(REGISTRY):$(TAG)
+	podman push $(REGISTRY):latest
+	@echo ">> publicado $(REGISTRY):$(TAG) (+ :latest)"
