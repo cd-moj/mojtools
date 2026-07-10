@@ -29,7 +29,12 @@ chmod +x "$PKG/scripts/compare.sh"
   echo "aviso: scripts/testlib.h local existe e TEM PRECEDÊNCIA sobre o vendorado ($HERE/testlib.h) — mantenha só se for intencional"
 
 # smoke: gabarito contra ele mesmo tem de ser Accepted (exit 4)
-first="$(find "$PKG/tests/input" -maxdepth 1 -type f 2>/dev/null | LC_ALL=C sort | head -1)"
+# `| head -1` fecha o pipe cedo; com muitos testes o `sort` ainda escrevendo
+# leva SIGPIPE (rc=141) e o `pipefail` do topo do script aborta o instalador
+# --- determinístico (não flake) em pacotes com centenas de testes. O
+# `|| true` interno absorve o SIGPIPE sem mascarar erro real (find/sort vazio
+# só resulta em `first` vazio, tratado abaixo).
+first="$(find "$PKG/tests/input" -maxdepth 1 -type f 2>/dev/null | LC_ALL=C sort | head -1 || true)"
 if [[ -n "$first" ]]; then
   name="$(basename "$first")"; exp="$PKG/tests/output/$name"
   if [[ -f "$exp" ]]; then
