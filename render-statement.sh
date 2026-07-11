@@ -16,11 +16,19 @@ case "$fmt" in org) pf=org;; tex) pf=latex;; *) pf=markdown;; esac
 
 esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
+# --resource-path do pandoc resolve imagens relativas ao CWD do CHAMADOR, não à
+# pasta do enunciado (achado real: gen-problem-json.sh/preview.sh chamam com o
+# enunciado por caminho absoluto mas sem "cd" pra dentro de docs/ antes -- sem
+# isso, toda imagem local vira <img src="arquivo.png"> quebrado em vez de
+# embutida em base64, mesmo com --embed-resources). Captura o dir do FONTE
+# original (antes da possível cópia p/ tempfile abaixo, que iria pra /tmp).
+srcdir="$(cd "$(dirname "$src")" 2>/dev/null && pwd)" || srcdir="."
+
 # o título vem do campo -> remove um "% Título" legado da 1ª linha do fonte (não duplica)
 rsrc="$src"
 if head -1 "$src" 2>/dev/null | grep -q '^%'; then rsrc="$(mktemp)"; tail -n +2 "$src" > "$rsrc"; fi
 
-html="$(pandoc -f "$pf" --mathml -s --embed-resources "$rsrc" 2>/dev/null)"
+html="$(pandoc -f "$pf" --mathml -s --embed-resources --resource-path="$srcdir" "$rsrc" 2>/dev/null)"
 [[ -n "$html" ]] || html="$(printf '<!DOCTYPE html><html><head></head><body><pre>%s</pre></body></html>' \
   "$(esc < "$rsrc")")"
 [[ "$rsrc" != "$src" ]] && rm -f "$rsrc"
