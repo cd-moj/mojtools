@@ -50,4 +50,4 @@ if [[ -n "$first" ]]; then
 fi
 
 echo "instalado: scripts/checker.cpp + scripts/compare.sh (bridge testlib)"
-echo "lembrete: 'moj push' NÃO carrega scripts/ — transporte o pacote com 'moj upload <id> <tar.gz>'."
+echo "lembrete: 'moj push' carrega o scripts/ (round-trip completo); 'moj upload <id> <tar.gz>' sobe o pacote inteiro."

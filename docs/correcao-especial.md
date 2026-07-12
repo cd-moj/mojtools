@@ -18,9 +18,10 @@ Regras gerais:
 
 - **`chmod +x` obrigatório** em todo `scripts/*.sh` — `cage-run.sh` executa o script direto
   (`is no executable` ⇒ Compilation Error em tudo).
-- **Transporte:** `moj push` **não** carrega `scripts/`. Use `moj upload <id> <tar.gz>` (sobe o
-  pacote inteiro). Publicar **por último** (um `upload` posterior reverte `public` se o
-  `.moj-meta.json` do tar tiver `public:false`).
+- **Transporte:** `moj push`/`moj clone` fazem o **round-trip completo** de `scripts/` (conteúdo,
+  bit `+x` e symlinks — campo `scripts_files` da API) e do `tests/score`. `moj upload <id> <tar.gz>`
+  segue existindo como via do pacote inteiro; nesse caso, publicar **por último** (um `upload`
+  posterior reverte `public` se o `.moj-meta.json` do tar tiver `public:false`).
 - **Checksum:** `tl-checksum.sh` inclui `scripts/*` (conteúdo + bit +x); mudar um driver/comparador
   invalida o cache do juiz e dispara recalibração.
 - **Comparador (contrato):** recebe `$1 saída_do_time $2 saída_esperada $3 entrada`; `exit 4` = AC,

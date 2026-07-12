@@ -86,4 +86,4 @@ else
 fi
 
 echo "instalado: scripts/arbitro.$ext + driver (c +symlinks:$linked) + compare$( ((SCORE)) && echo ' + summary(rank)' )"
-echo "lembrete: 'moj push' NÃO carrega scripts/ — transporte o pacote com 'moj upload <id> <tar.gz>'."
+echo "lembrete: 'moj push' carrega o scripts/ (round-trip completo, symlinks inclusive); 'moj upload <id> <tar.gz>' sobe o pacote inteiro."
