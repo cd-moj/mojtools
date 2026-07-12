@@ -129,6 +129,13 @@ echo $workdirbase
 
 cd $(dirname $0)
 
+# Raiz do mojtools, EXPORTADA: o compare.sh do pacote é EXECUTADO (não sourced), então não
+# enxerga as variáveis daqui. Os comparadores baseados em testlib precisam achar o cabeçalho
+# compartilhado em $MOJTOOLS_DIR/checkers/testlib.h em vez de cada pacote carregar sua cópia
+# de 190KB. Ver checkers/README.md.
+MOJTOOLS_DIR=$PWD
+export MOJTOOLS_DIR
+
 cp "$SRCCODE" $workdir/
 
 declare -a BIN
