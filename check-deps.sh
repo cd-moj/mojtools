@@ -66,6 +66,22 @@ report "== compiladores/runtimes ($([[ -n "$ROOTFS" ]] && printf 'rootfs=%s' "$R
 for c in $COMPILERS; do _have_lang "$c" || { report "  ausente: $c"; ((miss_lang++)); }; done
 (( miss_lang == 0 )) && report "  OK (todos presentes)."
 
+# Bit de execução dos scripts de linguagem — dep DURA, e não é firula: o cage-run.sh monta cada um
+# como /tmp/script (bind READ-ONLY) e o executa DIRETO (`timeout $TLE /tmp/script`, sem `bash`).
+# Sem +x é "Permission denied" e não dá nem p/ consertar de dentro da jaula. O `kt` nasceu 644 no git
+# e Kotlin (linguagem oficial do ICPC) não rodava em juiz NENHUM provisionado do repositório.
+report "== scripts de linguagem executáveis =="
+_SELF="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+noexec=""
+for f in "$_SELF"/lang/*/compile.sh "$_SELF"/lang/*/run.sh "$_SELF"/lang/*/compare.sh "$_SELF"/lang/compare.sh; do
+  [[ -e "$f" ]] || continue
+  [[ -x "$f" ]] || { noexec="$noexec ${f#"$_SELF"/}"; ((miss_hard++)); }
+done
+if [[ -n "$noexec" ]]; then
+  report "  SEM +x (a jaula executa o script direto):$noexec"
+  report "  conserte no REPO: git update-index --chmod=+x <arquivo>   (chmod local some no próximo clone)"
+else report "  OK."; fi
+
 report ""
 report "resumo: duros_faltando=$miss_hard opcionais_ausentes=$miss_soft linguagens_ausentes=$miss_lang"
 # exit != 0 SÓ se faltar dep DURO (o que impede o juiz de funcionar).

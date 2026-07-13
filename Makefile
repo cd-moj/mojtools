@@ -22,10 +22,21 @@ APL        ?=
 help:
 	@sed -n '1,12p' Makefile
 
-## check — bash -n em todos os .sh do repo
+## check — bash -n em todos os .sh do repo + bit de execução dos scripts de linguagem
+# O +x de lang/*/{compile,run,compare}.sh é LOAD-BEARING: o cage-run.sh monta cada um como
+# /tmp/script (bind READ-ONLY) e o executa DIRETO (`timeout $$TLE /tmp/script`, sem `bash`) — sem o
+# bit é "Permission denied", e nem dá p/ consertar de dentro da jaula. Checamos o modo NO ÍNDICE DO
+# GIT (é ele que um `clone` materializa; um `chmod` local não viaja). O `kt` nasceu 644 e Kotlin
+# (linguagem oficial do ICPC) não rodava em juiz nenhum provisionado do repositório.
 check:
 	@find . -name '*.sh' -not -path './sysroot/rootfs/*' -print0 | xargs -0 -n1 bash -n \
 	  && echo "sintaxe ok"
+	@bad="$$(git ls-files -s 'lang/*/compile.sh' 'lang/*/run.sh' 'lang/*/compare.sh' 'lang/compare.sh' 2>/dev/null \
+	         | awk '$$1 != "100755" { print "    " $$4 }')"; \
+	if [ -n "$$bad" ]; then \
+	  echo "SEM +x NO GIT (a jaula executa o script direto -> Permission denied):"; echo "$$bad"; \
+	  echo "  conserte: git update-index --chmod=+x <arquivo>"; exit 1; \
+	else echo "bits de execução ok (lang/*/{compile,run,compare}.sh)"; fi
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:
