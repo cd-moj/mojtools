@@ -267,8 +267,10 @@ O jeito recomendado é escrever o checker em C++ com a [testlib](https://github.
 bash mojtools/testlib/install-checker.sh <pacote> checker.cpp
 ```
 
-Isso põe o **fonte** em `scripts/checker.cpp` e uma ponte em `scripts/compare.sh`, que compila o
-checker no juiz sob demanda. **Nunca commite o binário do checker.**
+Isso põe o **fonte** em `scripts/checker.cpp` e um **stub** de 10 linhas em `scripts/compare.sh`,
+que chama a bridge do mojtools (`testlib/checker-bridge.sh`) — é ela que compila o checker no juiz
+sob demanda. O pacote **não** carrega a bridge nem o `testlib.h`. **Nunca commite o binário do
+checker.**
 
 Guia de autoria, com receitas prontas: **[docs/checker-testlib.md](docs/checker-testlib.md)**.
 

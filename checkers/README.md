@@ -1,34 +1,38 @@
-# `checkers/` — apoio compartilhado para corretores testlib
+# `checkers/` — COMPAT (o canônico mora em `testlib/`)
 
-## `testlib.h`
+Este diretório existe só para **não quebrar pacotes antigos**. O caminho oficial do checker
+testlib é:
 
-Cabeçalho do [testlib](https://github.com/MikeMirzayanov/testlib/) (o de sempre nos pacotes
-estilo *polygon*/Maratona), **compartilhado**: o pacote do problema carrega só o seu
-`scripts/checker.cpp`, não uma cópia de 190 KB do cabeçalho.
+- **bridge**: `mojtools/testlib/checker-bridge.sh` (fonte única — o pacote leva só o
+  `testlib/compare-stub.sh` como `scripts/compare.sh`);
+- **cabeçalho**: `mojtools/testlib/testlib.h` (vendorado, uma cópia só).
 
-O `build-and-test.sh` **exporta `MOJTOOLS_DIR`** (o `scripts/compare.sh` do pacote é
-*executado*, não *sourced*, então não herda as variáveis dele). Um comparador testlib acha o
-cabeçalho nesta ordem:
+`checkers/testlib.h` é um **symlink** para `../testlib/testlib.h`: pacotes migrados antes da
+unificação carregam uma **cópia da bridge** dentro de `scripts/compare.sh` que procura o
+cabeçalho em `$MOJTOOLS_DIR/checkers/testlib.h`. Eles continuam funcionando; pacote novo (ou
+reinstalado com `install-checker.sh`) não passa mais por aqui.
 
-1. `$MOJTOOLS_DIR/checkers/testlib.h`
-2. `$PWD/checkers/testlib.h` (o `build-and-test.sh` faz `cd $(dirname $0)`, então o CWD é o
-   mojtools)
-3. `<pacote>/scripts/testlib.h` (fallback: pacote antigo, ou uso fora do juiz)
+## Por que a bridge saiu de dentro do pacote
 
-## Compilar um checker: `-DBOCA_SUPPORT` e o contrato de saída
+Cada pacote carregava a **sua cópia** da bridge. Quando se descobriu que o fallback de
+compilação (`g++` da rootfs via `bwrap`, o único caminho num juiz — que não tem compilador no
+host) bindava o pacote no **caminho absoluto do host dentro de uma rootfs read-only**
+(`bwrap: Can't mkdir parents … Read-only file system` ⇒ checker não compila ⇒ **UE em todo
+teste**), o conserto no mojtools **não alcançou nenhum dos 198 pacotes já empacotados**. Daí a
+regra:
 
-O juiz chama o comparador como `compare.sh <saída_do_time> <esperada> <entrada>` e lê o código
-de saída: **4 = AC, 5 = AC/PE, 6 = WA** (convenção BOCA). Compilado com `-DBOCA_SUPPORT`, o
-testlib já recebe os argumentos nessa ordem e já devolve 4/5/6.
+> **driver canônico que roda no HOST ⇒ o pacote leva um STUB** (aponta p/ o mojtools);
+> **o que entra na JAULA (`<lang>/run.sh`, `compile.sh`) ⇒ cópia real.**
 
-**Cuidado com o PE.** No BOCA, *presentation error* é rejeição; no MOJ, **exit 5 vale
-`AC,PE`, ou seja, ACEITO**. O testlib devolve PE em dois caminhos:
+## O contrato de saída (e a pegadinha do PE)
 
-- `quitf(_pe, ...)` explícito do checker (ex.: "esperava SIM ou NAO, achei LIXO");
-- saída truncada (`_unexpected_eof`) quando `ENABLE_UNEXPECTED_EOF` não está definido.
+O juiz chama `compare.sh <saída_do_time> <esperada> <entrada>` e lê o código: **4 = AC,
+5 = AC/PE, 6 = WA** (qualquer outro = erro de juiz). A bridge canônica compila o checker com
+**testlib PADRÃO** (sem `-DBOCA_SUPPORT`) e traduz ela mesma: `_ok`⇒4; `_wa`/`_pe`/`_dirt`/
+eof-inesperado⇒**6**; `_fail`/`_points`⇒erro de juiz.
 
-Sem tratamento, **uma saída lixo ou truncada é ACEITA**. Por isso o `compare.sh` dos pacotes
-migrados mapeia **exit 5 → 6 (WA)**, cobrindo os dois caminhos. (Nos pacotes da IX Maratona do
-IFB e da V Escola de Inverno havia 5 problemas cujos autores já tinham patchado o
-`testlib.h` na mão para o segundo caso — o mapeamento no wrapper resolve de forma uniforme e
-sem manter um testlib divergente.)
+O cuidado com o PE está embutido nessa tradução: o `_pe` do testlib é "saída fora do formato /
+não parseável" (= **resposta errada**), enquanto o **exit 5** do MOJ significa "certa, só o
+espaçamento difere" (= **aceito**). Mapear `_pe` para 5 faria **saída lixo ou truncada ser
+ACEITA** — por isso ele vai para 6. (As cópias antigas, compiladas com `-DBOCA_SUPPORT`,
+resolviam o mesmo problema convertendo `5 → 6` no fim do script.)

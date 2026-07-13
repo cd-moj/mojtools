@@ -16,6 +16,8 @@
 #   tests_paired      — todo input tem output e vice-versa
 #   has_good_sol      — >=1 solução em sols/good/
 #   good_sol_accepts  — (se VALIDATE_RUN_SOLS=1 e há bwrap) cada sols/good é Accepted
+#   scripts_exec      — todo scripts/**/*.sh tem +x (o juiz executa direto; sem o bit é UE)
+#   checker_src       — (se compare.sh é o checker testlib) existe scripts/checker.cpp
 set -u
 
 PKG="${1:?uso: validate-problem.sh <pkgdir> [id]}"
@@ -69,8 +71,31 @@ if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$
 fi
 # --- aviso SOFT: checker BINÁRIO commitado como compare.sh (padrão antigo/deprecado) ---
 # normalize p/ fonte + bridge: scripts/checker.cpp via mojtools/testlib/install-checker.sh
+compare_elf=false
 if [[ -f "$PKG/scripts/compare.sh" ]] && file -b "$PKG/scripts/compare.sh" 2>/dev/null | grep -q ELF; then
+  compare_elf=true
   render_leak="${render_leak}compare.sh-binário(use-testlib/install-checker.sh) "
+fi
+
+# --- scripts_exec (HARD): o bit +x da correção especial é LOAD-BEARING e nada mais o checava.
+#     O compare.sh é EXECUTADO pelo juiz (no host, FORA da jaula), o <lang>/prep.sh é testado
+#     com -x antes do source, e <lang>/{compile,run}.sh são montados na JAULA e executados
+#     DIRETO. Sem o bit: "Permission denied" (exit 126) => UE em TODO teste — e o tl-checksum
+#     ainda passa a divergir do servidor (o modo entra no hash). ---
+noexec=""
+if [[ -d "$PKG/scripts" ]]; then
+  while IFS= read -r f; do [[ -x "$f" ]] || noexec+="${f#"$PKG/"} "; done \
+    < <(find "$PKG/scripts" -type f -name '*.sh' 2>/dev/null | LC_ALL=C sort)
+fi
+[[ -z "$noexec" ]] && add scripts_exec 1 \
+  || add scripts_exec 0 "sem +x (o juiz executa o script direto => UE em todo teste): $noexec"
+
+# --- checker_src (HARD): compare.sh é o bridge/stub do testlib => o FONTE tem de vir junto.
+#     (O bridge compila scripts/checker.cpp no juiz, sob demanda; sem o fonte, todo teste é UE.) ---
+if [[ -f "$PKG/scripts/compare.sh" && "$compare_elf" == false ]] \
+   && grep -qE 'checker-bridge|checker\.cpp' "$PKG/scripts/compare.sh" 2>/dev/null; then
+  [[ -f "$PKG/scripts/checker.cpp" ]] && add checker_src 1 "scripts/checker.cpp" \
+    || add checker_src 0 "compare.sh é o checker testlib, mas falta scripts/checker.cpp"
 fi
 
 # --- examples / tests pairing ---

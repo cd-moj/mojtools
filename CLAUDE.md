@@ -52,17 +52,28 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `moj interactive`, `moj test --run` (julga local via build-and-test; exige bwrap real).
 - `interactive/` — **problemas INTERATIVOS normalizados**: driver comum entre linguagens
   (`run.sh` roda árbitro+jogador por FIFOs; `prep.sh` materializa o árbitro — C++ compilado
-  no host com `-static` e cache FORA de `scripts/`; `compare.sh` genérico 13/6/4;
+  com `-static` e cache FORA de `scripts/`; `compare.sh` genérico 13/6/4;
   `summary-score.sh` p/ ranking) + `install-interactive.sh <pkg> <arbitro> [--score]`.
   Protocolo: árbitro lê o teste de `argv[1]`; ÚLTIMA linha do stderr = resultado
   (`WRONG <motivo>` ⇒ WA). Guia: `docs/problema-interativo.md`; técnico: `interactive/README.md`.
 - `testlib/` — **checkers testlib normalizados**: `testlib.h` vendorada + `checker-bridge.sh`
-  (vai p/ o pacote como `scripts/compare.sh`; compila `scripts/checker.cpp` no juiz sob demanda,
-  cache FORA de `scripts/` p/ não poluir o tl-checksum) + `install-checker.sh <pkg> <checker.cpp>`.
+  (compila `scripts/checker.cpp` no juiz sob demanda, cache FORA de `scripts/` p/ não poluir o
+  tl-checksum) + `compare-stub.sh` + `install-checker.sh <pkg> <checker.cpp>`.
   Checker é testlib PADRÃO (sem `-DBOCA_SUPPORT`); mapa: `_ok`⇒AC, `_wa`/`_pe`/eof⇒WA (o `_pe`
   da testlib é "formato inválido" = errado, NÃO é o AC,PE do MOJ), `_fail`/`quitp`⇒UE. **Nunca
   commitar binário de checker** (padrão antigo deprecado; o validate avisa). Guia de autoria:
   `docs/checker-testlib.md`; técnico: `testlib/README.md`.
+- **DRIVER CANÔNICO NO PACOTE = STUB, NUNCA CÓPIA** (regra, e ela é cara de aprender): o que
+  roda **no HOST** — `scripts/compare.sh` (checker/interativo), `scripts/<lang>/prep.sh`,
+  `scripts/summary.sh` — vai p/ o pacote como um **stub de ~10 linhas** que chama o canônico do
+  mojtools (`testlib/compare-stub.sh`, `interactive/{prep,compare,summary}-stub.sh`; o
+  `build-and-test.sh` **exporta `MOJTOOLS_DIR`**). Só o que **entra na JAULA**
+  (`scripts/<lang>/{run,compile}.sh`) é **cópia real** — lá dentro o mojtools não existe.
+  Motivo: cada pacote carregava a sua cópia da bridge, e um bug de `bwrap` nela (bind do pacote
+  no caminho absoluto do host dentro da rootfs READ-ONLY ⇒ `Can't mkdir parents` ⇒ checker não
+  compila ⇒ **UE em todo teste**) nasceu replicado em **198 pacotes** — o conserto no mojtools
+  não alcançava nenhum. O `+x` dos stubs é load-bearing (o `make check` confere no índice do
+  git): o handler de `script-templates` do cdmoj copia p/ o pacote o bit **do alvo** do symlink.
 - `tl-checksum.sh` — checksum do pacote p/ invalidar o TL quando muda. Também é **carimbado no
   índice de donos** por `gen-problem-owners.sh` (campo `tl_checksum`, SÓ p/ problemas já calibrados
   — têm `run/tl/<id>.json`) p/ a gestão comparar com o checksum calibrado e marcar "precisa

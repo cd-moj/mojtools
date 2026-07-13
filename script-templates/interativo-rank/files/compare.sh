@@ -1,1 +1,1 @@
-../../../interactive/compare.sh
+../../../interactive/compare-stub.sh

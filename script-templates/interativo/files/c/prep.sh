@@ -1,1 +1,1 @@
-../../../../interactive/prep.sh
+../../../../interactive/prep-stub.sh

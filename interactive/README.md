@@ -6,11 +6,16 @@ por stdin/stdout dentro da jaula. **Tutorial de autoria (comece por aqui):
 
 | arquivo | vira no pacote | papel |
 |---|---|---|
-| `run.sh` | `scripts/c/run.sh` (+ symlinks `scripts/<lang> -> c`) | roda árbitro+jogador cruzados por FIFOs (`stdbuf -oL`, `/bin/time` nos dois), materializa o RESULTADO em `/tmp/out`, trata TL (TERM), RTE e crash do árbitro. Driver ÚNICO — dispatch por extensão do `$BIN` (compilados, `.py`, `.sh`; melhor esforço `.js`/`.class`). |
-| `prep.sh` | `scripts/c/prep.sh` | materializa `$workdir/arbitro` a partir de `scripts/arbitro.{cpp,cc,py,sh}` (ou `scripts/arbitro` pronto). C++ compila NO HOST com `-static` (roda dentro do rootfs) e cache em `<pkg>/.arbitro-cache/` (fora do tl-checksum; o FONTE entra no checksum). Fallback: g++ do rootfs via bwrap. Sourced — nunca `exit`. |
-| `compare.sh` | `scripts/compare.sh` | veredicto por teste a partir de `/tmp/out`: vazio ⇒ **13**=UE; última linha `WRONG …` ⇒ **6**=WA; senão ⇒ **4**=AC + ecoa `SCORE=<resultado>`. Problema pode substituir por um custom (ex.: razão contra `tests/output`, padrão fcte-delivery). |
-| `summary-score.sh` | `scripts/summary.sh` (com `--score`) | ranking: soma os `SCORE` dos testes AC; qualquer WA zera; sobrescreve `FINALRESP` (+`SCORE`/`SCORE_MAX`/`SCORE_KIND=rank`). |
+| `run.sh` | `scripts/c/run.sh` (+ symlinks `scripts/<lang> -> c`) — **CÓPIA REAL** (entra na JAULA) | roda árbitro+jogador cruzados por FIFOs (`stdbuf -oL`, `/bin/time` nos dois), materializa o RESULTADO em `/tmp/out`, trata TL (TERM), RTE e crash do árbitro. Driver ÚNICO — dispatch por extensão do `$BIN` (compilados, `.py`, `.sh`; melhor esforço `.js`/`.class`). |
+| `prep.sh` | `scripts/c/prep.sh` = **STUB** (`prep-stub.sh`; roda no HOST) | materializa `$workdir/arbitro` a partir de `scripts/arbitro.{cpp,cc,py,sh}` (ou `scripts/arbitro` pronto). C++ compila com `-static` (roda dentro do rootfs) e cache em `<pkg>/.arbitro-cache/` (fora do tl-checksum; o FONTE entra no checksum), com `flock` (juiz multi-slot). Usa o `g++` do host ou — o caso normal num juiz — o da rootfs via `bwrap`, **bindando tudo sob `/tmp`** (a rootfs é `/` READ-ONLY: bindar caminho do host lá dentro é `Can't mkdir parents` ⇒ árbitro não compila ⇒ UE). Sourced — nunca `exit`. |
+| `compare.sh` | `scripts/compare.sh` = **STUB** (`compare-stub.sh`; roda no HOST) | veredicto por teste a partir de `/tmp/out`: vazio ⇒ **13**=UE; última linha `WRONG …` ⇒ **6**=WA; senão ⇒ **4**=AC + ecoa `SCORE=<resultado>`. Problema pode substituir por um custom (ex.: razão contra `tests/output`, padrão fcte-delivery). |
+| `summary-score.sh` | `scripts/summary.sh` = **STUB** (`summary-stub.sh`, com `--score`) | ranking: soma os `SCORE` dos testes AC; qualquer WA zera; sobrescreve `FINALRESP` (+`SCORE`/`SCORE_MAX`/`SCORE_KIND=rank`). |
 | `install-interactive.sh` | — | instala tudo: `install-interactive.sh <pkg> <arbitro> [--score] [--langs "…"] [--keep-compare]` + smoke do prep. |
+
+**Regra:** driver que roda **no HOST** vai p/ o pacote como **stub** (aponta p/ o canônico daqui —
+`build-and-test.sh` exporta `MOJTOOLS_DIR`); só o que **entra na JAULA** é **cópia real**. Assim um
+bug no driver se conserta em UM lugar, e não em cada pacote já empacotado (foi o que aconteceu com o
+bind do `bwrap`: nasceu replicado em 198 pacotes).
 
 ## Fluxo dentro da jaula
 

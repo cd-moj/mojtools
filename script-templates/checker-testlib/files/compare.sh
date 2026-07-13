@@ -1,1 +1,1 @@
-../../../testlib/checker-bridge.sh
+../../../testlib/compare-stub.sh

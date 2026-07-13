@@ -82,6 +82,22 @@ if [[ -n "$noexec" ]]; then
   report "  conserte no REPO: git update-index --chmod=+x <arquivo>   (chmod local some no próximo clone)"
 else report "  OK."; fi
 
+# Toolchain do CHECKER/ÁRBITRO — dep DURA, e não é a mesma coisa que "ter g++ p/ C++": o
+# comparador testlib e o árbitro dos interativos são compilados e rodam NO HOST (fora da
+# jaula). Serve o g++ do host OU o da rootfs via bwrap (o caso normal: juiz sem compilador no
+# host). Sem nenhum dos dois, TODO problema com checker/interativo dá UE em todo teste — e
+# antes disto o doctor saía 0 assim mesmo (o g++ contava só como "linguagem ausente").
+report "== toolchain do checker/árbitro (compila NO HOST, fora da jaula) =="
+if _have_host g++; then
+  report "  OK (g++ do host)."
+elif [[ -n "$ROOTFS" && -x "$ROOTFS/usr/bin/g++" ]] && _have_host bwrap; then
+  report "  OK (g++ da rootfs via bwrap: $ROOTFS/usr/bin/g++)."
+else
+  report "  FALTA: nenhum g++ alcançável (nem no host, nem em <rootfs>/usr/bin/g++ com bwrap)"
+  report "  => problema com checker testlib ou interativo daria UE em TODO teste."
+  ((miss_hard++))
+fi
+
 report ""
 report "resumo: duros_faltando=$miss_hard opcionais_ausentes=$miss_soft linguagens_ausentes=$miss_lang"
 # exit != 0 SÓ se faltar dep DURO (o que impede o juiz de funcionar).

@@ -1,1 +1,1 @@
-../../../interactive/summary-score.sh
+../../../interactive/summary-stub.sh

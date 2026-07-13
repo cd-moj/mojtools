@@ -8,9 +8,32 @@ Suporte de PRIMEIRA CLASSE a corretores especiais escritos com a
 
 | arquivo | papel |
 |---|---|
-| `testlib.h` | testlib **vendorada** (v0.9.40-SNAPSHOT, md5 `c561daa4384f4bf8cb7ad9e0ff9adda8` — a cópia upstream usada pelos pacotes eimp2024, sem edição MOJ). O checker do pacote compila contra ELA; o pacote não precisa (nem deve) embutir a sua. |
-| `checker-bridge.sh` | vai p/ o pacote como `scripts/compare.sh`: compila `scripts/checker.cpp` no juiz sob demanda (cache) e mapeia a interface testlib PADRÃO → contrato do MOJ. |
-| `install-checker.sh` | instala checker+bridge num pacote (`install-checker.sh <pkg> <checker.cpp>`) e roda um smoke (gabarito×gabarito ⇒ Accepted). |
+| `testlib.h` | testlib **vendorada** (v0.9.40-SNAPSHOT, md5 `c561daa4384f4bf8cb7ad9e0ff9adda8` — a cópia upstream, sem edição MOJ). O checker do pacote compila contra ELA; o pacote não carrega a sua. (`../checkers/testlib.h` é symlink p/ cá — compat com pacotes antigos.) |
+| `checker-bridge.sh` | **a bridge, e ela mora AQUI** (fonte única): compila o `scripts/checker.cpp` do pacote no juiz sob demanda (cache fora de `scripts/`) e mapeia a interface testlib PADRÃO → contrato do MOJ. |
+| `compare-stub.sh` | o que o PACOTE carrega como `scripts/compare.sh`: 10 linhas que chamam a bridge (`--pkg <dir do pacote>`). |
+| `install-checker.sh` | instala fonte+stub num pacote (`install-checker.sh <pkg> <checker.cpp>`) e roda um smoke (gabarito×gabarito ⇒ Accepted). |
+
+## Por que o pacote leva um STUB (e não a bridge)
+
+Até 2026-07 cada pacote carregava **a sua cópia** da bridge. Quando se descobriu que o
+fallback de compilação (o `g++` da rootfs via `bwrap` — o **único** caminho num juiz, que não
+tem compilador no host) bindava o pacote no **caminho absoluto do host dentro de uma rootfs
+read-only**, o `bwrap` morria com
+
+```
+bwrap: Can't mkdir parents for /…/pkg: Read-only file system
+```
+
+⇒ o checker não compilava ⇒ **UE em TODO teste de TODA solução**. E o conserto na bridge
+**não alcançava nenhum dos 198 pacotes já empacotados**. Daí a regra:
+
+> **driver canônico que roda no HOST ⇒ o pacote leva um STUB** (aponta p/ o mojtools);
+> **o que entra na JAULA (`<lang>/run.sh`, `compile.sh`) ⇒ cópia real** (a jaula não enxerga
+> o mojtools).
+
+O `build-and-test.sh` **exporta `MOJTOOLS_DIR`** (o `compare.sh` é *executado*, não *sourced*);
+é por ele que o stub acha a bridge. Pacote antigo com a bridge embutida **continua
+funcionando** (sem `--pkg`, ela deriva o pacote do próprio caminho).
 
 ## O contrato (tudo num lugar só: a bridge)
 
@@ -40,13 +63,22 @@ A mensagem do checker (stderr) aparece no log `.compare` do `report.html`.
 
 ## Onde compila e onde cacheia
 
-- O compare roda **FORA da jaula, no host do juiz** — o requisito real é **g++ no host**
-  (presente no dev e nos juízes C3SL). Fallback: sem g++ no host mas com `CAGE_ROOT`,
-  compila com o g++ do rootfs via `bwrap`, **estático** (o binário roda no host).
+- O compare roda **FORA da jaula, no host do juiz**. Compila com o **`g++` do host** se
+  houver; senão — **o caso normal num juiz**, que só tem compilador na rootfs — com o **`g++`
+  do `CAGE_ROOT` via `bwrap`, estático** (o binário roda no host). Os dois caminhos são dep
+  DURA no `check-deps.sh`: sem nenhum, todo problema com checker daria UE.
+  **No `bwrap`, tudo entra sob `/tmp`** (o `--tmpfs`) — a rootfs é `/` READ-ONLY, e bindar um
+  caminho do host lá dentro faz o `bwrap` tentar criar o mountpoint na raiz RO. Mesmo padrão
+  do `cage-run.sh`.
 - O binário fica em **`<pkg>/.checker-cache/checker.<hash>`** — FORA de `scripts/`, de
   propósito: o `tl-checksum.sh` cobre `scripts/*`, e um binário lá dentro divergiria o
-  checksum do juiz do do servidor. O hash cobre fonte+testlib+compilador: mudou o
-  `checker.cpp` ⇒ recompila (e o tl-checksum muda via `scripts/checker.cpp` ⇒ recalibra).
+  checksum do juiz do do servidor. O hash cobre fonte+testlib+**compilador que vai compilar**
+  (host ou rootfs): mudou o `checker.cpp` ⇒ recompila (e o tl-checksum muda via
+  `scripts/checker.cpp` ⇒ recalibra). A compilação é protegida por `flock` (o juiz tem vários
+  slots: sem trava, um slot apagava o binário que o outro acabara de gravar).
+- Compila com `-include cassert -include cstring -include cstdint`: o `<bits/stdc++.h>` do
+  **gcc ≥ 15** não puxa mais esses cabeçalhos transitivamente e muitos checkers do Polygon
+  usam `assert()`/`memset()` sem incluir — sem isso, não compilam ⇒ UE em todo teste.
 - Falha de compilação/checker ⇒ `exit 7` = **UE** (erro visível), nunca WA silencioso.
 
 ## Por que “sem BOCA” (histórico do patch)

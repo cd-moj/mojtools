@@ -36,9 +36,12 @@ mkdir -p "$PKG/scripts/c"
 [[ "$(readlink -f "$SRC")" != "$(readlink -f "$PKG/scripts/arbitro.$ext" 2>/dev/null)" ]] \
   && cp "$SRC" "$PKG/scripts/arbitro.$ext"
 
-# driver comum: prep.sh + run.sh em scripts/c/, symlink de diretório p/ as outras linguagens
-cp "$HERE/prep.sh" "$PKG/scripts/c/prep.sh"
-cp "$HERE/run.sh"  "$PKG/scripts/c/run.sh"
+# driver comum em scripts/c/, symlink de diretório p/ as outras linguagens.
+#   prep.sh -> STUB (roda NO HOST: o build-and-test dá source nele; o de verdade mora no mojtools)
+#   run.sh  -> CÓPIA REAL (entra NA JAULA: o cage-run monta o arquivo como /tmp/script e o
+#              executa lá dentro — um stub não enxergaria o mojtools)
+cp "$HERE/prep-stub.sh" "$PKG/scripts/c/prep.sh"
+cp "$HERE/run.sh"       "$PKG/scripts/c/run.sh"
 chmod +x "$PKG/scripts/c/prep.sh" "$PKG/scripts/c/run.sh"   # prep é testado com -x!
 
 [[ -n "$LANGS" ]] || LANGS="$(find "$HERE/../lang" -maxdepth 1 \( -type d -o -type l \) -printf '%f\n' 2>/dev/null | grep -v '^lang$' | LC_ALL=C sort | paste -sd' ' -)"
@@ -53,19 +56,20 @@ for l in $LANGS; do
   linked+=" $l"
 done
 
-# compare genérico do protocolo (13/6/4 + SCORE=)
+# compare genérico do protocolo (13/6/4 + SCORE=) — STUB (roda no host)
 if [[ -f "$PKG/scripts/compare.sh" && "$KEEPCMP" == 1 ]]; then
   echo "aviso: scripts/compare.sh existente PRESERVADO (--keep-compare)"
 else
   [[ -f "$PKG/scripts/compare.sh" ]] && echo "aviso: scripts/compare.sh existente foi substituído pelo genérico"
-  cp "$HERE/compare.sh" "$PKG/scripts/compare.sh"
+  cp "$HERE/compare-stub.sh" "$PKG/scripts/compare.sh"
   chmod +x "$PKG/scripts/compare.sh"
 fi
 
-# summary de ranking (opcional)
+# summary de ranking (opcional) — STUB (é SOURCED no host)
 if (( SCORE )); then
   [[ -f "$PKG/scripts/summary.sh" ]] && echo "aviso: scripts/summary.sh existente foi substituído pelo de ranking"
-  cp "$HERE/summary-score.sh" "$PKG/scripts/summary.sh"
+  cp "$HERE/summary-stub.sh" "$PKG/scripts/summary.sh"
+  chmod +x "$PKG/scripts/summary.sh"
 fi
 
 # conf: só AVISA (não edita) sobre o que interativo costuma precisar
@@ -75,9 +79,12 @@ grep -q 'ULIMITS\[-u\]' "$conf" 2>/dev/null || \
 grep -q 'TLMOD\[calibrafactor\]' "$conf" 2>/dev/null || \
   echo "aviso: conf sem TLMOD[calibrafactor] — o tempo do ÁRBITRO entra no TL; calibre com folga (ex.: TLMOD[calibrafactor]=\"10+1.5\")"
 
-# smoke: prep materializa o árbitro num dir temporário? (compila o .cpp na hora)
+# smoke: prep materializa o árbitro num dir temporário? (compila o .cpp na hora, pelo bridge
+# do mojtools — o MOJTOOLS_DIR é o que o stub usa p/ achá-lo, igual ao build-and-test)
+MOJT="$(cd "$HERE/.." && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-PROBLEMTEMPLATEDIR="$PKG" EXTRABINDINGS="" bash -c "source '$PKG/scripts/c/prep.sh' '$T'" || true
+PROBLEMTEMPLATEDIR="$PKG" EXTRABINDINGS="" MOJTOOLS_DIR="$MOJT" \
+  bash -c "source '$PKG/scripts/c/prep.sh' '$T'" || true
 if [[ -x "$T/arbitro" ]]; then
   echo "smoke OK: prep materializou o árbitro ($(file -b "$T/arbitro" | cut -d, -f1))"
 else

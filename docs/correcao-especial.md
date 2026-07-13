@@ -86,16 +86,18 @@ sem resultado ⇒ RTE (jogador morreu) ou UE. Guia completo com exemplos:
 Para checkers em C++ com a [testlib](https://github.com/MikeMirzayanov/testlib) (padrão
 Codeforces/Polygon — múltiplas respostas válidas, tolerância, validação contra a entrada),
 o pacote leva só o **fonte** (`scripts/checker.cpp`, testlib PADRÃO, sem `-DBOCA_SUPPORT`)
-e a **bridge** `scripts/compare.sh` instalada por:
+e um **stub** `scripts/compare.sh` (10 linhas, aponta p/ a bridge do mojtools), instalados por:
 
 ```sh
 bash mojtools/testlib/install-checker.sh <pacote> checker.cpp
 ```
 
-A bridge compila o checker no juiz sob demanda (cache fora de `scripts/`, não polui o
-tl-checksum) contra a testlib **vendorada** (`mojtools/testlib/testlib.h`) e mapeia os
-exit codes: `_ok`⇒Accepted; `_wa`/`_pe`/eof⇒Wrong Answer (o `_pe` da testlib é "formato
-inválido" = resposta errada — NÃO é o `AC,PE` do MOJ); `_fail`/`quitp`⇒erro de juiz.
+A **bridge mora no mojtools** (`testlib/checker-bridge.sh` — fonte única; o pacote não carrega
+cópia dela nem do `testlib.h`) e compila o checker no juiz sob demanda (cache fora de
+`scripts/`, não polui o tl-checksum) contra a testlib **vendorada**
+(`mojtools/testlib/testlib.h`), mapeando os exit codes: `_ok`⇒Accepted; `_wa`/`_pe`/eof⇒Wrong
+Answer (o `_pe` da testlib é "formato inválido" = resposta errada — NÃO é o `AC,PE` do MOJ);
+`_fail`/`quitp`⇒erro de juiz.
 **Nunca commite o binário do checker** (o padrão antigo de ELF de 2.7MB em
 `scripts/compare.sh` está deprecado — o `validate-problem` avisa). Guia completo de
 autoria com receitas: **[`checker-testlib.md`](checker-testlib.md)**; detalhes técnicos:
