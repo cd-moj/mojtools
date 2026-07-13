@@ -30,10 +30,24 @@ HOST_SOFT='cset systemd-run podman unzip wget'
 
 # Binário principal de cada linguagem aceita (basta UMA alternativa existir por grupo).
 # Espelha judge/agent/inventory.sh _LANGBIN.
-COMPILERS='gcc g++ javac java pypy3 python3 fpc mcs mono gccgo rustc ghc node swipl kotlinc spim'
+COMPILERS='gcc g++ javac java pypy3 python3 fpc mcs mono gccgo rustc ghc node swipl kotlinc spim dyalogscript'
 
 _have_host()   { command -v "$1" >/dev/null 2>&1; }
-_have_rootfs() { local b="$1"; [[ -x "$ROOTFS/usr/bin/$b" || -x "$ROOTFS/usr/local/bin/$b" ]]; }
+# Dentro do rootfs, o binário da distro quase sempre é SYMLINK p/ caminho ABSOLUTO
+# (/usr/bin/javac -> /etc/alternatives/javac -> /usr/lib/jvm/…). Visto do HOST esse alvo aponta p/
+# FORA do rootfs, e um `-x` simples dá FALSO-NEGATIVO: javac/java/fpc/kotlinc/dyalogscript "somem"
+# de um rootfs que os tem. Resolve a cadeia de symlinks DENTRO do rootfs.
+_rootfs_exec() {  # <caminho absoluto dentro do rootfs>
+  local p="$1" t n=0
+  while [[ -L "$ROOTFS$p" ]]; do
+    (( ++n > 10 )) && return 1                      # laço de symlink
+    t="$(readlink "$ROOTFS$p")"
+    case "$t" in /*) p="$t";; *) p="$(dirname "$p")/$t";; esac
+  done
+  [[ -x "$ROOTFS$p" ]]
+}
+_have_rootfs() { local b="$1"
+  _rootfs_exec "/usr/local/bin/$b" || _rootfs_exec "/usr/bin/$b" || _rootfs_exec "/bin/$b"; }
 _have_lang()   { if [[ -n "$ROOTFS" ]]; then _have_rootfs "$1"; else _have_host "$1"; fi; }
 
 miss_hard=0 miss_soft=0 miss_lang=0
@@ -48,7 +62,7 @@ report "== deps opcionais do HOST =="
 for d in $HOST_SOFT; do _have_host "$d" || { report "  ausente (opcional): $d"; ((miss_soft++)); }; done
 (( miss_soft == 0 )) && report "  OK."
 
-report "== compiladores/runtimes (${ROOTFS:+rootfs=$ROOTFS}${ROOTFS:-host}) =="
+report "== compiladores/runtimes ($([[ -n "$ROOTFS" ]] && printf 'rootfs=%s' "$ROOTFS" || printf 'host')) =="
 for c in $COMPILERS; do _have_lang "$c" || { report "  ausente: $c"; ((miss_lang++)); }; done
 (( miss_lang == 0 )) && report "  OK (todos presentes)."
 
