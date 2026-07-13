@@ -149,24 +149,42 @@ bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" "$title" > "$tmp
 # --arg -> jq falhava -> json VAZIO -> o problema sumia do treino (jq -s pula arquivo vazio).
 b64f="$(mktemp)"; base64 -w0 < "$tmp_html" | tr -d '\n' > "$b64f"; rm -f "$exf" "$tmp_html"
 
-# ----- 7. público? (default: não tem PUBLIC=no no conf, e .moj-meta.public != false) -----
-public=true
-grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false
-[[ -f "$meta" ]] && [[ "$(jq -r '.public // "unset"' "$meta" 2>/dev/null)" == "false" ]] && public=false
+# ----- 7. público? FAIL-CLOSED: só é público se o .moj-meta.json disser public:true -----
+# ESTE É O PORTÃO DA LISTA PÚBLICA DO TREINO (var/jsons/ é servido SEM login: lista + enunciado).
+# NUNCA teste booleano com o `//` do jq: ele trata FALSE como vazio, então `.public // "unset"`
+# devolvia "unset" p/ public:false — indistinguível de "ausente". A checagem virava código morto, o
+# default (que era `true`) prevalecia e TODO problema privado ia parar no índice público, com o
+# enunciado servido a qualquer anônimo. Prova em elaboração vazava. Use `jq -e '.public == true'`.
+public=false                                                       # default: PRIVADO
+[[ -f "$meta" ]] && jq -e '.public == true' "$meta" >/dev/null 2>&1 && public=true
+grep -q '^PUBLIC=no' "$PKG/conf" 2>/dev/null && public=false       # legado: força privado
+# 2ª camada (vem do servidor): org sem `public_allowed` NUNCA gera índice público, doa o que doer
+# o meta (import legado, org rebaixada, bug futuro). Ver cdmoj lib/tl-store.sh index_problem_bg.
+[[ "${MOJ_FORCE_PRIVATE:-0}" == 1 ]] && public=false
 
 # ----- 8. escreve (ou remove) o índice servível -----
 mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
+# `public` VAI no json: quem SERVE (handlers/treino/{problems,problem}.sh, anônimos) recusa
+# `.public == false` — assim um json privado que reapareça em var/jsons/ por qualquer caminho
+# ainda não é servido (defesa em profundidade; json legado sem o campo continua passando).
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, statement_html_b64:$html}')"
+  --argjson pub "$public" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub, statement_html_b64:$html}')"
 rm -f "$b64f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
-tmpj="$TREINO_JSONS/.$ID.tmp"
-printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"          # cópia sempre (p/ contests privados)
+tmpj="$(dirname "$priv")/.$ID.tmp"                                 # tmp no dir PRIVADO: um mv falho
+printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"         # não deixa lixo no dir PÚBLICO
+# O cache da lista (var/problems.json) tem de morrer nos DOIS ramos: ele alimenta /treino/problems
+# (TTL 5min) e o banco de contests `cc_bank_json` — que o lê **sem TTL nenhum**. Sem isto, um
+# problema despublicado (ex.: por um tl-report) continuaria no banco de sorteio para sempre.
+CACHE="$(dirname "$TREINO_JSONS")/problems.json"
 if [[ "$public" == true ]]; then
-  cp -f "$priv" "$TREINO_JSONS/$ID.json"
+  ptmp="$TREINO_JSONS/.$ID.pub.tmp"
+  cp -f "$priv" "$ptmp" && mv -f "$ptmp" "$TREINO_JSONS/$ID.json"  # publicação ATÔMICA (rename)
+  rm -f "$CACHE"
   echo "gen-problem-json: $ID publicado (title='$title', exemplos=$n)"
 else
-  rm -f "$TREINO_JSONS/$ID.json"
+  rm -f "$TREINO_JSONS/$ID.json" "$CACHE"
   echo "gen-problem-json: $ID privado (fora do treino; cópia em jsons-private)"
 fi
