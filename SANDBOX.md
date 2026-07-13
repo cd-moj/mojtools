@@ -52,14 +52,17 @@ diretório:
 bash make-sysroot.sh --out /srv/moj-sysroot          # Ubuntu 24.04 + todos os compiladores
 bash make-sysroot.sh --base debian:12 --out /srv/d12 # outra base
 bash make-sysroot.sh --pkgs "" --out /srv/core       # só o core (C/C++/Java/Python/PyPy3), rápido
-bash make-sysroot.sh --apl ./dyalog_19.0.deb --out /srv/full   # + APL (Dyalog, .deb proprietário)
+bash make-sysroot.sh --apl ./dyalog.deb --out /srv/full   # + APL (Dyalog, .deb proprietário)
 export CAGE_ROOT=/srv/moj-sysroot                     # aí é só apontar a jaula
 ```
 
 O `Containerfile` instala o **core** (sempre: `time`,`coreutils`,`bash`,`make`, `build-essential`,
-`openjdk-21`, `python3`+`pypy3`) e os **extras** best-effort (Pascal, Mono/C#, Go/gccgo, Rust, GHC,
+**`bison`+`flex`** — o curso de compiladores submete lex/yacc —, `openjdk-21`, `python3`+`pypy3`) e os
+**extras** best-effort (Pascal, Mono/C#, Go/gccgo, Rust, GHC,
 Node, OCaml, SWI-Prolog, SPIM). **PyPy3 é o `python3` padrão** do juiz (symlink em `/usr/local/bin`,
-mantendo o CPython do sistema p/ o apt). Casos especiais: **APL** (Dyalog proprietário, via `--apl`),
+mantendo o CPython do sistema p/ o apt). Casos especiais: **APL** (Dyalog proprietário, via `--apl`
+— camada extra; o `postinst` do `.deb` cria `/usr/bin/dyalogscript` por `update-alternatives`, e é
+esse binário que o `lang/apl/run.sh` chama, sem fixar a versão no caminho),
 **RISC-V** (só precisa do JDK; o `rars.jar` é baixado pelo `prep`). **Python é UMA linguagem: `py`**
 (interpretador **pypy3**, com fallback `python3` no modo host; o `compile.sh` faz **check de sintaxe**
 via `py_compile` — erro de sintaxe = Compilation Error). `py2` foi **removido**; `.py2`/`.py3` são

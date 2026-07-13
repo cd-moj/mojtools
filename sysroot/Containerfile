@@ -26,9 +26,11 @@ RUN set -eux; \
     apt-get update
 
 # CORE (precisa funcionar): runtime da jaula + C/C++ + Java + Python3 + PyPy3
+# bison/flex: o curso de compiladores submete lex/yacc — aqui, e não nos EXTRAS best-effort,
+# porque um "WARN: pacote indisponível" silencioso viraria Compilation Error no aluno.
 RUN set -eux; apt-get install -y --no-install-recommends \
       time coreutils bash make ca-certificates \
-      build-essential \
+      build-essential bison flex \
       openjdk-21-jdk-headless \
       python3 pypy3
 

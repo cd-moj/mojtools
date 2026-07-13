@@ -103,7 +103,7 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `scripts/py` (sem isso a correção especial py do APC era ignorada — solução pelada ⇒ WA
   vazio), e o `build-and-test.sh` tem shim `TL[py]=TL[py3]` p/ caches `tl.<host>` calibrados
   antes da unificação.
-- `bash -n` antes de commitar. **Não commitar `lang/apl/run.sh`** (mod local pré-existente).
+- `bash -n` antes de commitar.
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
 - **Doc junto com o código** (doc atrasada = bug): mudou render/validação/cálculo de TL, ou o que um
   script faz/como se chama? atualize o **`README.md` daqui** (roteiro + referência de comandos) e, se
