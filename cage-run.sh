@@ -239,11 +239,16 @@ if [[ "$USER" == "root" ]] && [[ -n "$(which cset)" ]]; then
     chown -R $SHIELDUSER $RWDIR $(dirname $TIMELOG)
   fi
   if [[ -n "$MEMLIMIT" ]]; then
-    if [[ ! -d /sys/fs/cgroup/memory/mojtools ]]; then
-      mkdir /sys/fs/cgroup/memory/mojtools
+    # cgroup ÚNICO por invocação: o antigo /sys/fs/cgroup/memory/mojtools fixo era GLOBAL —
+    # cages concorrentes compartilhavam um só budget de memória e o limite virava o do último
+    # escritor (multi-slot: MLE mal aplicado + OOM cruzando slots). Removido no fim do script.
+    # (Modo root continua single-slot only — ver SANDBOX.md; isto é hardening barato.)
+    MOJCG="/sys/fs/cgroup/memory/mojtools.$$"
+    if [[ ! -d "$MOJCG" ]]; then
+      mkdir "$MOJCG"
     fi
-    echo $((MEMLIMIT*1024*1024)) > /sys/fs/cgroup/memory/mojtools/memory.limit_in_bytes
-    echo $$ > /sys/fs/cgroup/memory/mojtools/tasks
+    echo $((MEMLIMIT*1024*1024)) > "$MOJCG/memory.limit_in_bytes"
+    echo $$ > "$MOJCG/tasks"
   fi
 
 fi
@@ -316,3 +321,10 @@ done
   /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o /tmp/timelog timeout $TLE /tmp/script) \
   11< <(getent passwd 65534) \
   12< <(getent group 65534)
+_rc=$?
+# devolve o próprio processo ao cgroup raiz e remove o cgroup da invocação (modo root/v1)
+if [[ -n "$MOJCG" && -d "$MOJCG" ]]; then
+  echo $$ > /sys/fs/cgroup/memory/tasks 2>/dev/null
+  rmdir "$MOJCG" 2>/dev/null
+fi
+exit $_rc

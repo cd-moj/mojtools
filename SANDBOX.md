@@ -80,6 +80,12 @@ extensões legadas normalizadas p/ `py` (o lang-dir `py3` é só um symlink de c
   cage degrada com aviso no stderr p/ o comportamento clássico. O `build-and-test.sh` passa
   `-M max(600, MEMLIMITMB+64)` p/ a execução (root e sem root — o cgroup v1 do root também
   respeita) e `-M ${COMPILEMEMLIMIT:-2048}` p/ a **compilação** (kotlinc/JVM passam de 600MB).
+- **Modo ROOT é single-slot only.** O caminho root (cset/cgroup v1) usa estado GLOBAL da
+  máquina: o `cset shield` é um só e o cgroup de memória, embora agora tenha **nome único por
+  invocação** (`mojtools.$$`, removido no fim), não muda o fato de o shield ser compartilhado.
+  Jamais rode um juiz **particionado** (multi-slot) como root — o agente força 1 slot nesse
+  caso. Produção roda o agente como usuário comum (caminho cgroup v2 acima, escopo por
+  invocação, seguro p/ N slots).
 - **JVM respeita o MEMLIMITMB:** o `binfile.sh` (que todo `run.sh` sourceia) carrega
   `MOJ_MEMLIMITMB`/`MOJ_STACKKB` p/ dentro da jaula; `lang/java`, `lang/kt` e o driver
   interativo dimensionam **`-Xmx = MEMLIMITMB`** (heap tão grande quanto o limite; 500m sem

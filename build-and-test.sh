@@ -330,9 +330,12 @@ fi
 
 declare -A TL
 # TL por host: usa tl.<hostname> se existir (calibração específica da máquina,
-# calibrada neste host), senão o tl padrão do pacote.
+# calibrada neste host), senão o tl padrão do pacote. MOJ_TLFILE (env) VENCE os dois:
+# é como o calibreitor aponta os filhos p/ uma tabela PRIVADA (fora do pacote
+# compartilhado) — nenhum placeholder/tabela parcial fica visível a outro slot do juiz.
 TLFILE="$PROBLEMTEMPLATEDIR/tl"
 [[ -e "$PROBLEMTEMPLATEDIR/tl.$HOSTNAME" ]] && TLFILE="$PROBLEMTEMPLATEDIR/tl.$HOSTNAME"
+[[ -n "${MOJ_TLFILE:-}" && -e "${MOJ_TLFILE:-}" ]] && TLFILE="$MOJ_TLFILE"
 if [[ ! -e "$TLFILE" ]]; then
   echo "Wrong package format. No TimeLimit found"
   LOG "Timelimit is not set"

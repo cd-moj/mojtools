@@ -410,6 +410,15 @@ pula essa parte, e é o que o agente do juiz usa quando está com pressa).
 
 Grava também um `report.html` por solução em `.calib-reports/`, que o agente sobe para o servidor.
 
+**Concorrência (juiz multi-slot):** a tabela de TL de trabalho é PRIVADA — o calibreitor exporta
+**`MOJ_TLFILE`** (um temp) para os `build-and-test.sh` filhos, e essa env **vence** a seleção
+`tl.<máquina>`/`tl` (é o único jeito de apontar um TL fora do pacote). Os `tl.<máquina>`/`tl`
+finais são publicados **atomicamente** (mktemp no mesmo diretório + `mv`) e o `.calib-reports/`
+é montado em staging e trocado por rename no fim: outro slot julgando o MESMO problema nunca vê
+placeholder, tabela parcial nem dir de reports pela metade. (Duas calibrações do mesmo pacote no
+mesmo host continuam NÃO devendo rodar em paralelo — o agente serializa com flock por-problema;
+rodando na mão, não dispare duas.)
+
 ### `validate-problem.sh`: o portão de qualidade
 
 ```

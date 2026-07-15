@@ -32,7 +32,12 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   (pct de testes ou pontos/grupos).
 - `gen-report.sh` — gera o `report.html` por submissão.
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** e reporta
-  (`ensure_cached <id> [force] [full]`; `full` roda todas as soluções).
+  (`ensure_cached <id> [force] [full]`; `full` roda todas as soluções). **Concorrência
+  (multi-slot)**: a tabela de trabalho é PRIVADA (`MOJ_TLFILE`, env que VENCE a seleção
+  `tl.<host>`/`tl` no build-and-test); `tl.<host>`/`tl` finais são publicados ATÔMICOS
+  (mktemp+mv) e `.calib-reports/` troca por rename no fim — outro slot julgando o mesmo
+  problema nunca vê placeholder/tabela parcial. Nunca reintroduzir escrita direta no
+  diretório compartilhado do pacote durante a calibração (raiz de veredicto errado).
 - `render-statement.sh <enunf> [fmt=md] [exemplos.html] [titulo]` — **renderizador único** do
   enunciado (pandoc standalone, `--mathml --embed-resources`). **= o "Pré-visualizar" do editor
   = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado.
