@@ -46,6 +46,7 @@ if [[ -f "$_ia_pkg/scripts/arbitro.cpp" || -f "$_ia_pkg/scripts/arbitro.cc" ]]; 
           # ("Can't mkdir parents for /…: Read-only file system") => árbitro não compila =>
           # UE em todo teste. É o mesmo padrão do cage-run.sh.
           bwrap --die-with-parent --ro-bind "$CAGE_ROOT" / --dev /dev --proc /proc --tmpfs /tmp \
+                --setenv TMPDIR /tmp \
                 --ro-bind "$_ia_src" /tmp/arbitro.cpp --bind "$_ia_cache" /tmp/out --chdir /tmp \
                 /usr/bin/g++ -O2 -std=gnu++17 -static -o /tmp/out/arbitro.new /tmp/arbitro.cpp \
                 2> "$_ia_cache/compile.log" \

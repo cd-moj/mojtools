@@ -312,6 +312,7 @@ done
   --chdir / \
   --unshare-all \
   --die-with-parent \
+  --setenv TMPDIR /tmp \
   $PASSWDBINDS $ETCMASKS \
   --ro-bind $RUNSCRIPTFILE /tmp/script\
   --bind $TIMELOG /tmp/timelog\

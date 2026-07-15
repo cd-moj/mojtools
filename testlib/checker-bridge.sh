@@ -75,6 +75,7 @@ if [[ ! -x "$BIN" ]]; then
         #   "bwrap: Can't mkdir parents for /…/pkg: Read-only file system"
         # => checker não compila => UE em TODO teste. Mesmo padrão do cage-run.sh.
         bwrap --die-with-parent --ro-bind "$CAGE_ROOT" / --dev /dev --proc /proc --tmpfs /tmp \
+              --setenv TMPDIR /tmp \
               --ro-bind "$SRC" /tmp/checker.cpp --ro-bind "$TESTLIB" /tmp/testlib.h \
               --bind "$CACHE" /tmp/out --chdir /tmp \
               /usr/bin/g++ "${CFLAGS[@]}" -static -o /tmp/out/checker.new /tmp/checker.cpp -I /tmp \
