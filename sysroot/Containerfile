@@ -10,7 +10,7 @@ FROM ${BASE}
 ENV DEBIAN_FRONTEND=noninteractive
 # Lista de toolchains "extras" (best-effort: cada um instala se existir). Inclui nomes
 # alternativos p/ robustez entre versões. Override via --build-arg PKGS="..." (vazio = só core).
-ARG PKGS="fp-compiler mono-mcs mono-runtime gccgo gccgo-14 gccgo-13 rustc ghc nodejs ocaml-nox ocaml swi-prolog-nox swi-prolog spim"
+ARG PKGS="fp-compiler mono-mcs mono-runtime gccgo gccgo-14 gccgo-13 rustc ghc nodejs ocaml-nox ocaml swi-prolog-nox swi-prolog"
 
 # universe ligado (muitos toolchains vivem lá) + update.
 # Rootless podman: o usuário-sandbox do apt (_apt) não consegue setgroups no userns aninhado
@@ -34,11 +34,14 @@ RUN set -eux; \
 # fala PMI-1 — `mpirun -np N` vira N SINGLETONS (cada rank np=1; comprovado no juiz do newmoj
 # 2026-07-17). O mpich fica disponível como mpicc.mpich/mpirun.mpich p/ quando a distro
 # consertar; libomp-dev = OpenMP do LLVM.
+# libelf-dev (elfworks), clang+llvm (opt — fibonacci-memoizacao/callgraph) e spim
+# (sqrt-bisec-fac; PROMOVIDO dos EXTRAS): problemas ao vivo dependem deles — CORE.
 RUN set -eux; apt-get install -y --no-install-recommends \
       time coreutils bash make ca-certificates \
       build-essential bison flex \
       mpich libmpich-dev libomp-dev \
       openmpi-bin libopenmpi-dev \
+      libelf-dev clang llvm spim \
       openjdk-21-jdk-headless \
       python3 pypy3; \
     update-alternatives --set mpi /usr/bin/mpicc.openmpi || true; \
