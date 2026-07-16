@@ -6,6 +6,8 @@
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
 #                                          owner, collaborators[], collections[], public, html,
 #                                          tl_checksum, public_at, good_langs} ] }
+# html = ENUNCIADO COMPILADO E SERVÍVEL (json em var/jsons OU var/jsons-private) — vale também
+# p/ problema PRIVADO validado (a pill "sem HTML" do painel deixa de ser sinônimo de privado).
 # good_langs = extensões das soluções sols/good/* (= linguagens); a gestão marca "revisar" se alguma
 # não tem TL calibrado (solução good que não rodou/passou em nenhum juiz).
 # public_at = epoch da 1ª publicação (meta.public_at // seed do backfill); null se privado/desconhecido.
@@ -21,6 +23,7 @@ set -u
 : "${RUNDIR:=/home/ribas/moj/run}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"   # p/ achar tl-checksum.sh (irmão)
 JD="$CONTESTSDIR/treino/var/jsons"
+JDPRIV="$CONTESTSDIR/treino/var/jsons-private"   # enunciado compilado dos PRIVADOS (gen-problem-json)
 OUT="$CONTESTSDIR/treino/var/problem-owners.json"
 TMP="$OUT.tmp.$$"
 
@@ -76,6 +79,9 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     author="$(head -1 "$pdir/author" 2>/dev/null | tr -d '\t\r')"
     # público hoje = está no índice do treino (HTML buildado + servível)
     pub=0; [[ -n "${PUBSET[$id]:-}" ]] && pub=1
+    # html = enunciado COMPILADO e servível (público em var/jsons OU privado em jsons-private) —
+    # independente do flag public: privado validado tem html; público recém-marcado sem json não.
+    htm=0; [[ -n "${PUBSET[$id]:-}" || -f "$JDPRIV/$id.json" ]] && htm=1
     title="${TITLE[$id]:-}"; [[ -n "$title" ]] || title="$prob"
     owner=""; collabs=""; colls="$repo"; mpat=""   # default: o repo é uma "coleção" (curso)
     meta="$pdir/.moj-meta.json"
@@ -114,8 +120,8 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
     gl=""
     [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; case "$e" in py2|py3) e=py;; esac; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -133,7 +139,7 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
   [ inputs | split("\t")
     | .[1] as $repo | ($reg[$repo] // {}) as $rr
     | { id:.[0], repo:$repo, prob:.[2], author:.[3], author_norm:.[4], title:.[5],
-        public:(.[6]=="1"), html:(.[6]=="1"),
+        public:(.[6]=="1"), html:((.[13] // .[6])=="1"),
         owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
         collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
         collections:((.[9]//"")|split(",")|map(select(length>0))),
