@@ -28,14 +28,22 @@ RUN set -eux; \
 # CORE (precisa funcionar): runtime da jaula + C/C++ + Java + Python3 + PyPy3
 # bison/flex: o curso de compiladores submete lex/yacc — aqui, e não nos EXTRAS best-effort,
 # porque um "WARN: pacote indisponível" silencioso viraria Compilation Error no aluno.
-# mpich/libmpich-dev + libomp-dev: programação paralela (MPI, OpenMP; pthreads já vem no
-# build-essential/libc6-dev) — CORE pelo mesmo motivo: ausência muda = CE de aluno.
+# MPI/OpenMP/pthreads (programação paralela) — CORE pelo mesmo motivo: ausência muda = CE de
+# aluno. pthreads/libgomp já vêm no build-essential. O PADRÃO de mpicc/mpirun é o **OpenMPI**
+# (alternatives abaixo): o mpich 4.2 do noble é linkado com PMIx mas o mpirun dele (hydra)
+# fala PMI-1 — `mpirun -np N` vira N SINGLETONS (cada rank np=1; comprovado no juiz do newmoj
+# 2026-07-17). O mpich fica disponível como mpicc.mpich/mpirun.mpich p/ quando a distro
+# consertar; libomp-dev = OpenMP do LLVM.
 RUN set -eux; apt-get install -y --no-install-recommends \
       time coreutils bash make ca-certificates \
       build-essential bison flex \
       mpich libmpich-dev libomp-dev \
+      openmpi-bin libopenmpi-dev \
       openjdk-21-jdk-headless \
-      python3 pypy3
+      python3 pypy3; \
+    update-alternatives --set mpi /usr/bin/mpicc.openmpi || true; \
+    update-alternatives --set mpirun /usr/bin/mpirun.openmpi || true; \
+    update-alternatives --set mpi-x86_64-linux-gnu /usr/include/x86_64-linux-gnu/openmpi || true
 
 # EXTRAS (best-effort: um pacote ausente/renomeado não derruba o build do rootfs)
 RUN set -eux; for p in ${PKGS}; do \
