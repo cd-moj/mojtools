@@ -28,9 +28,12 @@ RUN set -eux; \
 # CORE (precisa funcionar): runtime da jaula + C/C++ + Java + Python3 + PyPy3
 # bison/flex: o curso de compiladores submete lex/yacc — aqui, e não nos EXTRAS best-effort,
 # porque um "WARN: pacote indisponível" silencioso viraria Compilation Error no aluno.
+# mpich/libmpich-dev + libomp-dev: programação paralela (MPI, OpenMP; pthreads já vem no
+# build-essential/libc6-dev) — CORE pelo mesmo motivo: ausência muda = CE de aluno.
 RUN set -eux; apt-get install -y --no-install-recommends \
       time coreutils bash make ca-certificates \
       build-essential bison flex \
+      mpich libmpich-dev libomp-dev \
       openjdk-21-jdk-headless \
       python3 pypy3
 
