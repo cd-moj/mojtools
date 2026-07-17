@@ -43,16 +43,23 @@ fi
 
 # 2) varre os pacotes -> TSV (uma linha por problema)
 tsv="$(mktemp)"
-# cache de tl_checksum p/ NÃO re-hashear pacote sem commit: id -> {head(commit do repo), cks}.
-# Repo sem commit desde o último carimbo => reusa o checksum (regen em regime fica barato: só
-# stat/git-rev-parse, sem LER o conteúdo dos testes — o custo O(bytes) só volta quando o repo muda).
+# cache de tl_checksum p/ NÃO re-hashear pacote sem mudança: id -> {head, sig, cks}.
+# Assinatura DUPLA: head (commit do repo) + sig (cksum da METADATA — path/modo/tamanho/mtime —
+# dos mesmos caminhos que o tl-checksum.sh cobre). Só o head NÃO basta: mudança FORA do git
+# (ex.: normalize-pkg-modes --apply trocando 660->644) muda o hash real sem commit e o cache
+# servia checksum velho p/ SEMPRE => "precisa recalibrar" fantasma no painel (13 mdp-ifb-ix,
+# 2026-07-17). A sig é só stat (sem ler conteúdo) — o custo O(bytes) segue só quando muda.
 # Repo sem git (head vazio) sempre recomputa. Auto-poda: grava só entradas calibradas desta passada.
 CKSCACHE="$CONTESTSDIR/treino/var/tl-checksum-cache.json"
-declare -A CKS_HEAD CKS_CKS
+# metadata dos caminhos do tl-checksum.sh (conf tests/input sols/good scripts), sem ler conteúdo
+_statsig(){ ( cd "$1" 2>/dev/null || exit 0
+  find conf tests/input sols/good scripts -type f -printf '%P\t%m\t%s\t%T@\n' 2>/dev/null \
+    | LC_ALL=C sort | cksum | awk '{print $1}' ) }
+declare -A CKS_HEAD CKS_SIG CKS_CKS
 if [[ -f "$CKSCACHE" ]]; then
-  while IFS=$'\t' read -r _cid _chead _ccks; do
-    [[ -n "$_cid" ]] && { CKS_HEAD["$_cid"]="$_chead"; CKS_CKS["$_cid"]="$_ccks"; }
-  done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.head // "")\t\(.value.cks // "")"' "$CKSCACHE" 2>/dev/null)
+  while IFS=$'\t' read -r _cid _chead _csig _ccks; do
+    [[ -n "$_cid" ]] && { CKS_HEAD["$_cid"]="$_chead"; CKS_SIG["$_cid"]="$_csig"; CKS_CKS["$_cid"]="$_ccks"; }
+  done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.head // "")\t\(.value.sig // "")\t\(.value.cks // "")"' "$CKSCACHE" 2>/dev/null)
 fi
 newcache="$(mktemp)"
 # seed lateral de public_at p/ o histórico (backfill; a migração não gravou a data). meta.public_at
@@ -105,16 +112,18 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     pat="$mpat"; [[ -n "$pat" ]] || pat="${PUBSEED[$id]:-}"; pat="${pat//[^0-9]/}"
     an="$(norm "$author")"
     # checksum do pacote SÓ p/ problemas já calibrados (é onde "precisa recalibrar" faz sentido).
-    # Reusa do cache se o repo não teve commit (head igual); senão recomputa (lê o conteúdo). Casa
-    # com o checksum guardado em run/tl/<id>.json (juiz e servidor usam o MESMO tl-checksum.sh).
+    # Reusa do cache se head E sig batem (nem commit nem mudança fora do git); senão recomputa
+    # (lê o conteúdo). Casa com o run/tl/<id>.json (juiz e servidor usam o MESMO tl-checksum.sh).
     cks=""
     if [[ -f "$RUNDIR/tl/$id.json" ]]; then
-      if [[ -n "$rhead" && "${CKS_HEAD[$id]:-}" == "$rhead" && -n "${CKS_CKS[$id]:-}" ]]; then
+      sig="$(_statsig "$pdir")"
+      if [[ -n "$rhead" && "${CKS_HEAD[$id]:-}" == "$rhead" && -n "$sig" \
+            && "${CKS_SIG[$id]:-}" == "$sig" && -n "${CKS_CKS[$id]:-}" ]]; then
         cks="${CKS_CKS[$id]}"
       else
         cks="$(bash "$HERE/tl-checksum.sh" "$pdir" 2>/dev/null)"; cks="${cks//[^0-9a-f]/}"
       fi
-      [[ -n "$rhead" ]] && printf '%s\t%s\t%s\n' "$id" "$rhead" "$cks" >> "$newcache"
+      [[ -n "$rhead" ]] && printf '%s\t%s\t%s\t%s\n' "$id" "$rhead" "$sig" "$cks" >> "$newcache"
     fi
     # linguagens das soluções good (extensão = a linguagem que o calibreitor keya). A gestão compara
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
@@ -127,7 +136,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
 done
 # grava o cache de checksums (atômico). Só as entradas desta passada -> some quem deixou de ser
 # calibrado. Falha do jq não derruba a geração do índice (cache é best-effort).
-jq -Rn '[inputs|split("\t")|select(length>=3)|{key:.[0], value:{head:.[1], cks:.[2]}}]|from_entries' \
+jq -Rn '[inputs|split("\t")|select(length>=4)|{key:.[0], value:{head:.[1], sig:.[2], cks:.[3]}}]|from_entries' \
   "$newcache" > "$CKSCACHE.tmp.$$" 2>/dev/null && mv -f "$CKSCACHE.tmp.$$" "$CKSCACHE" || rm -f "$CKSCACHE.tmp.$$"
 rm -f "$newcache"
 

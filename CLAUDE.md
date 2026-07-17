@@ -89,8 +89,11 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   linguagem good não tem TL calibrado (solução good que não rodou/passou em juiz nenhum).
   **Storage MOJ-nativo (repo git local por problema):** cada problema é um repo git LOCAL em
   `MOJ_PROBLEMS_DIR/<org>/<prob>`; o servidor commita direto (`problem_commit` em `cdmoj/lib/problems.sh`,
-  flock por-problema). `gen-problem-owners.sh` lê o HEAD **por problema** p/ assinar o cache de
-  `tl_checksum`. (O antigo mirror/LFS/serviço externo foi removido no cut-over — ver `cdmoj`.)
+  flock por-problema). `gen-problem-owners.sh` assina o cache de `tl_checksum` com **HEAD por
+  problema + statsig** (cksum da metadata path/modo/tamanho/mtime dos caminhos do hash) — só o
+  HEAD não pega mudança FORA do git (ex.: `normalize-pkg-modes --apply`) e o cache servia
+  checksum velho p/ sempre ⇒ "precisa recalibrar" fantasma no painel.
+  (O antigo mirror/LFS/serviço externo foi removido no cut-over — ver `cdmoj`.)
   `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode
   passar de 100). Além do `FINALRESP` legado (`Wrong,60p. Pontos | 30 | 0 |…`), emite o
   **`SCORE_GROUPS`** estruturado (acima) p/ o backend servir grupos por submissão.
