@@ -51,9 +51,11 @@ tsv="$(mktemp)"
 # 2026-07-17). A sig é só stat (sem ler conteúdo) — o custo O(bytes) segue só quando muda.
 # Repo sem git (head vazio) sempre recomputa. Auto-poda: grava só entradas calibradas desta passada.
 CKSCACHE="$CONTESTSDIR/treino/var/tl-checksum-cache.json"
-# metadata dos caminhos do tl-checksum.sh (conf tests/input sols/good scripts), sem ler conteúdo
+# metadata dos caminhos do tl-checksum.sh (conf tests/{input,output,score} sols/good scripts),
+# sem ler conteúdo — a lista TEM de acompanhar o tl-checksum.sh (fora dela, mudança no arquivo
+# não invalida o cache e o checksum velho é servido p/ sempre)
 _statsig(){ ( cd "$1" 2>/dev/null || exit 0
-  find conf tests/input sols/good scripts -type f -printf '%P\t%m\t%s\t%T@\n' 2>/dev/null \
+  find conf tests/input tests/output tests/score sols/good scripts -type f -printf '%P\t%m\t%s\t%T@\n' 2>/dev/null \
     | LC_ALL=C sort | cksum | awk '{print $1}' ) }
 declare -A CKS_HEAD CKS_SIG CKS_CKS
 if [[ -f "$CKSCACHE" ]]; then

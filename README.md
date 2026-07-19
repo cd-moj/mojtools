@@ -251,8 +251,11 @@ soma_geral_* - 60 pontos
 ```
 
 Cada linha é um grupo: um ou mais globs de nome de teste, ` - `, e o peso. O grupo é **tudo ou nada**
-(um teste falhou, o grupo vale 0), e o valor do problema é a **soma dos pesos**. Quem interpreta o
-arquivo é o `score-summary.sh`, sozinho, sem você precisar chamar nada.
+(um teste falhou, o grupo vale 0), e o valor do problema é a **soma dos pesos**. Linha começando com
+`#` é comentário; linha fora do formato é ignorada com aviso. O casamento teste→grupo é por glob
+mesmo (`aula_*` casa `aula_2_1`) e **todo teste precisa cair num grupo** — o `validate-problem.sh`
+confere (check `score_file_sane`). Quem interpreta o arquivo é o `score-summary.sh`, sozinho, sem
+você precisar chamar nada.
 
 ### Checker (quando há mais de uma resposta certa)
 
@@ -496,12 +499,14 @@ Você não costuma chamar este script: o `build-and-test.sh` já o chama no fim.
 tl-checksum.sh <pacote>      # imprime 16 dígitos hexadecimais
 ```
 
-O checksum cobre **só o que pode mudar o tempo de execução**: o `conf`, os `tests/input/*`, as
-`sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução). Não cobre o enunciado, as tags, o
-autor nem os `tests/output/*`.
+O checksum cobre **o que pode mudar o tempo de execução OU o veredicto**: o `conf`, os
+`tests/{input,output,score}`, as `sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução).
+Não cobre o enunciado, as tags nem o autor.
 
-É por isso que **corrigir um typo no enunciado não força recalibração**, mas trocar um teste, uma
-solução `good`, o `conf` ou um script força.
+É por isso que **corrigir um typo no enunciado não força recalibração**, mas trocar um teste (entrada
+ou saída esperada), o `tests/score`, uma solução `good`, o `conf` ou um script força — o juiz usa
+este checksum para saber quando **re-baixar o pacote**, então tudo que muda o julgamento tem de
+entrar nele (fora dele, um `tests/score` corrigido nunca chegava ao juiz).
 
 ### `score-summary.sh`: pontuação por grupos
 

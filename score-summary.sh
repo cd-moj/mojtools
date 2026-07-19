@@ -5,11 +5,15 @@
 # summary.sh histórico dos problemas da OBI
 # (moj-problems/obi-problems/*/scripts/summary.sh) num único script reutilizável.
 #
-# Formato de tests/score — uma linha por grupo:
-#     <glob> - <peso> pontos          ex.:  g2_* - 20 pontos
-# Cada teste é associado ao seu grupo pelo NOME do arquivo de entrada, tirando os
-# dígitos finais (ex.: g2_03 -> grupo "g2_", casado pelo glob "g2_*"). Por isso o
-# prefixo do grupo deve terminar em não-dígito (use "<grupo>_<NN>").
+# Formato de tests/score — uma linha por grupo (linhas começando com "#" são COMENTÁRIO;
+# linha sem " - <N> pontos" é IGNORADA com aviso — antes virava grupo-fantasma que
+# derrubava o veredicto p/ Wrong mesmo com todos os testes AC, caso obi2026f1pm_aula):
+#     <glob>[, <glob>…] - <peso> pontos      ex.:  g2_* - 20 pontos
+# Cada teste é associado ao seu grupo pelo NOME do arquivo de entrada: primeiro pelo
+# atalho histórico (tira os dígitos finais: g2_03 -> "g2_" = glob "g2_*" sem o "*"),
+# e, se não achar, por GLOB REAL contra os padrões na ordem do arquivo (cobre padrões
+# com dígito no meio, ex.: "aula_*" casando "aula_2_1"). Nunca expande p/ arquivos do
+# CWD (set -f) — o casamento é determinístico, independente de onde rodamos.
 #
 # Pontuação TUDO-OU-NADA por grupo: o grupo só vale seus pontos se TODOS os seus
 # testes derem AC. FINALRESP é sobrescrito com os pontos somados dos grupos 100%
@@ -22,19 +26,30 @@
 
 declare -A GROUPFFS      # nome-do-grupo  -> índice do grupo em GROUP[]
 declare -a GROUP         # índice         -> peso (pontos)
+declare -a GROUPPATS     # índice         -> globs originais do grupo (p/ o fallback de glob real)
 declare -A SOMA          # "idx,AC"/"idx,WRONG" -> contagem
 TOTAL=0
 
+_ss_glob_off=0; [[ $- == *f* ]] && _ss_glob_off=1
+set -f                   # daqui até o fim: glob de score NUNCA expande p/ arquivos do CWD
+
 if [[ -e "$PROBLEMTEMPLATEDIR/tests/score" ]]; then
   while IFS='-' read -r GRUPO SCORE; do
+    [[ "$GRUPO" =~ ^[[:space:]]*# ]] && continue           # comentário
     [[ -z "${GRUPO//[[:space:]]/}" ]] && continue          # linha em branco
+    if [[ -z "${SCORE//[^0-9]/}" ]]; then                  # sem " - <N> pontos": NÃO é grupo
+      LOG "# score-summary: linha IGNORADA (não é '<globs> - N pontos'): $GRUPO"
+      continue
+    fi
     for PAT in $GRUPO; do
-      groupname="${PAT%\**}"; groupname="${groupname%,}"    # tira o "*" final (e vírgula)
+      PAT="${PAT%,}"                                       # o separador ", " deixa vírgula no fim
+      GROUPPATS[${#GROUP[@]}]+="${GROUPPATS[${#GROUP[@]}]:+ }$PAT"
+      groupname="${PAT%\**}"                               # tira o "*" final
       GROUPFFS[$groupname]=${#GROUP[@]}
       SOMA[${#GROUP[@]},AC]=0
       SOMA[${#GROUP[@]},WRONG]=0
     done
-    gval="${SCORE//[^0-9]/}"; gval=${gval:-0}               # extrai o número de "... pontos"
+    gval="${SCORE//[^0-9]/}"                               # extrai o número de "... pontos"
     GROUP+=( "$gval" )
     (( TOTAL += gval ))
   done < "$PROBLEMTEMPLATEDIR/tests/score"
@@ -56,6 +71,15 @@ NOGROUP=""
 for INPUT in "${!VERDICT[@]}"; do
   groupname="${INPUT%%+([0-9])}"                            # tira os dígitos finais
   [[ -n "${GROUPFFS[$INPUT]}" ]] && groupname="$INPUT"      # nome exato também vale como grupo
+  if [[ -z "${GROUPFFS[$groupname]}" ]]; then
+    # fallback: GLOB REAL contra os padrões, na ordem do arquivo (o atalho acima só cobre
+    # prefixo-sem-dígitos-finais — "aula_*" não vira o nome derivado de "aula_2_1")
+    for (( _g=0; _g<${#GROUP[@]}; _g++ )); do
+      for _pat in ${GROUPPATS[$_g]:-}; do
+        if [[ "$INPUT" == $_pat ]]; then GROUPFFS[$INPUT]=$_g; groupname="$INPUT"; break 2; fi
+      done
+    done
+  fi
   [[ -z "${GROUPFFS[$groupname]}" && -n "$EXTRAGROUP" ]] && GROUPFFS[$groupname]=$EXTRAGROUP
   if [[ -z "${GROUPFFS[$groupname]}" ]]; then
     LOG "- score-summary: sem grupo para o teste '$INPUT'"; NOGROUP="$INPUT"; break
@@ -106,3 +130,4 @@ fi
 LOG ""
 LOG "- score-summary FINALRESP: $FINALRESP"
 LOG ""
+(( _ss_glob_off )) || set +f                                # restaura o glob do chamador (somos sourced)

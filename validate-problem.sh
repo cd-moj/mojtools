@@ -14,6 +14,8 @@
 #   html_builds       — make <problema>.html sai 0 (stderr do pandoc vai p/ detail)
 #   examples_present  — >=1 par tests/input|output (exemplos sempre aparentes)
 #   tests_paired      — todo input tem output e vice-versa
+#   score_file_sane   — (se tests/score existe) toda linha é '<globs> - N pontos' (ou "#"),
+#                       todo teste casa um grupo e todo grupo de peso>0 casa >=1 teste
 #   has_good_sol      — >=1 solução em sols/good/
 #   good_sol_accepts  — (se VALIDATE_RUN_SOLS=1 e há bwrap) cada sols/good é Accepted
 #   scripts_exec      — todo scripts/**/*.sh tem +x (o juiz executa direto; sem o bit é UE)
@@ -113,6 +115,52 @@ if [[ -d "$PKG/tests/output" ]]; then
 fi
 (( npair >= 1 )) && add examples_present 1 "$npair par(es)" || add examples_present 0 "sem pares input/output"
 [[ -z "$unpaired" ]] && add tests_paired 1 "$npair par(es)" || add tests_paired 0 "sem par: $unpaired"
+
+# --- score_file_sane (HARD): tests/score que não casa os testes vira grupo-fantasma "-1"/
+#     NOGROUP no juiz e derruba o veredicto MESMO com todos os testes AC (caso
+#     obi2026f1pm_aula). Espelha a semântica do score-summary.sh: "#" = comentário; linha
+#     de grupo = '<glob>[, <glob>…] - <N> pontos'; teste casa grupo por
+#     prefixo-sem-dígitos-finais, nome exato OU glob real. ---
+if [[ -f "$PKG/tests/score" ]]; then
+  shopt -s extglob
+  sc_badline=""; sc_pats=(); sc_wts=()
+  while IFS='-' read -r _g _s || [[ -n "$_g" ]]; do
+    [[ "$_g" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${_g//[[:space:]]/}" ]] && continue
+    if [[ -z "${_s//[^0-9]/}" ]]; then sc_badline+="'$_g' "; continue; fi
+    _pl=""
+    set -f; for _p in $_g; do _p="${_p%,}"; _pl+="${_pl:+ }$_p"; done; set +f
+    sc_pats+=("$_pl"); sc_wts+=("${_s//[^0-9]/}")
+  done < "$PKG/tests/score"
+  declare -A sc_hit=()
+  sc_nogrp=""
+  if [[ -d "$PKG/tests/input" ]]; then
+    for f in "$PKG/tests/input/"*; do
+      [[ -e "$f" ]] || continue; b="${f##*/}"; gn="${b%%+([0-9])}"
+      hit=""
+      for _gi in "${!sc_pats[@]}"; do
+        set -f
+        for _p in ${sc_pats[$_gi]}; do
+          pn="${_p%\**}"
+          if [[ "$b" == "$pn" || "$gn" == "$pn" || "$b" == $_p ]]; then hit="$_gi"; break 2; fi
+        done
+        set +f
+      done
+      set +f
+      if [[ -n "$hit" ]]; then sc_hit[$hit]=1; else sc_nogrp+="$b "; fi
+    done
+  fi
+  sc_empty=""
+  for _gi in "${!sc_wts[@]}"; do
+    (( ${sc_wts[$_gi]} > 0 )) && [[ -z "${sc_hit[$_gi]:-}" ]] && sc_empty+="'${sc_pats[$_gi]}' "
+  done
+  sc_det=""
+  [[ -n "$sc_badline" ]] && sc_det+="linha sem ' - N pontos' (vira grupo-fantasma): $sc_badline; "
+  [[ -n "$sc_nogrp"   ]] && sc_det+="teste sem grupo (zera a submissão): $sc_nogrp; "
+  [[ -n "$sc_empty"   ]] && sc_det+="grupo de peso>0 sem nenhum teste: $sc_empty"
+  [[ -z "$sc_det" ]] && add score_file_sane 1 "${#sc_wts[@]} grupo(s)" \
+    || add score_file_sane 0 "${sc_det:0:300}"
+fi
 
 # --- has_good_sol ---
 ngood=0; [[ -d "$PKG/sols/good" ]] && ngood="$(find "$PKG/sols/good" -maxdepth 1 -type f 2>/dev/null | wc -l)"
