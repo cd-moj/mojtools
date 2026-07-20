@@ -235,8 +235,25 @@ Pronto: o pacote está completo, validado, calibrado e indexado.
 
 ## 3. Recursos opcionais
 
-Os três recursos abaixo são opcionais, e cada um já tem um guia próprio. Aqui vai só o suficiente para
+Os recursos abaixo são opcionais, e cada um já tem um guia próprio. Aqui vai só o suficiente para
 você saber que existem e quando usar.
+
+### Grafos no enunciado
+
+Se o enunciado precisa **desenhar um grafo** (rede de cidades, árvore, autômato), escreva-o em
+[graphviz DOT](https://graphviz.org/doc/info/lang.html) dentro de um bloco de código com a classe
+`.graph` — o renderizador roda o `dot` e troca por um **SVG** (a fonte DOT fica **editável** no
+`docs/enunciado.md`, não é uma imagem colada):
+
+````
+```{ .graph .center caption="Rede de cidades" }
+graph G { a -- b; b -- c; a -- c; }
+```
+````
+
+`.center` centraliza a figura; `caption="…"` é o rótulo acessível; `prog="neato"` troca o layout
+(default `dot`). Precisa do `dot` (graphviz) no servidor de render — já está na imagem. Se o DOT tiver
+erro, o bloco fica como código (não quebra o resto). Guia: **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**.
 
 ### Pontuação por grupos (subtarefas)
 
@@ -474,7 +491,9 @@ render-statement.sh <arquivo-do-enunciado> [formato] [html-dos-exemplos] [títul
 
 Escreve o HTML completo no stdout. Usa pandoc com `--mathml` (a matemática vira MathML de verdade) e
 `--embed-resources` (as imagens entram embutidas, o HTML é autocontido). Injeta o `<h1>` a partir do
-**título**, que é um argumento, e remove um `% Título` legado da primeira linha.
+**título**, que é um argumento, e remove um `% Título` legado da primeira linha. Blocos de código
+` ```{.graph} ` (fonte graphviz DOT) viram **SVG** via `dot` (lua-filter `graphviz.lua`) —
+ver **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**.
 
 **Este é o único renderizador de enunciado do MOJ.** O botão "Pré-visualizar" do editor, o HTML que o
 aluno lê e o que a validação confere passam todos por aqui. Se você precisa mudar como o enunciado é

@@ -40,7 +40,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   diretório compartilhado do pacote durante a calibração (raiz de veredicto errado).
 - `render-statement.sh <enunf> [fmt=md] [exemplos.html] [titulo]` — **renderizador único** do
   enunciado (pandoc standalone, `--mathml --embed-resources`). **= o "Pré-visualizar" do editor
-  = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado.
+  = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado. Blocos
+  ` ```{.graph} ` (fonte graphviz DOT) viram **SVG inline** via `dot` (lua-filter `graphviz.lua`;
+  precisa do `graphviz` na imagem do servidor — degrada p/ código se faltar) — guia `docs/enunciado-grafos.md`.
 - `gen-problem-json.sh <pkg> [id]` — gera o índice servível do treino
   (`contests/treino/var/jsons/<id>.json`): título + autor (arquivo `author`, verbatim) + TL +
   tags + **coleções** (`.moj-meta.json` `collections`, verbatim — um problema pode estar em várias) +

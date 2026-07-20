@@ -10,6 +10,8 @@
 # um bloco "% ..." legado do início do fonte. Injeta os exemplos (HTML pronto, num arquivo) antes
 # de </body> e um CSS limpo. Usado por preview.sh, gen-problem-json.sh e validate-problem.sh.
 set -u
+# dir deste script — p/ achar o lua-filter dos grafos (graphviz.lua, ver docs/enunciado-grafos.md)
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SELF="."
 src="${1:?uso: render-statement.sh <enunciado> [fmt] [examples-html-file] [title]}"
 fmt="${2:-md}"; exf="${3:-}"; title="${4:-}"
 case "$fmt" in org) pf=org;; tex) pf=latex;; *) pf=markdown;; esac
@@ -28,14 +30,14 @@ srcdir="$(cd "$(dirname "$src")" 2>/dev/null && pwd)" || srcdir="."
 rsrc="$src"
 if head -1 "$src" 2>/dev/null | grep -q '^%'; then rsrc="$(mktemp)"; tail -n +2 "$src" > "$rsrc"; fi
 
-html="$(pandoc -f "$pf" --mathml -s --embed-resources --resource-path="$srcdir" "$rsrc" 2>/dev/null)"
+html="$(pandoc -f "$pf" --mathml -s --embed-resources --resource-path="$srcdir" --lua-filter="$SELF/graphviz.lua" "$rsrc" 2>/dev/null)"
 [[ -n "$html" ]] || html="$(printf '<!DOCTYPE html><html><head></head><body><pre>%s</pre></body></html>' \
   "$(esc < "$rsrc")")"
 [[ "$rsrc" != "$src" ]] && rm -f "$rsrc"
 
 th=""; [[ -n "$title" ]] && th="<h1 class=\"moj-title\">$(printf '%s' "$title" | esc)</h1>"
 
-style='<style>body{font-family:system-ui,Arial,sans-serif;max-width:52rem;margin:1rem auto;padding:0 1rem;line-height:1.55;color:#111}.moj-title{margin:.2rem 0 1.1rem}pre{background:#f3f4f6;padding:.6rem;border-radius:6px;overflow:auto;white-space:pre-wrap}.moj-exemplos h2{margin-top:1.2rem}.moj-exemplo{border:1px solid #e5e7eb;border-radius:8px;padding:.2rem .8rem;margin:.6rem 0}.moj-exemplo h3,.moj-exemplo h4{margin:.5rem 0 .2rem}.moj-exemplo-nota{margin:.1rem 0 .5rem;color:#374151}img{max-width:100%}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.2rem .5rem}</style>'
+style='<style>body{font-family:system-ui,Arial,sans-serif;max-width:52rem;margin:1rem auto;padding:0 1rem;line-height:1.55;color:#111}.moj-title{margin:.2rem 0 1.1rem}pre{background:#f3f4f6;padding:.6rem;border-radius:6px;overflow:auto;white-space:pre-wrap}.moj-exemplos h2{margin-top:1.2rem}.moj-exemplo{border:1px solid #e5e7eb;border-radius:8px;padding:.2rem .8rem;margin:.6rem 0}.moj-exemplo h3,.moj-exemplo h4{margin:.5rem 0 .2rem}.moj-exemplo-nota{margin:.1rem 0 .5rem;color:#374151}img{max-width:100%}.moj-graph{margin:1rem 0}.moj-graph.center{text-align:center}.moj-graph svg{max-width:100%;height:auto}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.2rem .5rem}</style>'
 
 awk -v exfile="$exf" -v st="$style" -v th="$th" '
   BEGIN{ s=""; if(exfile!=""){ while((getline l<exfile)>0) s=s l "\n" } }
