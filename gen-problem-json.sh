@@ -127,9 +127,15 @@ for s in "${SAMPLES[@]}"; do
   if [[ -f "$in" && -f "$out" ]]; then
     samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
     samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre>"
-    note=""; [[ -f "$NOTESF" ]] && note="$(jq -r --argjson k "$i" '.[$k] // ""' "$NOTESF" 2>/dev/null)"
+    # nota: formato de autoria docs/notes/<sample>.md (pareia pelo NOME; markdown puro);
+    # legado sample-notes.json por índice. --embed-resources/resource-path: `![](fig.png)`
+    # com a figura em docs/ funciona TAMBÉM na nota (mesma regra do enunciado).
+    note=""
+    if [[ -f "$PKG/docs/notes/$s.md" ]]; then note="$(cat "$PKG/docs/notes/$s.md")"
+    elif [[ -f "$NOTESF" ]]; then note="$(jq -r --argjson k "$i" '.[$k] // ""' "$NOTESF" 2>/dev/null)"; fi
     if [[ -n "$note" ]]; then
-      nh="$(printf '%s' "$note" | pandoc -f markdown -t html 2>/dev/null)"; [[ -n "$nh" ]] || nh="<p>$(printf '%s' "$note" | esc)</p>"
+      nh="$(printf '%s' "$note" | pandoc -f markdown -t html --embed-resources --resource-path="$PKG/docs" 2>/dev/null)"
+      [[ -n "$nh" ]] || nh="<p>$(printf '%s' "$note" | esc)</p>"
       samples_html+="<div class=\"moj-exemplo-nota\">$nh</div>"
     fi
     samples_html+="</div>"; (( n++ ))

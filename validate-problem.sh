@@ -71,6 +71,20 @@ if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|output)' <<<"$ebody";
 if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
   render_leak="${render_leak}exemplo-no-texto? "
 fi
+# --- aviso SOFT: notas de exemplo desemparelhadas (nota truncada/deslocada passava MUDA) ---
+# formato novo docs/notes/<sample>.md: nota sem sample correspondente = sobra;
+# legado sample-notes.json: contagem de notas != contagem de samples.
+if [[ -d "$PKG/docs/notes" ]]; then
+  for _nf in "$PKG/docs/notes"/*.md; do
+    [[ -e "$_nf" ]] || continue
+    _nb="$(basename "$_nf" .md)"
+    [[ -f "$PKG/tests/input/$_nb" ]] || render_leak="${render_leak}nota-sem-sample($_nb) "
+  done
+elif [[ -f "$PKG/docs/sample-notes.json" ]]; then
+  _nn="$(jq 'length' "$PKG/docs/sample-notes.json" 2>/dev/null)"
+  _ns="$(find "$PKG/tests/input" -maxdepth 1 -name 'sample*' 2>/dev/null | wc -l)"
+  [[ "$_nn" =~ ^[0-9]+$ ]] && (( _nn != _ns )) && render_leak="${render_leak}notas($_nn)!=samples($_ns) "
+fi
 # --- aviso SOFT: checker BINÁRIO commitado como compare.sh (padrão antigo/deprecado) ---
 # normalize p/ fonte + bridge: scripts/checker.cpp via mojtools/testlib/install-checker.sh
 compare_elf=false
