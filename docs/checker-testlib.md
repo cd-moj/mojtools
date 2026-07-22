@@ -6,6 +6,10 @@ Codeforces/Polygon — e colocá-lo num pacote de problema do MOJ. A parte
 técnica (bridge, cache, exit codes) está em [`../testlib/README.md`](../testlib/README.md);
 a mecânica geral de `scripts/` está em [`correcao-especial.md`](correcao-especial.md).
 
+> **Composição**: o checker ocupa só o slot COMPARE — compõe com submissão de função e com
+> ban (slots COMPILE); NÃO compõe com o interativo (compare próprio). Ver os 4 slots em
+> `correcao-especial.md`.
+
 ## Quando você precisa de um checker (e quando não)
 
 **NÃO precisa** de checker quando a resposta é única e determinística: o comparador

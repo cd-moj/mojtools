@@ -44,6 +44,14 @@ Depois:
 4. `moj push` + `moj validate`/`calibrate` como sempre (mexer em `scripts/` muda o
    tl-checksum ⇒ o Painel pede recalibração — correto, aceite).
 
+## Compõe com checker (e o que NÃO compõe)
+
+Submissão de função ocupa só o slot **COMPILE** (`scripts/<lang>/compile.sh`) — ela **compõe**
+com um checker especial (slot COMPARE): `moj fn <dir> && moj checker <dir> checker.cpp` é
+combinação normal (função cujo retorno tem várias formas válidas, tolerância de float…). Cada
+installer preenche o próprio slot e preserva o resto. O que NÃO compõe é o **interativo**
+(dono da execução por linguagem). A mecânica completa dos 4 slots: `correcao-especial.md`.
+
 ## Boas práticas anti-IO: a SENTINELA
 
 **O risco nº 1 deste formato**: o aluno, em vez de usar os parâmetros, lê a entrada por

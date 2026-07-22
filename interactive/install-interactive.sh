@@ -30,6 +30,16 @@ PKG="$(cd "$PKG" && pwd)"
 ext="${SRC##*.}"
 case "$ext" in cpp|cc|py|sh) ;; *) echo "ERRO: árbitro deve ser .cpp/.cc/.py/.sh (ou adapte scripts/arbitro à mão)" >&2; exit 1;; esac
 
+# COMPOSIÇÃO: o interativo OCUPA a execução por linguagem (scripts/<lang> vira symlink p/ c)
+# e tem compare próprio — NÃO compõe com submissão-de-função nem com checker testlib
+# (ver docs/correcao-especial.md, "slots"). compile.sh real no caminho = conflito.
+if compgen -G "$PKG/scripts/*/compile.sh" >/dev/null 2>&1; then
+  echo "AVISO: este pacote tem scripts/<lang>/compile.sh (submissão de função/ban?)." >&2
+  echo "       Interativo × submissão-de-função NÃO compõem: o interativo controla a" >&2
+  echo "       execução por linguagem. Langs com dir real serão MANTIDAS (sem symlink) —" >&2
+  echo "       confira se é isso que você quer." >&2
+fi
+
 mkdir -p "$PKG/scripts/c"
 
 # árbitro no nível de scripts/ (o prep.sh procura arbitro.{cpp,cc,py,sh} lá)

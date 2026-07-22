@@ -1,5 +1,8 @@
 {
   "name": "Checker testlib (C++)",
   "description": "Corretor especial com a testlib (padrão Codeforces/Polygon): edite o checker.cpp; a bridge compila no juiz sob demanda. Use quando há múltiplas respostas válidas, tolerância ou validação contra a entrada.",
-  "conf_hints": "Requer g++ no juiz (já presente). Guia com receitas: mojtools/docs/checker-testlib.md. _ok=Accepted, _wa/_pe=Wrong Answer, _fail=erro de juiz."
+  "conf_hints": "Requer g++ no juiz (já presente). Guia com receitas: mojtools/docs/checker-testlib.md. _ok=Accepted, _wa/_pe=Wrong Answer, _fail=erro de juiz.",
+  "slots": [
+    "compare"
+  ]
 }

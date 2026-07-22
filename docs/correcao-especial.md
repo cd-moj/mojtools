@@ -14,6 +14,35 @@ explica a **ideia da solução**; aqui fica a mecânica.
 | `scripts/compare.sh` (ou `scripts/<lang>/compare.sh`) | `lang/compare.sh` | comparador de saída |
 | `scripts/summary.sh` | scorer padrão (`tests/score`/% de testes) | sourced no FIM do julgamento; pode sobrescrever `FINALRESP`/`SCORE`/`SCORE_KIND` (base do ranking interativo) |
 
+## Os 4 slots e a COMPOSIÇÃO (leia antes de misturar templates)
+
+A tabela acima define **4 slots independentes** — e é por isso que os mecanismos **compõem**:
+um problema de **submissão de função** pode ter **checker especial**, um problema com **ban**
+pode ter **comparador com tolerância**, etc. Cada template preenche o(s) slot(s) dele e
+**preserva os demais**; aplicar dois templates do MESMO slot = o último vence naquele slot.
+
+| Slot | Arquivo(s) | Quem o preenche |
+|---|---|---|
+| **COMPILE** (como compila) | `scripts/<lang>/compile.sh` | submissão de função (`moj fn`), ban de funções |
+| **RUN** (como roda) | `scripts/<lang>/{run,prep}.sh` + symlinks de lang | interativo (`moj interactive`) |
+| **COMPARE** (como compara) | `scripts/compare.sh` (+ `checker.cpp`) | checker testlib (`moj checker`), compare-float, na mão |
+| **SUMMARY** (como pontua) | `scripts/summary.sh` | interativo-rank; `tests/score` cobre o caso comum sem script |
+
+Matriz do que compõe:
+
+| | função (compile) | ban (compile) | checker (compare) | float (compare) | interativo (run+compare) |
+|---|---|---|---|---|---|
+| **função** | — | mesmo slot: um OU outro por linguagem | ✓ | ✓ | ✗ |
+| **checker** | ✓ | ✓ | — | mesmo slot | ✗ (o interativo tem compare próprio) |
+| **interativo** | ✗ (controla a execução por linguagem) | ✗ | ✗ | ✗ | — |
+
+Na prática: **função + checker é combinação normal** (`moj fn <dir> && moj checker <dir>
+<checker.cpp>` — cada um instala só o seu slot e avisa o que preservou). O editor web faz o
+mesmo: "**+ Adicionar template**" é ADITIVO (merge por arquivo; o confirm diz o que entra, o
+que fica e o que seria substituído); "🧹 limpar" zera todos os slots. O único que não mistura
+é o **interativo** — ele é dono da execução por linguagem e do protocolo de comparação; os
+installers recusam/pulam com aviso (e `--force` existe p/ quem sabe o que está fazendo).
+
 Regras gerais:
 
 - **`chmod +x` obrigatório** em todo `scripts/*.sh` — `cage-run.sh` executa o script direto

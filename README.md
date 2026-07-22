@@ -328,7 +328,9 @@ Proibir uma função da biblioteca para forçar a implementação na mão, compa
 de ponto flutuante: tudo isso é `scripts/`, e está em
 **[docs/correcao-especial.md](docs/correcao-especial.md)**.
 
-Há **templates prontos** em `script-templates/`, que o editor web oferece num seletor.
+Há **templates prontos** em `script-templates/`, que o editor web oferece num seletor —
+**aditivos por SLOT** (compile/run/compare/summary): função + checker compõem; só o
+interativo não mistura (a matriz completa está no topo do `docs/correcao-especial.md`).
 
 ## 4. O caminho normal do autor: a CLI
 

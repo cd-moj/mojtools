@@ -12,11 +12,22 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 MOJT="$(cd "$HERE/.." && pwd)"
 
-PKG="${1:?uso: install-checker.sh <pkgdir> <checker.cpp>}"
-SRC="${2:?uso: install-checker.sh <pkgdir> <checker.cpp>}"
+PKG="${1:?uso: install-checker.sh <pkgdir> <checker.cpp> [--force]}"
+SRC="${2:?uso: install-checker.sh <pkgdir> <checker.cpp> [--force]}"
+FORCE=0; [[ "${3:-}" == --force ]] && FORCE=1
 PKG="$(cd "$PKG" && pwd)"
 [[ -f "$SRC" ]] || { echo "ERRO: checker não encontrado: $SRC" >&2; exit 1; }
 [[ -d "$PKG/tests/input" || -f "$PKG/conf" ]] || { echo "ERRO: $PKG não parece um pacote MOJ" >&2; exit 1; }
+
+# COMPOSIÇÃO por slots (ver docs/correcao-especial.md): este installer só preenche o slot
+# COMPARE (compare.sh + checker.cpp) — compile.sh/run.sh de outros templates FICAM intactos.
+# Exceção estrutural: pacote INTERATIVO tem compare próprio (protocolo de FIFOs) — um
+# checker testlib o QUEBRARIA; recuse sem --force.
+if [[ -f "$PKG/scripts/c/run.sh" && $FORCE -eq 0 ]]; then
+  echo "ERRO: este pacote é INTERATIVO (scripts/c/run.sh existe) — o interativo usa o próprio" >&2
+  echo "      compare (protocolo); um checker testlib não compõe com ele. --force p/ insistir." >&2
+  exit 1
+fi
 
 mkdir -p "$PKG/scripts"
 
@@ -65,4 +76,9 @@ if [[ -n "$first" ]]; then
 fi
 
 echo "instalado: scripts/checker.cpp + scripts/compare.sh (stub -> mojtools/testlib/checker-bridge.sh)"
+# composição: os demais slots são de outros templates e FICAM como estavam
+_pres=""
+compgen -G "$PKG/scripts/*/compile.sh" >/dev/null 2>&1 && _pres+=" compile.sh(submissão-de-função/ban)"
+[[ -f "$PKG/scripts/summary.sh" ]] && _pres+=" summary.sh"
+[[ -n "$_pres" ]] && echo "slots PRESERVADOS (compõem com o checker):$_pres"
 echo "lembrete: 'moj push' carrega o scripts/ (round-trip completo); 'moj upload <id> <tar.gz>' sobe o pacote inteiro."

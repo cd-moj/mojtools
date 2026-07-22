@@ -1,5 +1,10 @@
 {
   "name": "Interativo com RANKING (score)",
   "description": "Driver interativo + summary que SOMA os scores dos testes aceitos (a última linha do stderr do árbitro precisa ser o score numérico; qualquer WRONG zera tudo).",
-  "conf_hints": "Recomendado no conf: ULIMITS[-u]=10000, TLMOD[calibrafactor]=\"10+1.5\", CALIBRATIONTL=5, ALLOWPARALLELTEST=n, STOPWHEN_WA=y. Tutorial: mojtools/docs/problema-interativo.md (seção Ranking)."
+  "conf_hints": "Recomendado no conf: ULIMITS[-u]=10000, TLMOD[calibrafactor]=\"10+1.5\", CALIBRATIONTL=5, ALLOWPARALLELTEST=n, STOPWHEN_WA=y. Tutorial: mojtools/docs/problema-interativo.md (seção Ranking).",
+  "slots": [
+    "run",
+    "compare",
+    "summary"
+  ]
 }

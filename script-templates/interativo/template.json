@@ -1,5 +1,9 @@
 {
   "name": "Problema interativo",
   "description": "Driver comum de interativo (árbitro conversa com o jogador por stdin/stdout): edite o arbitro.sh (ou troque por arbitro.py/arbitro.cpp). A última linha do stderr do árbitro é o resultado (score ou WRONG <motivo>).",
-  "conf_hints": "Recomendado no conf: ULIMITS[-u]=10000, TLMOD[calibrafactor]=\"10+1.5\", CALIBRATIONTL=5, ALLOWPARALLELTEST=n. Tutorial: mojtools/docs/problema-interativo.md."
+  "conf_hints": "Recomendado no conf: ULIMITS[-u]=10000, TLMOD[calibrafactor]=\"10+1.5\", CALIBRATIONTL=5, ALLOWPARALLELTEST=n. Tutorial: mojtools/docs/problema-interativo.md.",
+  "slots": [
+    "run",
+    "compare"
+  ]
 }

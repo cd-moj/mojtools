@@ -6,6 +6,9 @@ Este guia é o protocolo canônico + passo a passo. A parte técnica do driver e
 [`../interactive/README.md`](../interactive/README.md); a mecânica geral de `scripts/`
 em [`correcao-especial.md`](correcao-especial.md).
 
+> **Composição**: o interativo é dono dos slots RUN e COMPARE — NÃO compõe com checker
+> testlib nem com submissão de função. Ver os 4 slots em `correcao-especial.md`.
+
 ## Componentes
 
 ```
