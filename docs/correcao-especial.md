@@ -29,6 +29,10 @@ Regras gerais:
 
 ## Submissão de função (aluno entrega só a função)
 
+> **Guia completo (com templates prontos e as boas práticas anti-IO/sentinela):**
+> [docs/submissao-de-funcao.md](submissao-de-funcao.md). Instale os drivers com
+> `moj fn <dir>` ou pelo template "Submissão de função" do editor web.
+
 `scripts/<lang>/compile.sh` injeta um `main`/wrapper que lê a entrada, chama a função do aluno e
 imprime o retorno. A fonte do aluno mantém o basename no workdir (`/tmp/rwdir`); em Java a
 submissão é sempre `Main.java`. Convenção: **mesmo nome de função nas 5 linguagens** (Rust com

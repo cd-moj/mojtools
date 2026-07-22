@@ -1,0 +1,5 @@
+{
+  "name": "Submissão de função (driver por linguagem)",
+  "description": "O aluno envia SÓ a função; o driver (main do autor, inline em cada scripts/<lang>/compile.sh) lê a entrada, chama a função e imprime. Exemplo funcional soma(a,b) com SENTINELA anti-IO: a última linha da entrada é 424242 — se a função do aluno consumir a entrada, o driver detecta e imprime SENTINELA-VIOLADA (WA determinístico). Edite as zonas EDIT-ME (protótipo, leitura, chamada) nas linguagens que for liberar e apague os compile.sh das demais. Guia completo: mojtools/docs/submissao-de-funcao.md.",
+  "conf_hints": "Mesma função (mesmo nome) em todas as linguagens liberadas. Restrinja `languages` no problema às linguagens COM driver (sem isso, trocar de linguagem burla o esquema). A entrada de TODO teste termina com a linha 424242 (a sentinela). Mexer em scripts/ muda o tl-checksum ⇒ recalibração (correto). Float: imprima com 6 casas e Locale.US no Java; use o template compare-float se precisar de tolerância."
+}

@@ -63,6 +63,12 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `summary-score.sh` p/ ranking) + `install-interactive.sh <pkg> <arbitro> [--score]`.
   Protocolo: árbitro lê o teste de `argv[1]`; ÚLTIMA linha do stderr = resultado
   (`WRONG <motivo>` ⇒ WA). Guia: `docs/problema-interativo.md`; técnico: `interactive/README.md`.
+- `fn/` — **submissão de função normalizada**: `install-fn.sh <pkg> [--langs …]` instala os
+  drivers-template de `script-templates/submissao-de-funcao/files/` (fonte única com o editor
+  web) em `scripts/<lang>/compile.sh` (cópia real +x — roda NA JAULA). Os 5 drivers (c/cpp/
+  py/java/rs) trazem a **SENTINELA anti-IO** (última linha de todo teste = 424242; função que
+  consome a entrada ⇒ SENTINELA-VIOLADA ⇒ WA determinístico). Guia:
+  `docs/submissao-de-funcao.md`; atalho da CLI: `moj fn`.
 - `testlib/` — **checkers testlib normalizados**: `testlib.h` vendorada + `checker-bridge.sh`
   (compila `scripts/checker.cpp` no juiz sob demanda, cache FORA de `scripts/` p/ não poluir o
   tl-checksum) + `compare-stub.sh` + `install-checker.sh <pkg> <checker.cpp>`.

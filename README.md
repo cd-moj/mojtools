@@ -309,11 +309,24 @@ stderr do árbitro é o resultado (`WRONG <motivo>` reprova). Com `--score`, o p
 
 Guia de autoria: **[docs/problema-interativo.md](docs/problema-interativo.md)**.
 
+### Submissão de função (o aluno entrega só a função)
+
+O driver (main do autor) vive inline em `scripts/<lang>/compile.sh`. Instale os templates
+prontos (5 linguagens, com a **sentinela anti-IO** embutida — detecta função que consome a
+entrada) com:
+
+```sh
+moj fn <dir> [--langs c,cpp,py,java,rs]    # ou: bash fn/install-fn.sh <dir>
+```
+
+Guia de autoria (anatomia por linguagem, boas práticas, erros comuns):
+**[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**.
+
 ### Outros ajustes de correção
 
-Submissão de função (o aluno entrega só a função, não o programa), proibir uma função da biblioteca
-para forçar a implementação na mão, comparador com tolerância de ponto flutuante: tudo isso é
-`scripts/`, e está em **[docs/correcao-especial.md](docs/correcao-especial.md)**.
+Proibir uma função da biblioteca para forçar a implementação na mão, comparador com tolerância
+de ponto flutuante: tudo isso é `scripts/`, e está em
+**[docs/correcao-especial.md](docs/correcao-especial.md)**.
 
 Há **templates prontos** em `script-templates/`, que o editor web oferece num seletor.
 
@@ -721,6 +734,7 @@ juiz.
 - **[docs/correcao-especial.md](docs/correcao-especial.md)**: `scripts/` por problema.
 - **[docs/checker-testlib.md](docs/checker-testlib.md)**: escrever um checker.
 - **[docs/problema-interativo.md](docs/problema-interativo.md)**: escrever um problema interativo.
+- **[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**: problema de submissão de função.
 - **`cdmoj/docs/PACOTE.md`** (no repositório `cdmoj`): o **formato do pacote**, orgs, coleções e
   metadados. É a referência.
 - **`cdmoj/docs/FLOW.md`**: o caminho de uma submissão, do browser até o placar.
