@@ -57,6 +57,11 @@ CKSCACHE="$CONTESTSDIR/treino/var/tl-checksum-cache.json"
 _statsig(){ ( cd "$1" 2>/dev/null || exit 0
   find conf tests/input tests/output tests/score sols/good scripts -type f -printf '%P\t%m\t%s\t%T@\n' 2>/dev/null \
     | LC_ALL=C sort | cksum | awk '{print $1}' ) }
+# a VERSÃO do próprio tl-checksum.sh entra na assinatura: mudou a FUNÇÃO de hash (ex.:
+# vazio≡ausente em tests/output) => o cache inteiro invalida UMA vez e recomputa com a função
+# nova. Sem isto, pacote sem mudança servia o checksum VELHO p/ sempre e era preciso lembrar
+# de apagar o cache na mão a cada mudança de cobertura.
+_TLCKS_VER="$(cksum "$HERE/tl-checksum.sh" 2>/dev/null | awk '{print $1}')"
 declare -A CKS_HEAD CKS_SIG CKS_CKS
 if [[ -f "$CKSCACHE" ]]; then
   while IFS=$'\t' read -r _cid _chead _csig _ccks; do
@@ -118,7 +123,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # (lê o conteúdo). Casa com o run/tl/<id>.json (juiz e servidor usam o MESMO tl-checksum.sh).
     cks=""
     if [[ -f "$RUNDIR/tl/$id.json" ]]; then
-      sig="$(_statsig "$pdir")"
+      sig="$(_statsig "$pdir").${_TLCKS_VER}"
       if [[ -n "$rhead" && "${CKS_HEAD[$id]:-}" == "$rhead" && -n "$sig" \
             && "${CKS_SIG[$id]:-}" == "$sig" && -n "${CKS_CKS[$id]:-}" ]]; then
         cks="${CKS_CKS[$id]}"
