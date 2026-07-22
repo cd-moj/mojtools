@@ -18,15 +18,20 @@ pkg="${1:?uso: tl-checksum.sh <pkgdir>}"
 {
   # conf: calibrafactor/ULIMITS/CALIBRATIONTL/ALLOWPARALLELTEST/etc. mudam o TL
   if [[ -f "$pkg/conf" ]]; then printf '=conf\n'; cat "$pkg/conf"; printf '\n'; fi
-  # testes (entrada + saída esperada + grupos do score) + soluções "good"
+  # testes (entrada + saída esperada + grupos do score) + soluções "good".
+  # Em tests/output, arquivo VAZIO ≡ AUSENTE (find -size +0c): interativo puro não tem
+  # saída esperada (o árbitro corrige) e um push que materializasse outputs vazios mudava
+  # o hash ⇒ recalibração espúria eterna. Vazio não muda veredicto nem TL de ninguém:
+  # p/ quem compara com diff, expected vazio ausente e presente são o mesmo julgamento.
   for d in tests/input tests/output tests/score sols/good; do
     if [[ -f "$pkg/$d" ]]; then   # tests/score é ARQUIVO
       printf '=%s\n' "$d"; cat "$pkg/$d"; printf '\n'; continue
     fi
     [[ -d "$pkg/$d" ]] || continue
+    sz=(); [[ "$d" == tests/output ]] && sz=(-size +0c)
     while IFS= read -r f; do
       printf '=%s\n' "${f#"$pkg"/}"; cat "$f"; printf '\n'
-    done < <(find "$pkg/$d" -type f 2>/dev/null | LC_ALL=C sort)
+    done < <(find "$pkg/$d" -type f "${sz[@]}" 2>/dev/null | LC_ALL=C sort)
   done
   # scripts de correção especial (compile/run/compare/prep por linguagem): mudam a
   # COMPILAÇÃO/EXECUÇÃO/comparação das soluções — logo podem mudar o TL e EXIGEM que o
