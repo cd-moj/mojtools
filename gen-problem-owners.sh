@@ -97,7 +97,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # independente do flag public: privado validado tem html; público recém-marcado sem json não.
     htm=0; [[ -n "${PUBSET[$id]:-}" || -f "$JDPRIV/$id.json" ]] && htm=1
     title="${TITLE[$id]:-}"; [[ -n "$title" ]] || title="$prob"
-    owner=""; collabs=""; colls="$repo"; mpat=""   # default: o repo é uma "coleção" (curso)
+    owner=""; collabs=""; colls="$repo"; mpat=""; mlangs=""   # default: o repo é uma "coleção" (curso)
     meta="$pdir/.moj-meta.json"
     if [[ -f "$meta" ]]; then
       # uma LINHA por campo + mapfile: preserva os campos VAZIOS por POSIÇÃO. (read/@tsv NÃO serve:
@@ -109,8 +109,9 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
         ((.collections // []) | join(",")),
         (.display_title // ""),
         (if .public==true then "1" elif .public==false then "0" else "" end),
-        (.public_at // "")' "$meta" 2>/dev/null)
-      owner="${_M[0]:-}"; collabs="${_M[1]:-}"; mcolls="${_M[2]:-}"; mtitle="${_M[3]:-}"; mpub="${_M[4]:-}"; mpat="${_M[5]:-}"
+        (.public_at // ""),
+        ((.languages // []) | join(","))' "$meta" 2>/dev/null)
+      owner="${_M[0]:-}"; collabs="${_M[1]:-}"; mcolls="${_M[2]:-}"; mtitle="${_M[3]:-}"; mpub="${_M[4]:-}"; mpat="${_M[5]:-}"; mlangs="${_M[6]:-}"
       [[ -n "$mcolls" ]] && colls="$mcolls"
       [[ -n "$mtitle" ]] && title="$mtitle"
       [[ -n "$mpub" ]] && pub="$mpub"
@@ -136,8 +137,8 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
     gl=""
     [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; case "$e" in py2|py3) e=py;; esac; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -161,7 +162,8 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         collections:((.[9]//"")|split(",")|map(select(length>0))),
         tl_checksum:(.[10] // ""),
         public_at:((.[11] // "")|if .=="" then null else tonumber end),
-        good_langs:((.[12] // "")|split(",")|map(select(length>0))) }
+        good_langs:((.[12] // "")|split(",")|map(select(length>0))),
+        languages:((.[14] // "")|split(",")|map(select(length>0))) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 
