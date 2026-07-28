@@ -44,9 +44,13 @@ bind do `bwrap`: nasceu replicado em 198 pacotes).
 
 ## Limitações v1
 
-- Dispatch de jogador TESTADO: compilados (ELF), `py`, `sh`; melhor esforço `js`, `java`;
-  `kt`/`riscv`/`spim`/`apl` sem dispatch — restrinja as linguagens do problema
-  (`problem-langs`) às suportadas.
+- Dispatch de jogador TESTADO: compilados (ELF), `py`, `sh`, **`java`** (roda a classe com
+  `main`, eleita pelo `lang/java/compile.sh`) e **`kt`** (`java -jar` do jar do `kotlinc
+  -include-runtime`); melhor esforço `js`; `cs`/`riscv`/`spim`/`apl`/`pl` sem dispatch —
+  restrinja as linguagens do problema às suportadas.
+- **JVM ignora o `stdbuf -oL`** do driver (I/O próprio): solução Java/Kotlin PRECISA de
+  `System.out.flush()` a cada resposta, senão trava (TLE). Diga isso no enunciado — o
+  guia de autoria tem os modelos.
 - **TL e memória INCLUEM o árbitro** (mesmo cgroup/tempo real): calibre com folga
   (`TLMOD[calibrafactor]`, `CALIBRATIONTL`) e lembre disso ao definir `MEMLIMITMB`.
 - Score contínuo só via `summary.sh` (`--score`); por teste o veredicto é binário.

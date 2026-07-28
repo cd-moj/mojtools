@@ -307,6 +307,10 @@ O árbitro recebe o teste como argumento e conversa com a solução por FIFOs. A
 stderr do árbitro é o resultado (`WRONG <motivo>` reprova). Com `--score`, o problema vira um ranking
 (a nota é o desempenho, não o acerto).
 
+Linguagens do jogador: compilados (ELF), `py`, `sh`, **`java`** e **`kt`** (as duas da JVM
+desde 2026-07-28); `js` é melhor esforço. ⚠ **Java/Kotlin exigem `System.out.flush()` a cada
+resposta** — a JVM não obedece o `stdbuf` do driver e sem flush o jogador trava (TLE).
+
 Guia de autoria: **[docs/problema-interativo.md](docs/problema-interativo.md)**.
 
 ### Submissão de função (o aluno entrega só a função)

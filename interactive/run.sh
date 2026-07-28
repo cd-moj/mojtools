@@ -35,27 +35,38 @@ trap sai_tl TERM
 cd /tmp/dir
 source binfile.sh
 
-# dispatch de linguagem pela extensão do binário/fonte (testado: c/cpp e demais compilados,
-# py, sh; melhor esforço: js, java — ver limitações no tutorial)
+# dispatch de linguagem pela extensão do binário/fonte (testado: compilados ELF, py, sh,
+# java, kt; melhor esforço: js — ver limitações no tutorial). Os ramos da JVM espelham
+# lang/java/run.sh e lang/kt/run.sh (mesmas flags de heap/stack): java roda a CLASSE
+# (compile.sh elege a que tem main), kotlin roda o JAR (kotlinc -include-runtime já põe o
+# Main-Class no manifest). ⚠ na JVM o `stdbuf -oL` abaixo é NO-OP (I/O próprio, não libc):
+# a solução TEM de dar flush a cada resposta — está no enunciado/tutorial.
 CMD=(/tmp/dir/$BIN)
+_JVM=(-Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k)
 case "$BIN" in
   *.py|*.py2|*.py3) CMD=(python3 /tmp/dir/$BIN) ;;
   *.sh)             CMD=(bash /tmp/dir/$BIN) ;;
   *.js)             CMD=(node /tmp/dir/$BIN) ;;
   *.class)          export CLASSPATH=/tmp/dir
-                    CMD=(java -Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k "$(basename "$BIN" .class)") ;;
+                    CMD=(java "${_JVM[@]}" "$(basename "$BIN" .class)") ;;
+  *.jar)            CMD=(java "${_JVM[@]}" -jar /tmp/dir/$BIN) ;;
 esac
 
 mkfifo /tmp/fifo.in /tmp/fifo.out
 cd /tmp/
 
-stdbuf -oL /bin/time --output /tmp/aluno.time -f "%M %U" "${CMD[@]}" < /tmp/fifo.out > /tmp/fifo.in 2>/dev/null &
+stdbuf -oL /bin/time --output /tmp/aluno.time -f "%M %U" "${CMD[@]}" < /tmp/fifo.out > /tmp/fifo.in 2>/tmp/aluno.log &
 stdbuf -oL /bin/time --output /tmp/arbitro.time -f "%M %U" /tmp/dir/arbitro /tmp/in > /tmp/fifo.out < /tmp/fifo.in 2> /tmp/arbitro.log &
 
 wait
 
-# log do árbitro + medidas do jogador vão p/ o stderr (aparecem no report)
+# log do árbitro + stderr do JOGADOR + medidas vão p/ o stderr (aparecem no report). O
+# stderr do jogador é o único diagnóstico de exceção em JVM/Python — não jogar fora.
 cat /tmp/arbitro.log >&2 2>/dev/null
+if [[ -s /tmp/aluno.log ]]; then
+  echo "======== stderr do jogador (últimas 40 linhas)" >&2
+  tail -n 40 /tmp/aluno.log >&2 2>/dev/null
+fi
 read -r MEMORIA TEMPO <<< "$(tail -n1 /tmp/aluno.time 2>/dev/null)"
 echo "Tempo do jogador (segundos de CPU): ${TEMPO:-?}" >&2
 echo "Memória do jogador (KB): ${MEMORIA:-?}" >&2

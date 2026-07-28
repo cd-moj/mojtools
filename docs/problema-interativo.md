@@ -179,10 +179,51 @@ referência em `tests/output/N` e substitua o `scripts/compare.sh` por um custom
 calcule `SCORE=<referência>/<obtido>` — o resto do driver continua igual (é o padrão do
 `fcte-delivery`).
 
+## O jogador: linguagens e o FLUSH obrigatório
+
+O driver despacha o jogador pela extensão do artefato compilado (`BIN`):
+
+| Linguagem | como o driver invoca | flush no jogador |
+|---|---|---|
+| C, C++, Rust, Go, Pascal… (ELF) | `/tmp/dir/$BIN` | `fflush(stdout)` / `cout << flush` / `io::stdout().flush()` — **o `-static` do C ignora o `stdbuf`** |
+| Python (`py`) | `python3 /tmp/dir/$BIN` | `print(..., flush=True)` |
+| Bash (`sh`) | `bash /tmp/dir/$BIN` | `echo` já é por linha |
+| **Java** | `java -Xmx… -Xss… <Classe>` (a classe com `main`, eleita no compile) | **`System.out.flush()` a cada resposta** |
+| **Kotlin** | `java -Xmx… -Xss… -jar prog.jar` (`kotlinc -include-runtime`) | **`System.out.flush()` a cada resposta** |
+| JavaScript | `node /tmp/dir/$BIN` | melhor esforço |
+
+Sem ramo no dispatch (julgariam NÃO-interativamente): `cs`, `apl`, `riscv`, `spim`, `pl` —
+restrinja as linguagens do problema.
+
+> **JVM não obedece o `stdbuf`.** Java e Kotlin têm I/O próprio; sem `flush()` explícito a
+> resposta fica no buffer, o árbitro nunca a recebe e o veredicto vira TLE (ou WRONG por
+> "jogador encerrou"). **Diga isso no enunciado** de todo problema interativo que aceite
+> JVM. Modelos que funcionam (`interativos#adivinhe-o-numero` traz os dois em `sols/good/`):
+
+```java
+BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+int n = Integer.parseInt(in.readLine().trim());
+System.out.println(palpite);
+System.out.flush();                 // <<< a cada resposta
+String r = in.readLine();           // uma linha por vez (nunca "leia tudo até EOF")
+```
+
+```kotlin
+val n = readLine()!!.trim().toInt()
+println(palpite)
+System.out.flush()                  // <<< a cada resposta
+val r = readLine()?.trim() ?: return
+```
+
+Ler **uma linha por vez** também é obrigatório (a armadilha do `read_to_string` do Rust vale
+para qualquer linguagem: o árbitro só fala depois de cada jogada, então ler até EOF trava).
+
 ## Erros comuns
 
 - **Esquecer o flush** no árbitro ou no jogador ⇒ deadlock ⇒ TLE. O driver usa
-  `stdbuf -oL`, mas isso não salva `printf` sem `\n`/flush.
+  `stdbuf -oL`, mas isso não salva `printf` sem `\n`/flush — e **não alcança a JVM nem
+  binário `-static`** (o `stdbuf` age por `LD_PRELOAD` sobre o stdio da libc). Ver a seção
+  de flush por linguagem abaixo: em Java/Kotlin o flush explícito é OBRIGATÓRIO.
 - **Árbitro saindo com exit ≠ 0** ou morrendo por sinal ⇒ UE (erro do problema, não WA).
 - **`tests/output` faltando**: o portão de validação exige input/output em PARES —
   crie placeholders.
