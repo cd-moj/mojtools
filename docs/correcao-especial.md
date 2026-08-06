@@ -110,7 +110,7 @@ bash mojtools/interactive/install-interactive.sh <pacote> arbitro.cpp [--score]
 
 Protocolo: árbitro recebe o teste em `argv[1]`; a ÚLTIMA linha do stderr dele é o
 RESULTADO (`WRONG <motivo>` ⇒ WA; score/info ⇒ AC, somável com `--score` p/ ranking);
-sem resultado ⇒ RTE (jogador morreu) ou UE. Guia completo com exemplos:
+sem resultado ⇒ RTE (jogador morreu) ou UE; árbitro morto por SIGPIPE = o JOGADOR fechou o pipe ⇒ RTE/WA (nunca UE — e linha de log de árbitro morto nunca vira resultado). Guia completo com exemplos:
 **[`problema-interativo.md`](problema-interativo.md)**; técnico:
 `mojtools/interactive/README.md`.
 

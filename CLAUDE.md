@@ -62,7 +62,13 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   com `-static` e cache FORA de `scripts/`; `compare.sh` genérico 13/6/4;
   `summary-score.sh` p/ ranking) + `install-interactive.sh <pkg> <arbitro> [--score]`.
   Protocolo: árbitro lê o teste de `argv[1]`; ÚLTIMA linha do stderr = resultado
-  (`WRONG <motivo>` ⇒ WA). Guia: `docs/problema-interativo.md`; técnico: `interactive/README.md`.
+  (`WRONG <motivo>` ⇒ WA). **Morte anormal do árbitro (2026-08-06)**: SIGPIPE = o JOGADOR
+  fechou o pipe ⇒ RTE/WA (nunca UE — era a vala "sinal ⇒ UE" que virava chamado em prova);
+  outro sinal/exit≠0 sem `WRONG` ⇒ UE, e linha de log de árbitro morto NUNCA vira resultado
+  (compare trata não-`WRONG` como AC — py com `BrokenPipeError` dava AC FALSO). Árbitros levam
+  a proteção por linguagem (trap PIPE / excepthook+`os._exit(0)` / `SIG_IGN`); regressão:
+  `interactive/test-driver.sh` (13 casos, /tmp fixo — dev/container).
+  Guia: `docs/problema-interativo.md`; técnico: `interactive/README.md`.
 - `fn/` — **submissão de função normalizada**: `install-fn.sh <pkg> [--langs …]` instala os
   drivers-template de `script-templates/submissao-de-funcao/files/` (fonte única com o editor
   web) em `scripts/<lang>/compile.sh` (cópia real +x — roda NA JAULA). Os 5 drivers (c/cpp/

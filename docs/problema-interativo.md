@@ -48,10 +48,19 @@ Regras do árbitro:
    - sucesso ⇒ imprima o **score** (número) ou uma informação final;
    - erro do jogador ⇒ imprima **`WRONG <motivo>`** (ex.: `WRONG clicou em bomba (10,5)`).
 4. **Termine com exit 0 SEMPRE** (inclusive no WRONG — quem decide o veredicto é o
-   resultado, não o exit). Crash/sinal do árbitro = erro do PROBLEMA ⇒ vira UE.
+   resultado, não o exit). Crash/sinal do árbitro = erro do PROBLEMA ⇒ vira UE — com UMA
+   exceção: **SIGPIPE (o jogador fechou o pipe) é erro do ALUNO**, e o driver o trata
+   (RTE/WA); ainda assim, PROTEJA o árbitro (regra 5½) para dar WA com motivo.
 5. **Jogador sumiu no meio** (EOF ao ler): imprima `WRONG <motivo>` e saia 0 — o aluno
    vê Wrong Answer. Se preferir que crash do jogador apareça como Runtime Error, apenas
    NÃO produza resultado (saia 0 em silêncio): o driver detecta a morte do jogador e dá RTE.
+5½. **Jogador sumiu na ESCRITA** (você responde e ele já morreu — o RE mais comum de
+   aluno): sem proteção o árbitro morre mudo (SIGPIPE em C/bash; `BrokenPipeError` +
+   exit≠0 em Python). Os modelos abaixo trazem a proteção de cada linguagem — trap
+   `PIPE` no bash, `except BrokenPipeError` + `os._exit(0)` no python, `SIG_IGN` no C++
+   (a escrita falha e a próxima leitura cai no EOF da regra 5). O driver moderno já
+   converte árbitro morto de SIGPIPE em RTE/WA, mas com a proteção o aluno recebe o
+   MOTIVO ("encerrou sem ler a resposta").
 6. **Não trate time limit**: o juiz mata todo mundo no TL (o driver recebe TERM e o
    veredicto sai TLE pelo tempo medido).
 
@@ -63,7 +72,8 @@ Regras do árbitro:
 | `WRONG <motivo>` | **Wrong Answer** |
 | nada + jogador morreu | **Runtime Error** |
 | nada + jogador ok | **UE** (anormal — árbitro com bug) |
-| (árbitro morto por sinal) | **UE** |
+| (árbitro morto por **SIGPIPE** — o jogador fechou o pipe) | **RTE** (jogador morto) ou **WA** "encerrou sem ler" (saiu 0); resultado `WRONG` do árbitro, se houver, MANDA |
+| (árbitro morto por outro sinal, ou exit ≠ 0 sem resultado `WRONG`) | **UE** — e linha de log NUNCA vira resultado (seria AC falso) |
 
 ## Exemplo completo: "adivinha o número"
 
@@ -75,6 +85,8 @@ tentativas sobraram.
 
 ```bash
 #!/bin/bash
+# jogador fechou o pipe (morreu/saiu sem ler a resposta)? SIGPIPE -> WRONG com motivo
+trap 'echo "WRONG o programa encerrou sem ler a resposta" >&2; exit 0' PIPE
 read -r ALVO MAX < "$1"                 # o teste vem de argv[1]
 echo "$MAX"                             # stdout -> jogador
 for ((i=1; i<=MAX; i++)); do
@@ -93,28 +105,42 @@ echo "WRONG estourou as $MAX tentativas" >&2
 ### Árbitro em python (`arbitro.py`)
 
 ```python
-import sys
-alvo, maxt = map(int, open(sys.argv[1]).read().split())
-print(maxt, flush=True)
-for i in range(1, maxt + 1):
-    try:
-        p = int(input())
-    except EOFError:
-        print("WRONG jogador encerrou sem acertar", file=sys.stderr); sys.exit(0)
-    print(f"palpite {i}: {p}", file=sys.stderr)
-    if p == alvo:
-        print("OK", flush=True)
-        print(maxt - i + 1, file=sys.stderr)   # última linha = score
-        sys.exit(0)
-    print("MAIOR" if p < alvo else "MENOR", flush=True)
-print(f"WRONG estourou as {maxt} tentativas", file=sys.stderr)
+import os, sys
+
+def jogo():
+    alvo, maxt = map(int, open(sys.argv[1]).read().split())
+    print(maxt, flush=True)
+    for i in range(1, maxt + 1):
+        try:
+            p = int(input())
+        except EOFError:
+            print("WRONG jogador encerrou sem acertar", file=sys.stderr); return
+        print(f"palpite {i}: {p}", file=sys.stderr)
+        if p == alvo:
+            print("OK", flush=True)
+            print(maxt - i + 1, file=sys.stderr)   # última linha = score
+            return
+        print("MAIOR" if p < alvo else "MENOR", flush=True)
+    print(f"WRONG estourou as {maxt} tentativas", file=sys.stderr)
+
+try:
+    jogo()
+except BrokenPipeError:
+    # jogador fechou o pipe (morreu/saiu sem ler a resposta)
+    print("WRONG o programa encerrou sem ler a resposta", file=sys.stderr)
+    sys.stderr.flush()
+    os._exit(0)   # sem os._exit, o flush do stdout QUEBRADO na saída viraria exit != 0
 ```
 
 ### Árbitro em C++ (`arbitro.cpp` — compilado pelo driver, com cache)
 
 ```cpp
 #include <cstdio>
+#include <csignal>
 int main(int argc, char** argv) {
+    // jogador fechou o pipe? a escrita falha (em vez de SIGPIPE matar o árbitro) e a
+    // PRÓXIMA leitura cai no EOF -> "WRONG jogador encerrou" (regra 5)
+    std::signal(SIGPIPE, SIG_IGN);
     long alvo, maxt;
     FILE* f = fopen(argv[1], "r");
     if (!f || fscanf(f, "%ld %ld", &alvo, &maxt) != 2) {
@@ -224,7 +250,7 @@ para qualquer linguagem: o árbitro só fala depois de cada jogada, então ler a
   `stdbuf -oL`, mas isso não salva `printf` sem `\n`/flush — e **não alcança a JVM nem
   binário `-static`** (o `stdbuf` age por `LD_PRELOAD` sobre o stdio da libc). Ver a seção
   de flush por linguagem abaixo: em Java/Kotlin o flush explícito é OBRIGATÓRIO.
-- **Árbitro saindo com exit ≠ 0** ou morrendo por sinal ⇒ UE (erro do problema, não WA).
+- **Árbitro saindo com exit ≠ 0** ou morrendo por sinal ⇒ UE (erro do problema, não WA) — exceto SIGPIPE, que o driver converte em RTE/WA (jogador fechou o pipe); resultado `WRONG` explícito é honrado mesmo com exit ≠ 0. **Árbitro SEM a proteção da regra 5½** ⇒ o aluno que morre no meio ganha veredicto sem motivo (RTE) em vez do WA explicativo.
 - **`tests/output` faltando**: o portão de validação exige input/output em PARES —
   crie placeholders.
 - **Linguagem sem o driver** julga NÃO-interativamente (o jogador leria `/tmp/in` cru) —

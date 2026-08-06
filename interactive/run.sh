@@ -11,6 +11,10 @@
 #     "WRONG <motivo>" no erro. (Compat: árbitro que grava /tmp/out direto é respeitado.)
 #   - O RESULTADO do árbitro MANDA: com resultado, o exit do jogador é ignorado;
 #     sem resultado, jogador que morreu = RTE (exit 3) e silêncio = UE (compare 13).
+#   - Morte ANORMAL do árbitro: SIGPIPE (13) = o JOGADOR fechou o pipe -> RTE (jogador
+#     morto) ou WRONG (saiu sem ler); qualquer outro sinal = erro do JUIZ -> UE; exit != 0
+#     sem resultado = UE. De árbitro morto/anormal só se honra /tmp/out explícito ou última
+#     linha "WRONG …" — linha de log benigna viraria AC FALSO (compare: não-WRONG = SCORE).
 #   - TL: o juiz manda TERM; materializamos o que houver e saímos 0 (o TLE sai pelo
 #     tempo medido, como em qualquer problema).
 
@@ -71,17 +75,67 @@ read -r MEMORIA TEMPO <<< "$(tail -n1 /tmp/aluno.time 2>/dev/null)"
 echo "Tempo do jogador (segundos de CPU): ${TEMPO:-?}" >&2
 echo "Memória do jogador (KB): ${MEMORIA:-?}" >&2
 
-# árbitro morto por sinal = erro do JUIZ: invalida qualquer resultado -> UE (compare 13)
-if grep -qi "signal" /tmp/arbitro.time 2>/dev/null; then
-  echo "DRIVER: árbitro terminou por SINAL — resultado invalidado (vira UE)" >&2
+# --- pós-morte: decidir o veredicto a partir de COMO cada lado terminou -----------------
+# aluno_died: o texto do GNU time é a única fonte (o `wait` sem PID não colhe status)
+aluno_died=0
+grep -Eqi "(non-zero|signal)" /tmp/aluno.time 2>/dev/null && aluno_died=1
+# número do sinal que matou o árbitro ("Command terminated by signal N"), vazio = sem sinal
+arbsig="$(grep -i 'terminated by signal' /tmp/arbitro.time 2>/dev/null | grep -oE '[0-9]+' | head -1)"
+
+# wrong_do_log: honra a última linha do stderr do árbitro SÓ se for um "WRONG …" — a última
+# linha de um árbitro que MORREU é log benigno, e o compare trata qualquer não-WRONG como
+# ACCEPTED (SCORE=<linha>); materializá-la seria AC falso. (Árbitro com a proteção de SIGPIPE
+# imprime o WRONG antes de sair — inclusive sob driver antigo.)
+wrong_do_log() {
+  local last
+  last="$(grep -v '^[[:space:]]*$' /tmp/arbitro.log 2>/dev/null | tail -n1)"
+  [[ "$last" == WRONG* ]] || return 1
+  printf '%s\n' "$last" > /tmp/out
+}
+
+if [[ "$arbsig" == 13 ]]; then
+  # SIGPIPE = o JOGADOR fechou o pipe e o árbitro morreu escrevendo a resposta: erro do
+  # ALUNO, não do juiz (era a vala comum do "sinal ⇒ UE" — cada aluno virava chamado).
+  if [[ -s /tmp/out ]] || wrong_do_log; then
+    echo "DRIVER: árbitro levou SIGPIPE (jogador fechou o pipe); resultado do árbitro mantido" >&2
+  elif (( aluno_died )); then
+    echo "DRIVER: jogador morreu sem ler a resposta pendente (árbitro levou SIGPIPE) -> Runtime Error" >&2
+    exit 3
+  else
+    echo "DRIVER: jogador ENCERROU sem ler a resposta pendente (árbitro levou SIGPIPE) -> Wrong Answer" >&2
+    printf 'WRONG o programa encerrou sem ler a resposta do árbitro\n' > /tmp/out
+  fi
+  exit 0
+fi
+
+if [[ -n "$arbsig" ]]; then
+  # qualquer OUTRO sinal (SEGV/ABRT/…) = erro do JUIZ: invalida o resultado -> UE (compare 13)
+  echo "DRIVER: árbitro terminou por SINAL $arbsig — resultado invalidado (vira UE)" >&2
   : > /tmp/out
+  exit 0
+fi
+
+if grep -qi "non-zero" /tmp/arbitro.time 2>/dev/null; then
+  # árbitro saiu ≠0 (o contrato manda SEMPRE 0). Cobrir o caso Python: pipe quebrado vira
+  # BrokenPipeError + exit 1 (SEM sinal) e a última linha do TRACEBACK virava "resultado"
+  # (= AC FALSO, pois compare trata não-WRONG como Accepted). Resultado explícito/WRONG
+  # valem; senão jogador morto -> RTE; senão árbitro bugado -> UE.
+  if [[ -s /tmp/out ]] || wrong_do_log; then
+    echo "DRIVER: árbitro saiu com exit != 0, mas deixou resultado — mantido" >&2
+  elif (( aluno_died )); then
+    echo "DRIVER: jogador morreu e o árbitro saiu com exit != 0 sem resultado -> Runtime Error" >&2
+    exit 3
+  else
+    echo "DRIVER: árbitro saiu com exit != 0 sem resultado (vira UE)" >&2
+    : > /tmp/out
+  fi
   exit 0
 fi
 
 materializa
 
 # sem resultado do árbitro: jogador que morreu explica o silêncio -> RTE; senão UE
-if [[ ! -s /tmp/out ]] && grep -Eqi "(non-zero|signal)" /tmp/aluno.time 2>/dev/null; then
+if [[ ! -s /tmp/out ]] && (( aluno_died )); then
   echo "DRIVER: jogador terminou com erro e o árbitro não produziu resultado -> Runtime Error" >&2
   exit 3
 fi

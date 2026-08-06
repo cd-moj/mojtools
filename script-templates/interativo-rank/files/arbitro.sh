@@ -2,6 +2,8 @@
 # EXEMPLO de árbitro: "adivinha o número" — adapte (tutorial: mojtools/docs/problema-interativo.md)
 # Contrato: teste em $1; stdout->jogador; stdin<-jogador; ÚLTIMA linha do stderr = resultado
 # (score no sucesso, "WRONG <motivo>" no erro); exit SEMPRE 0.
+# Jogador fechou o pipe (morreu/saiu sem ler a resposta)? SIGPIPE vira WRONG com motivo:
+trap 'echo "WRONG o programa encerrou sem ler a resposta" >&2; exit 0' PIPE
 read -r ALVO MAX < "$1"
 echo "$MAX"
 for ((i=1; i<=MAX; i++)); do

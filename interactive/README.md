@@ -6,7 +6,7 @@ por stdin/stdout dentro da jaula. **Tutorial de autoria (comece por aqui):
 
 | arquivo | vira no pacote | papel |
 |---|---|---|
-| `run.sh` | `scripts/c/run.sh` (+ symlinks `scripts/<lang> -> c`) — **CÓPIA REAL** (entra na JAULA) | roda árbitro+jogador cruzados por FIFOs (`stdbuf -oL`, `/bin/time` nos dois), materializa o RESULTADO em `/tmp/out`, trata TL (TERM), RTE e crash do árbitro. Driver ÚNICO — dispatch por extensão do `$BIN` (compilados, `.py`, `.sh`; melhor esforço `.js`/`.class`). |
+| `run.sh` | `scripts/c/run.sh` (+ symlinks `scripts/<lang> -> c`) — **CÓPIA REAL** (entra na JAULA) | roda árbitro+jogador cruzados por FIFOs (`stdbuf -oL`, `/bin/time` nos dois), materializa o RESULTADO em `/tmp/out`, trata TL (TERM), RTE, SIGPIPE do árbitro (= jogador sumiu ⇒ RTE/WA, nunca UE) e crash real do árbitro (UE). Regressão: `test-driver.sh` (matriz de 13 casos; rodar em dev/container, usa /tmp fixo). Driver ÚNICO — dispatch por extensão do `$BIN` (compilados, `.py`, `.sh`; melhor esforço `.js`/`.class`). |
 | `prep.sh` | `scripts/c/prep.sh` = **STUB** (`prep-stub.sh`; roda no HOST) | materializa `$workdir/arbitro` a partir de `scripts/arbitro.{cpp,cc,py,sh}` (ou `scripts/arbitro` pronto). C++ compila com `-static` (roda dentro do rootfs) e cache em `<pkg>/.arbitro-cache/` (fora do tl-checksum; o FONTE entra no checksum), com `flock` (juiz multi-slot). Usa o `g++` do host ou — o caso normal num juiz — o da rootfs via `bwrap`, **bindando tudo sob `/tmp`** (a rootfs é `/` READ-ONLY: bindar caminho do host lá dentro é `Can't mkdir parents` ⇒ árbitro não compila ⇒ UE). Sourced — nunca `exit`. |
 | `compare.sh` | `scripts/compare.sh` = **STUB** (`compare-stub.sh`; roda no HOST) | veredicto por teste a partir de `/tmp/out`: vazio ⇒ **13**=UE; última linha `WRONG …` ⇒ **6**=WA; senão ⇒ **4**=AC + ecoa `SCORE=<resultado>`. Problema pode substituir por um custom (ex.: razão contra `tests/output`, padrão fcte-delivery). |
 | `summary-score.sh` | `scripts/summary.sh` = **STUB** (`summary-stub.sh`, com `--score`) | ranking: soma os `SCORE` dos testes AC; qualquer WA zera; sobrescreve `FINALRESP` (+`SCORE`/`SCORE_MAX`/`SCORE_KIND=rank`). |
@@ -39,7 +39,9 @@ bind do `bwrap`: nasceu replicado em 198 pacotes).
 | resultado = `WRONG <motivo>` | **Wrong Answer** (mesmo se o jogador morreu — decisão do árbitro) |
 | sem resultado + jogador morreu (non-zero/sinal) | **Runtime Error** (driver exit 3) |
 | sem resultado + jogador ok | **UE** (compare exit 13 — anormal, investigar) |
-| árbitro morto por SINAL | **UE** (resultado invalidado — erro do juiz/setter) |
+| árbitro morto por **SIGPIPE** (o jogador fechou o pipe — RE clássico de aluno) | resultado explícito/`WRONG` do árbitro MANDA; senão jogador morto ⇒ **RTE**; jogador saiu 0 ⇒ **WA** sintético "encerrou sem ler a resposta" |
+| árbitro morto por OUTRO sinal | **UE** (resultado invalidado — erro do juiz/setter) |
+| árbitro exit ≠ 0 (contrato manda 0) | `/tmp/out`/última linha `WRONG` valem; senão jogador morto ⇒ **RTE** (fecha o AC falso do `BrokenPipeError` py); senão **UE**. Linha de log NUNCA vira resultado de árbitro anormal (não-`WRONG` ⇒ compare daria AC) |
 | tempo medido > TL | **TLE** (o juiz manda TERM; driver sai 0 com o parcial) |
 
 ## Limitações v1
