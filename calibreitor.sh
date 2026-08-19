@@ -27,9 +27,46 @@ function sai()
     rm -rf "$CALIBREPORTS" 2>/dev/null
     mv "$CALIBSTAGE" "$CALIBREPORTS" 2>/dev/null || rm -rf "$CALIBSTAGE"
   fi
+  # publica o vetor ESTRUTURADO da calibração (.calib-sols.json, atômico): por solução
+  # executada, {file,lang,category,verdict,tests:[{name,code,time,tl}]} — o mesmo formato
+  # do resultado de submissão normal. O agente o sobe no /judge/calib-report (campo sols).
+  if [[ -s "$TEMP.sols.jsonl" ]]; then
+    local t; t="$(mktemp "$PROBLEMDIR/.calib-sols.XXXXXX" 2>/dev/null)" \
+      && jq -s -c '.' "$TEMP.sols.jsonl" > "$t" 2>/dev/null && [[ -s "$t" ]] \
+      && mv -f "$t" "$PROBLEMDIR/.calib-sols.json" 2>/dev/null || rm -f "$t"
+  fi
   rm $TEMP
   rm -f $TEMP.*
   rm -rf $TOREMOVE
+}
+
+# vetor [{name,code,time,tl}] dos testes de UM workdir do build-and-test — o MESMO formato do
+# agent_tests_json do agente do juiz (fonte: log.verdictall + <file>-log.timelog + report.env).
+sol_tests_json(){  # $1=workdir
+  local wb="$1" tl="" line file code t
+  [[ -f "$wb/log.verdictall" ]] || { echo '[]'; return; }
+  tl="$(grep -m1 '^TL_LANG=' "$wb/report.env" 2>/dev/null | cut -d= -f2- | tr -d "'\"")"
+  {
+    while IFS= read -r line; do
+      [[ "$line" =~ ^VERDICT\[(.+)\]=(.+)$ ]] || continue
+      file="${BASH_REMATCH[1]}"; code="${BASH_REMATCH[2]}"
+      t=""
+      [[ -s "$wb/$file-log.timelog" ]] && \
+        t="$(grep -m1 '^real' "$wb/$file-log.timelog" 2>/dev/null | awk '{print $NF}')"
+      jq -cn --arg n "$file" --arg c "$code" --arg t "$t" --arg tl "$tl" \
+        '{name:$n, code:$c, time:($t|tonumber? // null), tl:($tl|tonumber? // null)}'
+    done < "$wb/log.verdictall"
+  } | jq -s -c '.'
+}
+# acumula UMA solução no vetor (tests via --slurpfile: nunca dado por argv de jq)
+sols_add(){  # $1=workdir $2=file $3=lang $4=category $5=verdict
+  command -v jq >/dev/null 2>&1 || return 0
+  sol_tests_json "$1" > "$TEMP.tests.json"
+  jq -cn --arg f "$2" --arg l "$3" --arg cat "$4" --arg v "$5" \
+     --slurpfile tests "$TEMP.tests.json" \
+     '{file:$f, lang:$l, category:$cat, verdict:$v, tests:($tests[0] // [])}' \
+     >> "$TEMP.sols.jsonl" 2>/dev/null
+  rm -f "$TEMP.tests.json"
 }
 
 trap sai EXIT
@@ -44,7 +81,7 @@ if [[ ! -e build-and-test.sh ]]; then
   exit 1
 fi
 
-declare -A ULIMITS TLMOD
+declare -A ULIMITS TLMOD TLOVERRIDE
 [[ -e $PROBLEMDIR/conf ]] && source $PROBLEMDIR/conf
 
 # A tabela de TL de trabalho é PRIVADA ($TEMP.tl, via MOJ_TLFILE): o dummy inicial e a tabela
@@ -57,7 +94,11 @@ TLHOST="$PROBLEMDIR/tl.$HOSTNAME"
 CALTL="$TEMP.tl"
 echo "TL[default]=$CALIBRATIONTL" > "$CALTL"
 export MOJ_TLFILE="$CALTL"       # build-and-test filhos leem daqui (vence tl.<host>/tl)
-rm -f "$PROBLEMDIR"/.tl.* 2>/dev/null   # temp de publicação de um run morto (kill -9)
+export MOJ_CALIBRATING=1         # a CALIBRAÇÃO mede de verdade: TLOVERRIDE não se aplica aqui
+# temps de um run morto (kill -9) + o vetor estruturado ANTERIOR: sols é sempre da calibração
+# corrente — run abortado deixa sols AUSENTE (o agente não o manda e o servidor preserva/zera
+# pelo checksum), nunca dado velho com cara de novo
+rm -f "$PROBLEMDIR"/.tl.* "$PROBLEMDIR"/.calib-sols.* "$PROBLEMDIR/.calib-sols.json" 2>/dev/null
 
 # coleta o report.html de cada solução (o agente sobe ao MOJ p/ o autor abrir no editor).
 # Coleta em STAGING; o dir final só troca no fim (sai/EXIT) — run abortado não deixa o
@@ -111,6 +152,7 @@ for AC in $PROBLEMDIR/sols/good/*; do
   echo "Verdict: $A"
   echo
   save_report "$T" "good-${AC##*/}"
+  sols_add "$T" "${AC##*/}" "$LANG" good "$A"
   TOREMOVE+=" ${T}"
   exec 7<&-
   rm -f $TEMP.coprocout
@@ -182,6 +224,7 @@ for OTHERSOL in pass slow wrong; do
     read -u 7 BIGRESP
     echo "Verdict: $BIGRESP"
     save_report "$T" "$OTHERSOL-${TLs##*/}"
+    sols_add "$T" "${TLs##*/}" "$LANG" "$OTHERSOL" "$BIGRESP"
     exec 7<&-
     rm -f $TEMP.coproc
     TOREMOVE+=" ${T}"

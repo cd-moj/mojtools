@@ -447,7 +447,18 @@ tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** 
 Depois, roda as soluções de `pass/`, `slow/` e `wrong/` para conferência (o `CALIBRATE_ONLY_GOOD=1`
 pula essa parte, e é o que o agente do juiz usa quando está com pressa).
 
-Grava também um `report.html` por solução em `.calib-reports/`, que o agente sobe para o servidor.
+Grava também um `report.html` por solução em `.calib-reports/`, que o agente sobe para o servidor,
+e o vetor **ESTRUTURADO** da calibração em **`.calib-sols.json`**: por solução executada,
+`{file, lang, category:good|pass|slow|wrong, verdict, tests:[{name,code,time,tl}]}` — o mesmo
+formato do vetor `tests` de uma submissão normal. O agente o envia no `/judge/calib-report`
+(campo `sols`) e o autor o consome estruturado no `/problems/calib` (`moj calib`, `moj --json
+calib`) para integrar com ferramentas externas. Durante a calibração o `tl` de cada teste é o
+`CALIBRATIONTL` (dummy de medição), não o TL final.
+
+**`TLOVERRIDE` no conf** (`TLOVERRIDE[default]=1.0`, `TLOVERRIDE[java]=2.5` — ver
+`cdmoj/docs/PACOTE.md`): o autor decide o TL na marra. A calibração **ignora** o override (mede
+de verdade: o calibreitor exporta `MOJ_CALIBRATING=1`); o **julgamento** o aplica no
+`build-and-test.sh` DEPOIS dos `TLMOD` (o override é final) e o servidor o aplica em toda exibição.
 
 **Concorrência (juiz multi-slot):** a tabela de TL de trabalho é PRIVADA — o calibreitor exporta
 **`MOJ_TLFILE`** (um temp) para os `build-and-test.sh` filhos, e essa env **vence** a seleção

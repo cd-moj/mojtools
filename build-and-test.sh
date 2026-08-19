@@ -142,6 +142,7 @@ declare -a BIN
 
 declare -A ULIMITS
 declare -A TLMOD
+declare -A TLOVERRIDE
 
 DEFAULTSHIELDCPU=3
 DEFAULTSHIELDUSER=judge
@@ -356,6 +357,17 @@ if [[ -n "${TLMOD[$LANGUAGE.sum]}" ]]; then
 fi
 if [[ -n "${TLMOD[$LANGUAGE.mult]}" ]]; then
   TL[$LANGUAGE]=$(echo "${TL[$LANGUAGE]}*${TLMOD[$LANGUAGE.mult]}"|bc -l)
+fi
+
+# TLOVERRIDE (conf): o AUTOR decide o TL na marra — por linguagem, com default — e ele é
+# FINAL: vence o calibrado E os ajustes TLMOD acima (quem quer compor, compõe no próprio
+# valor). Não se aplica DURANTE a calibração (MOJ_CALIBRATING): lá se mede de verdade.
+if [[ -z "${MOJ_CALIBRATING:-}" ]]; then
+  TLOV="${TLOVERRIDE[$LANGUAGE]:-${TLOVERRIDE[default]:-}}"
+  if [[ "$TLOV" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]]; then
+    TL[$LANGUAGE]="$TLOV"
+    LOG "TL override (conf): TL[$LANGUAGE]=$TLOV"
+  fi
 fi
 
 if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then

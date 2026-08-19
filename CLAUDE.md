@@ -31,7 +31,10 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   **não muda** (compat). O banner do `report.html` mostra o **`VERDICT_CANON`** + detalhe
   (pct de testes ou pontos/grupos).
 - `gen-report.sh` — gera o `report.html` por submissão.
-- `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** e reporta
+- `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL**, grava o
+  vetor ESTRUTURADO **`.calib-sols.json`** (por solução, `{file,lang,category,verdict,tests:
+  [{name,code,time,tl}]}` — mesmo formato do `tests` de submissão; o agente sobe como `sols`
+  do calib-report) e reporta
   (`ensure_cached <id> [force] [full]`; `full` roda todas as soluções). **Concorrência
   (multi-slot)**: a tabela de trabalho é PRIVADA (`MOJ_TLFILE`, env que VENCE a seleção
   `tl.<host>`/`tl` no build-and-test); `tl.<host>`/`tl` finais são publicados ATÔMICOS
@@ -121,6 +124,10 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
 - **Um renderizador só.** Mexeu no enunciado? é em `render-statement.sh` — o preview, o servido
   e a validação acompanham juntos. Não criar um pandoc paralelo.
 - Exemplos do enunciado vêm **sempre** de `tests/input|output/sample*` (na ordem), nunca do texto.
+- **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
+  o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
+  `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o
+  conf por GREP (nunca source) e exibe o efetivo em todo lugar.
 - **Limites de memória/stack**: `MEMLIMITMB` (conf) decide o MLE por RSS e a **JVM dimensiona
   `-Xmx = MEMLIMITMB`** (java/kt/interativo leem `MOJ_MEMLIMITMB`/`MOJ_STACKKB` do `binfile.sh`,
   o canal p/ dentro da jaula); cgroup duro = `max(600, MEMLIMITMB+64)` (root e sem root). Stack:

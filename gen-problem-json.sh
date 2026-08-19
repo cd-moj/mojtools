@@ -107,6 +107,21 @@ if [[ "$tl_json" == '{}' ]]; then
     unset TL TLMOD
   fi
 fi
+# TLOVERRIDE do conf do PACOTE: o autor decide o TL na marra e o treino exibe o EFETIVO
+# (override[lang] // override[default] // calibrado[lang]). O conf é CÓDIGO do autor e este
+# script roda no SERVIDOR: parse por sed, NUNCA source. Espelho de tl_conf_overrides/
+# tl_override_apply (cdmoj lib/tl-store.sh) — duplicação pequena e consciente: repos independentes.
+ov_json="$(sed -nE 's/^[[:space:]]*TLOVERRIDE\[([A-Za-z0-9]{1,16})\]=([0-9]+\.?[0-9]*|\.[0-9]+)[[:space:]]*(#.*)?$/\1\t\2/p' \
+    "$PKG/conf" 2>/dev/null \
+  | jq -Rnc '[inputs | split("\t") | select(length==2)
+              | {((.[0] | if .=="py3" or .=="py2" then "py" else . end)): .[1]}] | add // {}')"
+if [[ -n "$ov_json" && "$ov_json" != '{}' ]]; then
+  tl_json="$(jq -cn --argjson tl "$tl_json" --argjson ov "$ov_json" '
+    (($tl|keys) + ($ov|keys) | unique) as $ks
+    | reduce $ks[] as $k ({}; .[$k] = ($ov[$k] // $ov["default"] // $tl[$k]))
+    | with_entries(select(.value != null) | .value |= tostring)')"
+  [[ -n "$tl_json" ]] || tl_json='{}'
+fi
 
 # ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
 samples_html=""
