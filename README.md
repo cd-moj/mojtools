@@ -393,14 +393,17 @@ Artefatos que ficam no diretório de trabalho (ele **não** é apagado; quem cha
 O `report.env` é a fonte de verdade para o servidor. Ele traz `VERDICT_CANON` (o veredito **limpo**,
 sem a nota: `Accepted`, `Wrong Answer`, `Time Limit Exceeded`, `Memory Limit Exceeded`,
 `Runtime Error`, `Compilation Error`), `SCORE` e `SCORE_MAX`, `SCORE_KIND` (`tests` para porcentagem
-de testes, `points` para soma de grupos), `SCORE_GROUPS` (os grupos, em JSON, na ordem do
+de testes, `points` para soma de grupos, `rank` para pontuação por posição — a do interativo com
+`--score`), `SCORE_GROUPS` (os grupos, em JSON, na ordem do
 `tests/score`) e `CORRECT`/`TOTALTESTS`.
 
 Códigos de saída: `0` julgou (o veredito está na última linha), `1` erro de uso **ou Compilation
 Error**, `3` a linguagem não está disponível, ou falta o arquivo `tl`, ou o pacote não tem testes.
 
 Lê do ambiente: `CAGE_ROOT` (a raiz do sandbox), `CAGE_ROOT_<LANG>` (raiz diferente para uma
-linguagem específica), `MOJ_PROBLEM_ID`.
+linguagem específica), `MOJ_PROBLEM_ID`, **`MOJ_TLFILE`** (aponta uma tabela de TL FORA do pacote e
+vence `tl.<máquina>`/`tl` — é como o calibreitor isola os filhos dele) e **`MOJ_CALIBRATING`**
+(setado, desliga o `TLOVERRIDE` do conf: durante a calibração se mede de verdade).
 
 Lê do `conf` do problema: todas as chaves de limite (ver `cdmoj/docs/PACOTE.md`).
 
@@ -442,7 +445,9 @@ calibreitor.sh <pacote>
 
 Roda cada solução de `sols/good/`, pega o pior tempo por linguagem, multiplica pelo
 `TLMOD[calibrafactor]` (1.35 por padrão) e grava `tl.<máquina>` e `tl` dentro do pacote. Só emite
-tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** naquela máquina.
+tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** naquela máquina — com
+`ALLOWTLEDURINGCALIBRATION=y` no conf, um **TLE** também conta como calibrada (para a `good` que
+vive no limite de propósito). A conta exata é `calibrafactor × pior_tempo_AC + 0,02`.
 
 Depois, roda as soluções de `pass/`, `slow/` e `wrong/` para conferência (o `CALIBRATE_ONLY_GOOD=1`
 pula essa parte, e é o que o agente do juiz usa quando está com pressa).
@@ -478,7 +483,7 @@ validate-problem.sh <pacote> [<id>]
 Sai com 0 se o pacote passou, diferente de 0 se reprovou, e sempre escreve um relatório em
 `$RUNDIR/validation/<id>.json` com o resultado de cada checagem. **Todas** as checagens são
 obrigatórias: `has_author`, `has_statement`, `html_builds`, `secao_entrada`, `secao_saida`,
-`examples_present`, `tests_paired`, `has_good_sol`, `good_sol_accepts`.
+`examples_present`, `tests_paired`, `has_good_sol`, `good_sol_accepts`, **`scripts_exec`** (todo `scripts/**/*.sh` com +x — sem o bit, TUDO vira Compilation Error na jaula) e **`checker_src`** (compare.sh de testlib exige o `scripts/checker.cpp` junto), mais `score_file_sane` quando há `tests/score`.
 
 Alguns avisos são só informativos e **não** reprovam: LaTeX vazando na prosa do enunciado, exemplo
 escrito à mão no texto, checker commitado como binário.
@@ -504,7 +509,7 @@ Lê o pacote e escreve `contests/treino/var/jsons/<id>.json`, que é o que o fro
 ```
 
 Os **exemplos** vêm sempre dos arquivos de teste (`tests/input/sample*`, na ordem), nunca do texto do
-enunciado, e são injetados no HTML. As explicações de cada exemplo vêm de `docs/sample-notes.json`.
+enunciado, e são injetados no HTML. As explicações de cada exemplo vêm de **`docs/notes/<sample>.md`** (markdown, pareado pelo NOME do teste — é o formato de autoria; o antigo `docs/sample-notes.json`, por índice, só é lido como legado).
 O editorial (`docs/solucao.md`) é **ignorado** de propósito: ele não pode chegar ao aluno.
 
 Os tempos-limite vêm do store dos juízes (`run/tl/<id>.json`) e são o **máximo entre as máquinas**,
@@ -550,6 +555,8 @@ tl-checksum.sh <pacote>      # imprime 16 dígitos hexadecimais
 
 O checksum cobre **o que pode mudar o tempo de execução OU o veredicto**: o `conf`, os
 `tests/{input,output,score}`, as `sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução).
+Em `tests/output`, arquivo **vazio conta como ausente** — sem isso um problema interativo (que não
+tem saída esperada) pedia recalibração para sempre.
 Não cobre o enunciado, as tags nem o autor.
 
 É por isso que **corrigir um typo no enunciado não força recalibração**, mas trocar um teste (entrada
@@ -621,7 +628,7 @@ uma revisão humana.
 | Alvo | O que faz |
 |---|---|
 | `make help` | lista os alvos |
-| `make check` | roda `bash -n` em todos os `.sh` do repositório. **Rode antes de commitar** |
+| `make check` | roda `bash -n` em todos os `.sh` **e confere o bit +x no ÍNDICE DO GIT** dos drivers que a jaula executa (`lang/*/{compile,run,compare}.sh`, os stubs de `testlib/` e de `interactive/`) — é o gate que impediu uma linguagem inteira de não rodar em juiz nenhum. **Rode antes de commitar** |
 | `make deps` | o `check-deps.sh` |
 | `make sysroot` | constrói o rootfs e exporta para um diretório |
 | `make sysroot-image` | só a imagem, sem exportar |
@@ -657,8 +664,9 @@ implementa "proibir a função `exp()`": o `compile.sh` faz um `grep` no fonte d
 sai sem imprimir o `BIN=`.
 
 O tempo-limite da compilação é de 30 segundos. Uma linguagem de compilador lento sobe isso com um
-arquivo `lang/<lang>/compile-tl` (em segundos). Hoje só o Kotlin usa (120 segundos, porque a JVM do
-`kotlinc` demora a esquentar).
+arquivo `lang/<lang>/compile-tl` (em segundos) — e o **pacote** pode sobrescrever com
+`scripts/<lang>/compile-tl`, que tem precedência. Hoje só o Kotlin usa (120 segundos, porque a JVM
+do `kotlinc` demora a esquentar).
 
 ### `lang/<lang>/run.sh`
 
@@ -722,7 +730,7 @@ O `build-and-test.sh` procura os scripts **do problema antes** dos padrões da l
 | `<pacote>/scripts/<lang>/compile.sh` | `mojtools/lang/<lang>/compile.sh` |
 | `<pacote>/scripts/<lang>/run.sh` | `mojtools/lang/<lang>/run.sh` |
 | `<pacote>/scripts/<lang>/prep.sh` | `mojtools/lang/<lang>/prep.sh` |
-| `<pacote>/scripts/compare.sh` | `mojtools/lang/compare.sh` |
+| `<pacote>/scripts/<lang>/compare.sh` | `<pacote>/scripts/compare.sh` | `mojtools/lang/<lang>/compare.sh` | `mojtools/lang/compare.sh` |
 | `<pacote>/scripts/summary.sh` | `mojtools/score-summary.sh` (se houver `tests/score`) |
 
 É só isso. Submissão de função, ban de função da biblioteca, checker com tolerância, problema

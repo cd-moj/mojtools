@@ -15,7 +15,7 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   default de `python3` é **PyPy3**. Limite de memória `-M`: root = cgroup v1 (cset); **sem root
   = cgroup v2 via `systemd-run --user --scope` (MemoryMax; degrada com aviso sem user manager)**.
   **/etc entra INTEIRO da raiz escolhida, com MÁSCARAS** (shadow/sudoers/ssh/… zerados; passwd/
-  group sintéticos no host) — `prep.sh` NÃO binda nada de /etc (só /opt/kotlin, /opt/mdyalog,
+  group sintéticos nos DOIS modos) — `prep.sh` NÃO binda nada de /etc (só /opt/kotlin, /opt/mdyalog,
   /var/lib/ghc); ver SANDBOX.md. Antes de prova hostil, rode **`stress-cage.sh`** num juiz real
   (ver `SANDBOX.md` §Hardening).
 - `build-and-test.sh <lang> <sol> <pkg> [y]` — compila + roda contra os testes; o veredicto é a

@@ -21,7 +21,8 @@ sobrepostos do host. ulimits/shield/uid 65534/`--unshare-all`/verdito: inalterad
 **/etc entra INTEIRO** (da raiz escolhida, ro) **com máscaras por cima**: `--ro-bind /dev/null`
 em `shadow`/`gshadow`/`*-`/`sudoers`/`machine-id`/`krb5.keytab` e `--tmpfs` em `sudoers.d`/
 `ssh`/`ssl/private`; `passwd`+`group` são SOBREPOSTOS por versões sintéticas de 1 linha (uid
-65534) no modo host. Assim toolchains acham o que precisam (`alternatives`, `ld.so.conf.d`,
+65534) **nos DOIS modos** (host e rootfs) — de propósito: a jaula não lista nem os usuários
+de sistema do rootfs. Assim toolchains acham o que precisam (`alternatives`, `ld.so.conf.d`,
 `java.security`, `mono`, `fpc.cfg`, `localtime`) sem binds pontuais por linguagem — a classe
 de bug "Can't mkdir /etc/... (read-only)" (mountpoint inexistente na outra raiz) morreu. Os
 `prep.sh` só bindam o que NÃO é /etc (`/opt/kotlin`, `/opt/mdyalog`, `/var/lib/ghc`).
