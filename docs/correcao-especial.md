@@ -140,13 +140,19 @@ autoria com receitas: **[`checker-testlib.md`](checker-testlib.md)**; detalhes t
 
 Todos os juízes declaram `java`, mas algum host pode ter o `javac` quebrado (ex.: `macalan`) e
 ainda assim abocanhar o job genérico do `moj calibrate` (1 job por checksum) — aí o Java nunca
-calibra. Mire os hosts com JDK real:
+calibra. Mire os hosts com JDK real — calibração **direcionada**:
 
 ```sh
-curl -sk -X POST "$MOJ_URL/api/v1/problems/request-calibration" \
-  -H "Authorization: Bearer $(cat ~/.config/moj/token)" -H 'Content-Type: application/json' \
-  -d '{"id":"apc#<prob>","hosts":["cpu1","cpu2","orval"]}'
+moj calibrate <id> --hosts cpu1,cpu2,orval   # nos juízes citados
+moj calibrate <id> --per-cpu                 # 1 por modelo de CPU (o parque inteiro, sem repetir)
+moj calibrate --judges                       # lista o parque: host, CPU, linguagens, online
 ```
 
 O TL servível é o **máx entre hosts**, então o host de javac quebrado é inofensivo assim que um
 host bom reporta.
+
+Para **ver o que a calibração fez**, `moj calib <id>` mostra juiz por juiz, solução por solução,
+teste a teste (com `--json` p/ processar em ferramenta própria), e `moj calib-report` baixa o
+relatório rico de uma solução. Se nem assim o número convencer, `TLOVERRIDE` no `conf` decide o
+TL na marra (ver `cdmoj/docs/PACOTE.md`) — a calibração segue medindo, mas o valor honrado pelo
+juiz e mostrado ao aluno é o seu.

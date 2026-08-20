@@ -257,7 +257,15 @@ para qualquer linguagem: o árbitro só fala depois de cada jogada, então ler a
   o instalador cobre todas por default; se usar `--langs`, restrinja as linguagens do
   problema (`problem-langs`) às mesmas.
 - **TL apertado**: o tempo do árbitro entra na medição — `TLMOD[calibrafactor]` generoso
-  (os problemas reais usam de `"10+1.5"` a `"20+1"`).
+  (os problemas reais usam de `"10+1.5"` a `"20+1"`). Se a calibração continuar dando um número
+  em que você não confia (árbitro pesado, jogo com muitas rodadas), **decida o TL na marra** com
+  `TLOVERRIDE` no `conf` do pacote (`TLOVERRIDE[default]=3.0`, `TLOVERRIDE[java]=6.0`): o juiz
+  honra o override e é ELE que o aluno vê no enunciado. A calibração continua rodando e medindo —
+  o override só manda no valor final. Ver `cdmoj/docs/PACOTE.md`.
+- **Depurar o árbitro NO JUIZ, sem gastar submissão**: `moj testrun <id> sols/good.cpp` roda UMA
+  solução na jaula real (mesma máquina, mesmo TL) e devolve o veredicto teste a teste, **fora do
+  history**; `--report f.html` traz o relatório rico. É o caminho para ver o driver funcionando
+  sem publicar nem sujar a estatística do problema.
 - **Testar score parcial via checker**: não existe — parcial por teste é binário; rank é
   o `summary.sh`, e pontuação por grupos é `tests/score` (não misture os dois).
 - **CLI antiga** (push que ignora `scripts/`): o `moj push` atual faz round-trip completo de
