@@ -227,9 +227,15 @@ Você **não escreve** o tempo-limite à mão. Ele é medido.
 bash ../mojtools/gen-problem-json.sh . soma#soma
 ```
 
-Gera `contests/treino/var/jsons/soma#soma.json`, que é o que o frontend consome: o título, o autor, as
-tags, as coleções, os tempos-limite, o enunciado já em HTML e os exemplos. É o passo final, e ele já
-foi executado pelo passo 8 se a validação passou.
+Gera o JSON que o frontend consome: o título, o autor, as tags, as coleções, os tempos-limite, o
+enunciado já em HTML e os exemplos. É o passo final, e ele já foi executado pelo passo 8 se a
+validação passou.
+
+**Onde o arquivo cai depende de o problema ser público**, e o portão é **fail-closed**: o índice
+público (`var/jsons/`) é servido **sem login**, então só entra ali um pacote cujo `.moj-meta.json`
+diga `public: true`. Um pacote feito à mão como este não tem esse arquivo, e o JSON vai para
+`var/jsons-private/` — que é o certo: um problema só vira público pelo servidor, quando você manda
+publicar (`moj public on`), e depois de ele validar e calibrar.
 
 Pronto: o pacote está completo, validado, calibrado e indexado.
 
@@ -284,13 +290,16 @@ O jeito recomendado é escrever o checker em C++ com a [testlib](https://github.
 (o padrão do Codeforces) e instalá-lo:
 
 ```sh
-bash mojtools/testlib/install-checker.sh <pacote> checker.cpp
+bash mojtools/testlib/install-checker.sh <pacote> checker.cpp [--force]
 ```
 
 Isso põe o **fonte** em `scripts/checker.cpp` e um **stub** de 10 linhas em `scripts/compare.sh`,
 que chama a bridge do mojtools (`testlib/checker-bridge.sh`) — é ela que compila o checker no juiz
 sob demanda. O pacote **não** carrega a bridge nem o `testlib.h`. **Nunca commite o binário do
 checker.**
+
+Os três instaladores **recusam sobrescrever** um `scripts/` que já existe: `--force` manda
+substituir mesmo assim (use quando estiver trocando de checker/driver, não por reflexo).
 
 Guia de autoria, com receitas prontas: **[docs/checker-testlib.md](docs/checker-testlib.md)**.
 
@@ -300,18 +309,26 @@ Quando a solução do aluno precisa **conversar** com um árbitro (fazer pergunt
 como num jogo de adivinhação), o problema é interativo:
 
 ```sh
-bash mojtools/interactive/install-interactive.sh <pacote> arbitro.cpp [--score]
+bash mojtools/interactive/install-interactive.sh <pacote> arbitro.cpp \
+     [--score] [--langs "c cpp py"] [--keep-compare]
 ```
 
 O árbitro recebe o teste como argumento e conversa com a solução por FIFOs. A **última linha** do
 stderr do árbitro é o resultado (`WRONG <motivo>` reprova). Com `--score`, o problema vira um ranking
 (a nota é o desempenho, não o acerto).
 
+Por padrão o instalador escreve driver para **todas** as linguagens que o mojtools conhece;
+`--langs "c cpp py"` restringe a lista, e `--keep-compare` preserva um `scripts/compare.sh` que
+você já tinha escrito à mão (sem ele, o instalador reescreve o comparador).
+
 Linguagens do jogador: compilados (ELF), `py`, `sh`, **`java`** e **`kt`** (as duas da JVM
 desde 2026-07-28); `js` é melhor esforço. ⚠ **Java/Kotlin exigem `System.out.flush()` a cada
 resposta** — a JVM não obedece o `stdbuf` do driver e sem flush o jogador trava (TLE).
 
-Guia de autoria: **[docs/problema-interativo.md](docs/problema-interativo.md)**.
+Guia de autoria: **[docs/problema-interativo.md](docs/problema-interativo.md)**. O driver tem uma
+**matriz de regressão** própria — `bash interactive/test-driver.sh` — que cobre o contrato de morte
+do jogador (quem sai sem ler a resposta vira RTE/WA, nunca erro de juiz). Ela usa caminhos fixos em
+`/tmp`: não rode numa máquina com julgamento ativo.
 
 ### Submissão de função (o aluno entrega só a função)
 
@@ -320,7 +337,7 @@ prontos (5 linguagens, com a **sentinela anti-IO** embutida — detecta função
 entrada) com:
 
 ```sh
-moj fn <dir> [--langs c,cpp,py,java,rs]    # ou: bash fn/install-fn.sh <dir>
+moj fn <dir> [--langs c,cpp,py,java,rs]    # ou: bash fn/install-fn.sh <dir> [--force]
 ```
 
 Guia de autoria (anatomia por linguagem, boas práticas, erros comuns):
@@ -513,8 +530,22 @@ enunciado, e são injetados no HTML. As explicações de cada exemplo vêm de **
 O editorial (`docs/solucao.md`) é **ignorado** de propósito: ele não pode chegar ao aluno.
 
 Os tempos-limite vêm do store dos juízes (`run/tl/<id>.json`) e são o **máximo entre as máquinas**,
-mas só valem se o checksum do pacote ainda bate. Se o pacote mudou e ninguém recalibrou, o campo sai
-vazio.
+mas só valem se o checksum do pacote ainda bate. Se o pacote mudou e ninguém recalibrou, cai no
+arquivo `tl` do próprio pacote (o formato local, útil fora do servidor); se nem isso existe, o campo
+sai vazio. As chaves legadas `py2`/`py3` fundem em `py` pelo maior valor.
+
+Se o `conf` do pacote tem **`TLOVERRIDE`**, ele é aplicado por cima do calibrado
+(`override[lang] // override[default] // calibrado[lang]`), porque o número que o aluno lê tem de
+ser o que o juiz vai cobrar. Este script roda no **servidor** e o `conf` é código do autor: o
+override é lido por `sed`, **nunca** por `source`.
+
+**O portão do índice público mora aqui** (`var/jsons/` é servido sem login: lista *e* enunciado).
+É fail-closed: o default é privado, e só vira público se o `.moj-meta.json` disser `public: true` —
+teste com `jq -e '.public == true'`, nunca com o `//` do jq, que trata `false` como ausente (foi
+esse `//` que já vazou prova em elaboração). `PUBLIC=no` no `conf` legado e a variável
+`MOJ_FORCE_PRIVATE=1` (que o servidor liga para org sem `public_allowed`) forçam privado. O JSON
+carrega o campo `public`, e quem serve recusa `public:false` — defesa em profundidade, caso um
+arquivo privado reapareça no diretório público por qualquer caminho.
 
 Se o problema é privado, o JSON vai só para `jsons-private/`, e o do `jsons/` é removido.
 
@@ -575,7 +606,9 @@ por grupo, soma os pesos e reescreve o veredito com a nota.
 Sem argumentos. Varre **todos** os pacotes e escreve
 `contests/treino/var/problem-owners.json`, que a gestão de problemas usa para saber, de cada problema:
 quem é o dono, em que coleções está, se é público, o checksum atual, quando foi publicado pela
-primeira vez, e em quais linguagens existe solução `good`.
+primeira vez, em quais linguagens existe solução `good` (`good_langs`, medido do pacote) e a
+**whitelist** de linguagens que o autor declarou (`languages`, do `.moj-meta.json` — as duas coisas
+são diferentes: a primeira é o que existe, a segunda é o que o aluno pode enviar).
 
 Ele mantém um cache por commit de cada problema, para não ter que recalcular o checksum de um pacote
 que não mudou.
@@ -760,6 +793,7 @@ juiz.
 - **[docs/checker-testlib.md](docs/checker-testlib.md)**: escrever um checker.
 - **[docs/problema-interativo.md](docs/problema-interativo.md)**: escrever um problema interativo.
 - **[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**: problema de submissão de função.
+- **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**: desenhar grafo no enunciado (graphviz).
 - **`cdmoj/docs/PACOTE.md`** (no repositório `cdmoj`): o **formato do pacote**, orgs, coleções e
   metadados. É a referência.
 - **`cdmoj/docs/FLOW.md`**: o caminho de uma submissão, do browser até o placar.
