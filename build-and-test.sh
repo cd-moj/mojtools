@@ -363,6 +363,12 @@ fi
 # FINAL: vence o calibrado E os ajustes TLMOD acima (quem quer compor, compõe no próprio
 # valor). Não se aplica DURANTE a calibração (MOJ_CALIBRATING): lá se mede de verdade.
 if [[ -z "${MOJ_CALIBRATING:-}" ]]; then
+  # shim de compat, gêmeo do TL[py] acima: o LANGUAGE já foi normalizado p/ 'py' na linha 98,
+  # então um TLOVERRIDE[py3] do conf NUNCA seria encontrado — e o servidor, que normaliza a
+  # CHAVE (py3/py2 -> py) ao exibir, prometeria ao aluno um TL que o juiz não aplicaria.
+  # Exibir 2,5s e julgar com 0,08s é TLE injusto, e mudo.
+  [[ -z "${TLOVERRIDE[py]:-}" && -n "${TLOVERRIDE[py3]:-}" ]] && TLOVERRIDE[py]="${TLOVERRIDE[py3]}"
+  [[ -z "${TLOVERRIDE[py]:-}" && -n "${TLOVERRIDE[py2]:-}" ]] && TLOVERRIDE[py]="${TLOVERRIDE[py2]}"
   TLOV="${TLOVERRIDE[$LANGUAGE]:-${TLOVERRIDE[default]:-}}"
   if [[ "$TLOV" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]]; then
     TL[$LANGUAGE]="$TLOV"

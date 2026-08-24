@@ -5,7 +5,8 @@
 #   $CONTESTSDIR/treino/var/problem-owners.json
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
 #                                          owner, collaborators[], collections[], public, html,
-#                                          tl_checksum, public_at, good_langs} ] }
+#                                          tl_checksum, public_at, good_langs,
+#                                          tl_override} ] }
 # html = ENUNCIADO COMPILADO E SERVÍVEL (json em var/jsons OU var/jsons-private) — vale também
 # p/ problema PRIVADO validado (a pill "sem HTML" do painel deixa de ser sinônimo de privado).
 # good_langs = extensões das soluções sols/good/* (= linguagens); a gestão marca "revisar" se alguma
@@ -137,8 +138,18 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
     gl=""
     [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; case "$e" in py2|py3) e=py;; esac; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" \
+    # TLOVERRIDE do conf: o índice é o lugar onde o servidor guarda "o que sei do pacote sem
+    # abri-lo no request" (é o mesmo papel do tl_checksum acima). Sem isto o Painel da gestão
+    # mostraria o TL CALIBRADO — número que o juiz não usa — e teria de ler 1400 confs por
+    # abertura. ⚠ Espelho de `tl_conf_overrides` (cdmoj lib/tl-store.sh): mesma regex, e o conf
+    # é CÓDIGO do autor — parse por sed, NUNCA source. Vai como k=v separado por ';'.
+    ovr=""
+    if [[ -f "$pdir/conf" ]] && grep -q TLOVERRIDE "$pdir/conf" 2>/dev/null; then
+      ovr="$(sed -nE 's/^[[:space:]]*TLOVERRIDE\[([A-Za-z0-9]{1,16})\]=([0-9]+\.?[0-9]*|\.[0-9]+)[[:space:]]*(#.*)?$/\1=\2/p' \
+             "$pdir/conf" 2>/dev/null | sed -E 's/^py[23]=/py=/' | paste -sd';' -)"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -163,7 +174,9 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         tl_checksum:(.[10] // ""),
         public_at:((.[11] // "")|if .=="" then null else tonumber end),
         good_langs:((.[12] // "")|split(",")|map(select(length>0))),
-        languages:((.[14] // "")|split(",")|map(select(length>0))) }
+        languages:((.[14] // "")|split(",")|map(select(length>0))),
+        tl_override:(((.[15] // "")|split(";")|map(select(length>0)|split("=")|select(length==2)
+                      |{(.[0]):.[1]})|add) // {}) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 
