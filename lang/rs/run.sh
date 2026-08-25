@@ -5,4 +5,4 @@ exec &>/tmp/stderrlog
 cd /tmp/dir
 source binfile.sh
 
-exec ./$BIN < /tmp/in > /tmp/out
+exec ./"$BIN" < /tmp/in > /tmp/out

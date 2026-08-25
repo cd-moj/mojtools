@@ -16,4 +16,4 @@ source binfile.sh
 # termina cada linha com CR: o `tr -d '\r'` deixa a saída como o aluno escreveu (sem isso o
 # compare cai no `diff -b` e TODA submissão APL vira AC,PE).
 # `pipefail` preserva o código de saída do dyalog (o RE_NZEC depende dele).
-dyalog -s -script ./$BIN < /tmp/in | tr -d '\r' > /tmp/out
+dyalog -s -script ./"$BIN" < /tmp/in | tr -d '\r' > /tmp/out

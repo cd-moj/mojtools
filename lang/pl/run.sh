@@ -7,4 +7,4 @@ exec &>/tmp/stderrlog
 cd /tmp/dir
 source binfile.sh
 
-exec prolog -s ./$BIN -g "main" -t halt < /tmp/in > /tmp/out
+exec prolog -s ./"$BIN" -g "main" -t halt < /tmp/in > /tmp/out

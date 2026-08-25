@@ -147,6 +147,19 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `scripts/py` (sem isso a correção especial py do APC era ignorada — solução pelada ⇒ WA
   vazio), e o `build-and-test.sh` tem shim `TL[py]=TL[py3]` p/ caches `tl.<host>` calibrados
   antes da unificação.
+- **O NOME DO ARQUIVO CHEGA CRU AQUI — cite sempre.** O agente do juiz materializa a fonte com o
+  nome que o aluno mandou, o `build-and-test.sh` a copia p/ dentro da jaula e o
+  `lang/*/compile.sh` monta um Makefile cujo recipe o make entrega ao **`/bin/sh`**. Um
+  `l(1).cpp` — a marca que o navegador gruda em download repetido — virava
+  `g++ … l(1).cpp -o l` e dava **Compilation Error** com o código que passava como `l.cpp`
+  (relato de time, 2026-08-24). São três famílias, e as três já foram copiadas de linguagem em
+  linguagem: **recipe do make** (`'$^'`/`'$@'`, `@echo "BIN=$@"`), **`$BIN` dos `run.sh`** (o BIN
+  sai do nome do arquivo) e o **`binfile.sh`**, que é `source`ado DENTRO da jaula — `BIN=l(1)`
+  cru é erro de sintaxe do bash e mata a submissão no RUN, não na compilação. Portão:
+  **`check-quoting.sh`**, no `make check`. Bateria de juiz: `lang-test/` alvo **`hostile`**
+  (java fica de fora POR DEFINIÇÃO — `javac` exige que o arquivo case a classe pública).
+  ⚠ Espaço não tem conserto dentro do make (whitespace É o separador de lista): quem o remove é
+  o servidor, no `/submit` (`safe_src_filename`) — aqui é defesa em profundidade.
 - `bash -n` antes de commitar.
 - Rodapé de commit: **só** `Co-Authored-By:`, **nunca** uma linha `Claude-Session:` (ruído no histórico).
 - **Doc junto com o código** (doc atrasada = bug): mudou render/validação/cálculo de TL, ou o que um

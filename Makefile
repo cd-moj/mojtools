@@ -23,6 +23,7 @@ help:
 	@sed -n '1,12p' Makefile
 
 ## check — bash -n em todos os .sh do repo + bit de execução dos scripts de linguagem/drivers
+##         + aspas no caminho do NOME DO ARQUIVO DO ALUNO (check-quoting.sh)
 # O +x de lang/*/{compile,run,compare}.sh é LOAD-BEARING: o cage-run.sh monta cada um como
 # /tmp/script (bind READ-ONLY) e o executa DIRETO (`timeout $$TLE /tmp/script`, sem `bash`) — sem o
 # bit é "Permission denied", e nem dá p/ consertar de dentro da jaula. Checamos o modo NO ÍNDICE DO
@@ -45,6 +46,7 @@ check:
 	  echo "SEM +x NO GIT (o juiz/a jaula executa o script direto -> Permission denied):"; echo "$$bad"; \
 	  echo "  conserte: git update-index --chmod=+x <arquivo>"; exit 1; \
 	else echo "bits de execução ok (lang/*, testlib/*, interactive/*)"; fi
+	@bash check-quoting.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:

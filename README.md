@@ -753,6 +753,20 @@ cd lang-test && make alltests
 
 Se alguma linguagem parar de funcionar na máquina, é aqui que aparece primeiro.
 
+E há a bateria irmã, com o **nome de arquivo que o navegador produz** quando o aluno baixa o
+código duas vezes (`OlaMundo(1).<lang>`):
+
+```sh
+cd lang-test && make hostile
+```
+
+Ela existe porque esse nome já custou um veredicto errado: o mesmo código dava AC como `l.cpp` e
+**Compilation Error** como `l(1).cpp` — o nome chega ao recipe do make, que o entrega ao
+`/bin/sh`. Java fica de fora por definição (`javac` exige que o arquivo case a classe pública, e
+quem evita isso é o servidor, normalizando o nome na submissão). As duas baterias precisam de
+`bwrap` de verdade; a checagem que roda em qualquer máquina é `make check` na raiz
+(`check-quoting.sh`).
+
 ## 7. Como um problema customiza o julgamento
 
 O `build-and-test.sh` procura os scripts **do problema antes** dos padrões da linguagem. Essa é a
@@ -778,7 +792,8 @@ juiz.
 | Diretório | O que é |
 |---|---|
 | `lang/` | uma pasta por linguagem aceita, todas com o mesmo contrato (seção 6) |
-| `lang-test/` | o "olá, mundo" de cada linguagem, para conferir a máquina |
+| `lang-test/` | o "olá, mundo" de cada linguagem, para conferir a máquina (`make alltests`; `make hostile` = o mesmo com nome de arquivo hostil) |
+| `check-quoting.sh` | portão do `make check`: o nome do arquivo do aluno nunca chega solto a um shell (recipe do make, `$BIN`, `binfile.sh`) |
 | `interactive/` | o driver comum dos problemas interativos, mais o instalador. Técnico: `interactive/README.md` |
 | `testlib/` | a testlib vendorada, a ponte de compilação e o instalador de checker. Técnico: `testlib/README.md` |
 | `script-templates/` | templates de correção especial que o editor web oferece num seletor. Criar um template é criar uma pasta aqui |

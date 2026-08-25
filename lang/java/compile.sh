@@ -23,5 +23,5 @@ if [[ -z "$CLS" ]]; then
   for c in *.class; do [[ "$c" == *'$'* ]] && continue; [[ -f "$c" ]] || continue; CLS="$c"; break; done
 fi
 
-echo BIN=$CLS
+printf 'BIN=%s\n' "$CLS"
 exit $RET

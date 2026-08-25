@@ -45,15 +45,15 @@ source binfile.sh
 # (compile.sh elege a que tem main), kotlin roda o JAR (kotlinc -include-runtime já põe o
 # Main-Class no manifest). ⚠ na JVM o `stdbuf -oL` abaixo é NO-OP (I/O próprio, não libc):
 # a solução TEM de dar flush a cada resposta — está no enunciado/tutorial.
-CMD=(/tmp/dir/$BIN)
+CMD=(/tmp/dir/"$BIN")
 _JVM=(-Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k)
 case "$BIN" in
-  *.py|*.py2|*.py3) CMD=(python3 /tmp/dir/$BIN) ;;
-  *.sh)             CMD=(bash /tmp/dir/$BIN) ;;
-  *.js)             CMD=(node /tmp/dir/$BIN) ;;
+  *.py|*.py2|*.py3) CMD=(python3 /tmp/dir/"$BIN") ;;
+  *.sh)             CMD=(bash /tmp/dir/"$BIN") ;;
+  *.js)             CMD=(node /tmp/dir/"$BIN") ;;
   *.class)          export CLASSPATH=/tmp/dir
                     CMD=(java "${_JVM[@]}" "$(basename "$BIN" .class)") ;;
-  *.jar)            CMD=(java "${_JVM[@]}" -jar /tmp/dir/$BIN) ;;
+  *.jar)            CMD=(java "${_JVM[@]}" -jar /tmp/dir/"$BIN") ;;
 esac
 
 mkfifo /tmp/fifo.in /tmp/fifo.out

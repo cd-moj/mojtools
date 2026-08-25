@@ -7,4 +7,4 @@ exec &>/tmp/stderrlog
 cd /tmp/dir
 source binfile.sh
 
-spim -file $BIN < /tmp/in |tail -n+6 > /tmp/out
+spim -file "$BIN" < /tmp/in |tail -n+6 > /tmp/out

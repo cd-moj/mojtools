@@ -96,8 +96,10 @@ LANGUAGE=$1
 # python unificado: 'py' (pypy3). py2/py3 são extensões LEGADAS (submissões antigas,
 # sols de pacotes) — normaliza aqui p/ o lang-dir, o TL e o _VERCMD verem só 'py'.
 case "$LANGUAGE" in py2|py3) LANGUAGE=py;; esac
-SRCCODE=$(realpath $2)
-PROBLEMTEMPLATEDIR=$(realpath $3)
+# ⚠ ASPAS: o $2 é o arquivo do ALUNO, com o nome que ELE mandou (o agente do juiz materializa a
+# fonte preservando o nome). Sem aspas, "minha sol.cpp" vira dois argumentos do realpath.
+SRCCODE=$(realpath "$2")
+PROBLEMTEMPLATEDIR=$(realpath "$3")
 RUNALL=$4
 RUNALL=${RUNALL:=no}
 
@@ -111,11 +113,11 @@ fi
 
 exec 2> $workdirbase/run-trace.log
 
-LOG "% Running: $(basename $PROBLEMTEMPLATEDIR)"
+LOG "% Running: $(basename "$PROBLEMTEMPLATEDIR")"
 LOG ""
 LOG "- Minimal Information"
 LOG "  - Submission Language: $LANGUAGE"
-LOG "  - Submission SRCFILE: $(basename $SRCCODE)"
+LOG "  - Submission SRCFILE: $(basename "$SRCCODE")"
 LOG "  - Run all even on critical error: $RUNALL"
 LOG ""
 STARTDATE="$(date -R)"
@@ -289,10 +291,16 @@ if ! grep -q ^BIN= $workdirbase/compile.log.stdout || (( CAGERET != 0 )) ; then
   exit 1
 fi
 #cut -d'=' -f2 < $workdir/log.stdout
-BIN+=( $(cut -d'=' -f2 < $workdirbase/compile.log.stdout) )
+# A MESMA linha que o guard acima exigiu (`^BIN=`), sem word-splitting: o BIN sai do nome do
+# arquivo do ALUNO e pode ter qualquer coisa — um `$(cut -d= -f2)` pelado partia "meu bin" em
+# dois elementos do array e comia tudo depois de um segundo '='.
+_binline="$(grep -m1 '^BIN=' "$workdirbase/compile.log.stdout")"
+BIN+=( "${_binline#BIN=}" )
 # binfile.sh é o canal p/ DENTRO da jaula (todo run.sh faz `source binfile.sh`): além do BIN,
 # carrega os limites do problema — a JVM dimensiona -Xmx/-Xss por eles (java/kt/interactive).
-{ echo "BIN=${BIN[0]}"
+# ⚠ O BIN sai por %q porque este arquivo é SOURCEADO: `BIN=l(1)` cru é erro de sintaxe do bash
+# lá dentro, e aí a submissão morre no RUN (a mesma doutrina do conf/sessão do cdmoj).
+{ printf 'BIN=%q\n' "${BIN[0]}"
   echo "MOJ_MEMLIMITMB=${MEMLIMITMB:-}"
   echo "MOJ_STACKKB=${ULIMITS[-s]}"
 } > $workdir/binfile.sh
