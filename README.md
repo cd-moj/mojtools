@@ -762,9 +762,16 @@ cd lang-test && make hostile
 
 Ela existe porque esse nome já custou um veredicto errado: o mesmo código dava AC como `l.cpp` e
 **Compilation Error** como `l(1).cpp` — o nome chega ao recipe do make, que o entrega ao
-`/bin/sh`. Java fica de fora por definição (`javac` exige que o arquivo case a classe pública, e
-quem evita isso é o servidor, normalizando o nome na submissão). As duas baterias precisam de
-`bwrap` de verdade; a checagem que roda em qualquer máquina é `make check` na raiz
+`/bin/sh`.
+
+**Java e Rust ficam de fora por definição**: nas duas o nome do arquivo é semântico para o
+compilador (`javac` exige que o arquivo case a classe pública; `rustc` deriva daí o *crate name*
+e recusa parênteses), então ali `OlaMundo(1)` é Compilation Error legítimo — quem evita isso é o
+servidor, normalizando o nome na submissão.
+
+As duas baterias precisam de `bwrap` de verdade **e do rootfs do juiz**
+(`CAGE_ROOT=$HOME/moj-sysroot`), e a leitura é por comparação: rode `make alltests` antes, na
+mesma máquina. A checagem que roda em qualquer máquina é `make check` na raiz
 (`check-quoting.sh`).
 
 ## 7. Como um problema customiza o julgamento
