@@ -308,7 +308,13 @@ for _m in /etc/sudoers.d /etc/ssh /etc/ssl/private; do
   [[ -d "$ETCSRC$_m" ]] && ETCMASKS+=" --tmpfs $_m"
 done
 
-(exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $SCOPE bwrap $ROOTBINDS \
+# -f (tamanho de arquivo) do problema entra AQUI, no subshell do exec — herdado por
+# time/bwrap/código enjaulado e por NINGUÉM mais (nem o pós-processamento deste script).
+# O b-a-t exporta MOJ_CAGE_FSIZE e NÃO aplica -f em si mesmo: o -f no harness matava o
+# próprio julgamento com SIGXFSZ quando o trace ingeria stderr gigante do time (Maratona
+# 29/08). Sem a env (standalone/calibração) nada muda.
+([[ "${MOJ_CAGE_FSIZE:-}" =~ ^[0-9]+$ ]] && ulimit -f "$MOJ_CAGE_FSIZE" 2>/dev/null
+ exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $SCOPE bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \

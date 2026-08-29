@@ -190,7 +190,15 @@ ULIMITS[-u]=1024
 LOG "## LIMITS via ulimits"
 LOG ""
 #set ulimits
+# ⚠ -f (tamanho de arquivo) NÃO se aplica ao próprio harness (Maratona 29/08): o stderr de
+# 79 MB/teste de um time entrava inteiro no run-trace.log e o -f matava o b-a-t com SIGXFSZ
+# no meio do julgamento — a saída parava no workdir e o agente reportava lixo. O limite vale
+# SÓ para as execuções ENJAULADAS: exportamos o valor e o cage-run.sh (processo-filho) o
+# aplica em si mesmo antes do bwrap — compile, run e checker continuam limitados como sempre;
+# o gerador de log/trace pode crescer além do limite do problema.
+export MOJ_CAGE_FSIZE="${ULIMITS[-f]:-}"
 for l in ${!ULIMITS[@]}; do
+  [[ "$l" == -f ]] && { LOG "set: ulimit -f ${ULIMITS[$l]} (só na jaula, via cage-run)"; continue; }
   ulimit $l ${ULIMITS[$l]}
   LOG "set: ulimit $l ${ULIMITS[$l]}"
 done
@@ -524,8 +532,10 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   for f in $workdirbase/$FILE-{stderr,log.cage-run,log.timelog,log.bwraptime,log.bwrapexitcode}; do
     wc -c "$f"|grep -q "^0 " && continue;
     [[ "$f" == "$workdirbase/$FILE-team_output" ]] && continue
-    LOG "#### $(basename $f)"
-    LOG "$(< $f)"
+    LOG "#### $(basename $f) ($(wc -c < "$f") bytes)"
+    # EXCERTO, nunca o arquivo inteiro: um stderr de 79 MB/teste aqui era 79 MB numa variável
+    # bash E no run-trace.log por teste (Maratona 29/08). O arquivo cheio segue no workdir.
+    LOG "$(head -c 65536 "$f")"
   done
   LOG "8<-------------------------8<------------------"
   LOG "### END CAGE CONTROL DATA"
