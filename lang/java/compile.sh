@@ -4,7 +4,10 @@ exec 2>/tmp/stderrlog > /tmp/out
 cd /tmp/rwdir
 
 export _JAVA_OPTIONS="-Xmx300M -Xms50M -Xss10M"
-javac *java
+# -encoding UTF-8: mesma causa raiz do run.sh -- sem isso o javac le o .java assumindo o
+# charset do locale do host (que pode nem existir de fato aqui), e literais de string com
+# acento ("Media", "nao"...) saem CORROMPIDOS JA NO .class, antes de qualquer execucao.
+javac -encoding UTF-8 *java
 RET=$?
 #java -Xms10m -Xmx500m -Xss10m
 
