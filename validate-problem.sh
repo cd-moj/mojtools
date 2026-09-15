@@ -84,7 +84,7 @@ for _tl in $(stmt_langs_of "$PKG"); do
   # nota PT sem tradução: o aluno que lê em $_tl vê a explicação em PT (soft)
   for _nf in "$PKG/docs/notes"/*.md; do
     [[ -e "$_nf" ]] || continue; _nb="$(basename "$_nf" .md)"
-    [[ "$_nb" == *.* ]] && continue                       # já é uma nota traduzida
+    { [[ "$_nb" == *.* ]] && stmt_lang_ok "${_nb##*.}"; } && continue   # já é uma nota traduzida (sample.1.md não é)
     [[ -f "$PKG/docs/notes/$_nb.$_tl.md" ]] || render_leak="${render_leak}nota-sem-traducao($_nb,$_tl) "
   done
 done
