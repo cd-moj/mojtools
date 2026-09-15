@@ -147,6 +147,15 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `scripts/py` (sem isso a correção especial py do APC era ignorada — solução pelada ⇒ WA
   vazio), e o `build-and-test.sh` tem shim `TL[py]=TL[py3]` p/ caches `tl.<host>` calibrados
   antes da unificação.
+- **Extensão → linguagem tem FONTE ÚNICA: `lang-canon.sh`** (`lang_canon`; gêmea de
+  `cdmoj/lib/langs.sh lang_canon_ext`). C++ = `cpp|cc|cxx|c++` (+`hpp`), C = `c` (+`h`), Python =
+  `py` (+`py2|py3`). `build-and-test.sh`, `calibreitor.sh` (chave de TL E o argumento passado —
+  antes ia `${AC##*.}` cru), `validate-problem.sh` e `gen-problem-owners.sh` chamam a função; NÃO
+  reescreva o `case` inline. O `build-and-test.sh` copia a fonte p/ a jaula com a extensão
+  CANÔNICA quando a do aluno é alias (`sol.cc`/`sol.CPP` → `sol.cpp`): o `lang/cpp/compile.sh` e os
+  ~55 `scripts/cpp/compile.sh` de pacotes globam `*.cpp` — renomear a cópia faz todos funcionarem
+  sem tocar em nenhum (pedido do Ribas, 2026-09-14; antes `sol.cc` morria em "Language 'cc' not
+  availale"). Fixtures `lang-test/OlaMundo/OlaMundo.{cc,cxx,c++}` entram no `make alltests`/`hostile`.
 - **O NOME DO ARQUIVO CHEGA CRU AQUI — cite sempre.** O agente do juiz materializa a fonte com o
   nome que o aluno mandou, o `build-and-test.sh` a copia p/ dentro da jaula e o
   `lang/*/compile.sh` monta um Makefile cujo recipe o make entrega ao **`/bin/sh`**. Um

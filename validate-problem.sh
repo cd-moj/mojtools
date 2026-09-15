@@ -189,7 +189,7 @@ if [[ "$VALIDATE_RUN_SOLS" != 0 ]] && (( ngood >= 1 )) && [[ "$real_sandbox" == 
   bad=""
   for sol in "$PKG/sols/good/"*; do
     [[ -f "$sol" ]] || continue
-    lang="${sol##*.}"
+    lang="$(bash "$SELF/lang-canon.sh" "${sol##*.}")"   # cc/cxx/c++ -> cpp, py3 -> py
     verdict="$(bash "$SELF/build-and-test.sh" "$lang" "$sol" "$PKG" y 2>/dev/null | tail -n1)"
     [[ "$verdict" =~ ^Accepted ]] || bad+="$(basename "$sol"):${verdict:-?} "
   done

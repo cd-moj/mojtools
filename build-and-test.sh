@@ -93,9 +93,14 @@ if [[ ! -n "$3" ]]; then
 fi
 
 LANGUAGE=$1
-# python unificado: 'py' (pypy3). py2/py3 são extensões LEGADAS (submissões antigas,
-# sols de pacotes) — normaliza aqui p/ o lang-dir, o TL e o _VERCMD verem só 'py'.
-case "$LANGUAGE" in py2|py3) LANGUAGE=py;; esac
+# Extensão -> linguagem CANÔNICA (lang-canon.sh, fonte única): python unificado 'py' (py2/py3
+# são extensões LEGADAS de submissões antigas e sols de pacotes) e C++ = cpp|cc|cxx|c++ (pedido
+# do Ribas, 2026-09-14 — antes `sol.cc` morria em "Language 'cc' not availale"). O lang-dir, o TL
+# e o _VERCMD veem só o canônico. A porta do cdmoj já manda canônico; aqui cobre spool legado,
+# `moj test` e calibração com sols/*.cc.
+LANGUAGE_RAW="$(printf '%s' "$LANGUAGE" | tr '[:upper:]' '[:lower:]')"
+source "$(dirname "${BASH_SOURCE[0]}")/lang-canon.sh"
+LANGUAGE="$(lang_canon "$LANGUAGE_RAW")"
 # ⚠ ASPAS: o $2 é o arquivo do ALUNO, com o nome que ELE mandou (o agente do juiz materializa a
 # fonte preservando o nome). Sem aspas, "minha sol.cpp" vira dois argumentos do realpath.
 SRCCODE=$(realpath "$2")
@@ -138,7 +143,18 @@ cd $(dirname $0)
 MOJTOOLS_DIR=$PWD
 export MOJTOOLS_DIR
 
-cp "$SRCCODE" $workdir/
+# A cópia de trabalho leva a extensão CANÔNICA quando a do aluno é um alias (sol.cc -> sol.cpp,
+# x.h -> x.c): o lang/cpp/compile.sh e os scripts/cpp/compile.sh de dezenas de pacotes globam
+# `*.cpp` — renomear a cópia faz todos funcionarem sem tocar em nenhum. Python fica como está
+# (py3 já funciona por symlink de dir). O nome ORIGINAL do aluno nunca muda no servidor.
+# (compara a extensão CRUA: `sol.CPP` também precisa virar `sol.cpp` p/ o glob `*.cpp`)
+_src_ext="${SRCCODE##*.}"
+if [[ "$SRCCODE" == *.* && "$_src_ext" != "$LANGUAGE" ]] && [[ "$LANGUAGE" == cpp || "$LANGUAGE" == c ]]; then
+  _src_base="$(basename "$SRCCODE")"
+  cp "$SRCCODE" "$workdir/${_src_base%.*}.$LANGUAGE"
+else
+  cp "$SRCCODE" $workdir/
+fi
 
 declare -a BIN
 

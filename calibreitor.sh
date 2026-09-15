@@ -75,6 +75,7 @@ trap sai EXIT
 PROBLEMDIR=$(realpath $1)
 
 cd $(dirname $0)
+source ./lang-canon.sh   # extensão -> linguagem canônica (cc/cxx/c++ = cpp, py2/py3 = py)
 
 if [[ ! -e build-and-test.sh ]]; then
   stat build-and-test.sh
@@ -116,14 +117,14 @@ declare -A LANGOK          # linguagens que tiveram >=1 solução good Accepted 
 echo "AC solutions:"
 for AC in $PROBLEMDIR/sols/good/*; do
   echo "${AC##*/}:"
-  LANG=${AC##*.}
-  # python unificado: sols .py2/.py3 legadas contam como 'py' (chave única na tabela de TL)
-  case "$LANG" in py2|py3) LANG=py;; esac
+  # extensão -> linguagem canônica (lang-canon.sh): py2/py3 legadas = py; cc/cxx/c++ = cpp.
+  # Chave ÚNICA na tabela de TL — e é o canônico que vai ao build-and-test (era a extensão crua).
+  LANG="$(lang_canon "${AC##*.}")"
   [[ ! -n "${WORSTTIMEPERLANG[$LANG]}" ]] && WORSTTIMEPERLANG[$LANG]=0.01
 
   mkfifo $TEMP.coprocout
   export ALLOWPARALLELTEST=n
-  coproc bash build-and-test.sh ${AC##*.} $AC $PROBLEMDIR $ALLOWTLEDURINGCALIBRATION &>$TEMP.coprocout
+  coproc bash build-and-test.sh "$LANG" $AC $PROBLEMDIR $ALLOWTLEDURINGCALIBRATION &>$TEMP.coprocout
   #read -u ${COPROC[0]} T
   exec 7<$TEMP.coprocout
   read -u 7 T
@@ -208,10 +209,9 @@ for OTHERSOL in pass slow wrong; do
   for TLs in $PROBLEMDIR/sols/$OTHERSOL/*; do
     if [[ ! -e $TLs ]]; then echo none; continue;fi
     echo "${TLs##*/}:"
-    LANG="${TLs##*.}"
-    case "$LANG" in py2|py3) LANG=py;; esac
+    LANG="$(lang_canon "${TLs##*.}")"
     mkfifo $TEMP.coproc
-    coproc bash build-and-test.sh ${TLs##*.} $TLs $PROBLEMDIR y >$TEMP.coproc
+    coproc bash build-and-test.sh "$LANG" $TLs $PROBLEMDIR y >$TEMP.coproc
     exec 7<$TEMP.coproc
     read -u 7 T
     tail -f --pid=$COPROC_PID $T/run-trace.log|

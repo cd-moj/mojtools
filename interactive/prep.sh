@@ -18,8 +18,9 @@ _ia_pkg="$PROBLEMTEMPLATEDIR"
 _ia_dst="$1/arbitro"
 _ia_ok=0
 
-if [[ -f "$_ia_pkg/scripts/arbitro.cpp" || -f "$_ia_pkg/scripts/arbitro.cc" ]]; then
-  _ia_src="$_ia_pkg/scripts/arbitro.cpp"; [[ -f "$_ia_src" ]] || _ia_src="$_ia_pkg/scripts/arbitro.cc"
+_ia_src=""
+for _ia_e in cpp cc cxx c++; do [[ -f "$_ia_pkg/scripts/arbitro.$_ia_e" ]] && { _ia_src="$_ia_pkg/scripts/arbitro.$_ia_e"; break; }; done
+if [[ -n "$_ia_src" ]]; then
   _ia_cache="$_ia_pkg/.arbitro-cache"
   # a chave do cache inclui o COMPILADOR que vai compilar: num juiz não há g++ no host
   # (`g++ --version` vazio) e, sem a rootfs na chave, o binário sobreviveria a uma troca dela.

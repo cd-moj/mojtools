@@ -23,6 +23,7 @@ set -u
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
 : "${RUNDIR:=/home/ribas/moj/run}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"   # p/ achar tl-checksum.sh (irmão)
+source "$HERE/lang-canon.sh"   # extensão -> linguagem canônica (cc/cxx/c++ = cpp)
 JD="$CONTESTSDIR/treino/var/jsons"
 JDPRIV="$CONTESTSDIR/treino/var/jsons-private"   # enunciado compilado dos PRIVADOS (gen-problem-json)
 OUT="$CONTESTSDIR/treino/var/problem-owners.json"
@@ -137,7 +138,7 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     # linguagens das soluções good (extensão = a linguagem que o calibreitor keya). A gestão compara
     # com o TL servido: linguagem good SEM TL = solução good que não calibrou (falhou em todos os hosts).
     gl=""
-    [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; case "$e" in py2|py3) e=py;; esac; [[ "$e" != "$gf" ]] && echo "$e"; }; done | LC_ALL=C sort -u | paste -sd, -)"
+    [[ -d "$pdir/sols/good" ]] && gl="$(for gf in "$pdir/sols/good"/*; do [[ -f "$gf" ]] && { e="${gf##*.}"; [[ "$e" != "$gf" ]] && lang_canon "$e" && echo; }; done | LC_ALL=C sort -u | paste -sd, -)"
     # TLOVERRIDE do conf: o índice é o lugar onde o servidor guarda "o que sei do pacote sem
     # abri-lo no request" (é o mesmo papel do tl_checksum acima). Sem isto o Painel da gestão
     # mostraria o TL CALIBRADO — número que o juiz não usa — e teria de ler 1400 confs por

@@ -129,7 +129,7 @@ printf '2000\n'       > tests/output/test-002
 ### Passo 5: escrever a solução de referência
 
 Pelo menos **uma** solução correta em `sols/good/` é obrigatória. **A extensão do arquivo é o que
-diz a linguagem.**
+diz a linguagem.** C++ aceita `.cpp`, `.cc`, `.cxx` e `.c++`. O julgador trata as quatro como `cpp`.
 
 ```sh
 cat > sols/good/sol.c <<'EOF'
@@ -679,6 +679,11 @@ As 17 linguagens de hoje: `apl`, `c`, `cpp`, `cs`, `go`, `hs`, `java`, `js`, `kt
 > **Python é uma linguagem só: `py`**, rodada com **pypy3**. As extensões `.py2` e `.py3` são
 > **legadas**: o julgador as normaliza para `py` sozinho. O `lang/py/compile.sh` faz uma checagem de
 > sintaxe, então erro de sintaxe em Python vira **Compilation Error**, e não Runtime Error.
+
+> **C++ é uma linguagem só: `cpp`**, com quatro extensões: `.cpp`, `.cc`, `.cxx` e `.c++`. A tabela
+> extensão → linguagem tem uma fonte só: `lang-canon.sh`. O `build-and-test.sh` copia o arquivo
+> para a jaula com a extensão canônica (`sol.cc` vira `sol.cpp`). Assim o `lang/cpp/compile.sh` e
+> os `scripts/cpp/compile.sh` dos pacotes, que procuram `*.cpp`, funcionam sem mudança.
 
 ### `lang/<lang>/compile.sh`
 
