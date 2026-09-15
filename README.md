@@ -102,6 +102,33 @@ Repare em duas coisas que **não** estão no arquivo:
 - **Não há exemplo.** Os exemplos são montados a partir dos arquivos de teste, no passo seguinte, e
   injetados no fim do enunciado. Se você escrever um exemplo à mão aqui, ele vai aparecer duas vezes.
 
+#### Enunciado em outros idiomas (opcional)
+
+O português fica em `docs/enunciado.md` e é obrigatório. Para oferecer o problema em inglês ou
+espanhol, escreva a tradução ao lado, com o código do idioma no nome:
+
+```sh
+cat > docs/enunciado.en.md <<'EOF'
+Given two integers, print their sum.
+
+## Input
+
+The input has two integers $a$ and $b$ ($0 \le a, b \le 1000$), one per line.
+
+## Output
+
+Print one integer: the sum of $a$ and $b$.
+EOF
+```
+
+Regras: `en` e `es` são os idiomas aceitos; só markdown. A tradução tem as mesmas seções
+obrigatórias (`## Input`/`## Output`, ou `## Entrada`/`## Salida`). A explicação de um exemplo
+traduzida vai em `docs/notes/<sample>.en.md`; sem ela, o exemplo mostra a explicação em
+português. O editorial traduzido vai em `docs/solucao.en.md`. O título da tradução fica no
+metadado (`titles`; pela CLI: `moj title . --lang en "Sum"`). Os exemplos aparecem em todos os
+idiomas, com os rótulos do idioma. O formato completo está em `cdmoj/docs/PACOTE.md`, seção
+"Idiomas".
+
 ### Passo 3: criar os exemplos
 
 Exemplo é todo teste cujo nome **começa com `sample`**. Ele aparece no enunciado **e** corrige a
@@ -195,7 +222,8 @@ bash ../mojtools/validate-problem.sh . soma#soma
 ```
 
 O comando sai com 0 se passou, e escreve um relatório em `run/validation/<id>.json` dizendo, item a
-item, o que passou e o que não passou. Ele confere: autor, enunciado, as seções `## Entrada` e
+item, o que passou e o que não passou. Ele confere: autor, enunciado (e cada tradução
+`docs/enunciado.<lang>.md`, com as mesmas regras), as seções `## Entrada` e
 `## Saída`, se o pandoc renderiza, se há exemplo, se todo teste está pareado, se há solução `good`,
 e se a `good` é aceita.
 
@@ -522,12 +550,21 @@ Lê o pacote e escreve `contests/treino/var/jsons/<id>.json`, que é o que o fro
 
 ```json
 { "id": "...", "title": "...", "author": "...", "time_limits": {...}, "tags": [...],
-  "collections": [...], "languages": [...], "statement_html_b64": "..." }
+  "collections": [...], "languages": [...], "statement_html_b64": "...",
+  "statement_langs": ["pt", "en"], "statements": { "en": { "title": "...", "html_b64": "..." } } }
 ```
 
 Os **exemplos** vêm sempre dos arquivos de teste (`tests/input/sample*`, na ordem), nunca do texto do
 enunciado, e são injetados no HTML. As explicações de cada exemplo vêm de **`docs/notes/<sample>.md`** (markdown, pareado pelo NOME do teste — é o formato de autoria; o antigo `docs/sample-notes.json`, por índice, só é lido como legado).
 O editorial (`docs/solucao.md`) é **ignorado** de propósito: ele não pode chegar ao aluno.
+
+**Idiomas.** O script renderiza um HTML por idioma do pacote (`docs/enunciado.<lang>.md`, ver
+`statement-langs.sh`): o português vai em `title`/`statement_html_b64`, como sempre; cada tradução
+vai em `statements.<lang>` com o título de `titles` do meta (ou o título em português). Os exemplos
+saem em cada idioma com os rótulos do idioma, e a explicação traduzida (`docs/notes/<sample>.<lang>.md`)
+cai na explicação em português quando falta. `statement_langs` lista os idiomas servidos. O HTML dos
+exemplos é o de **`stmt_samples_html`** (`statement-langs.sh`) — o mesmo que o "Pré-visualizar" do
+editor usa.
 
 Os tempos-limite vêm do store dos juízes (`run/tl/<id>.json`) e são o **máximo entre as máquinas**,
 mas só valem se o checksum do pacote ainda bate. Se o pacote mudou e ninguém recalibrou, cai no
@@ -552,12 +589,14 @@ Se o problema é privado, o JSON vai só para `jsons-private/`, e o do `jsons/` 
 ### `render-statement.sh`: renderizar o enunciado
 
 ```
-render-statement.sh <arquivo-do-enunciado> [formato] [html-dos-exemplos] [título]
+render-statement.sh <arquivo-do-enunciado> [formato] [html-dos-exemplos] [título] [idioma]
 ```
 
 Escreve o HTML completo no stdout. Usa pandoc com `--mathml` (a matemática vira MathML de verdade) e
 `--embed-resources` (as imagens entram embutidas, o HTML é autocontido). Injeta o `<h1>` a partir do
-**título**, que é um argumento, e remove um `% Título` legado da primeira linha. Blocos de código
+**título**, que é um argumento, e remove um `% Título` legado da primeira linha. O 5º argumento é o
+**idioma** (`pt`, `en`, `es`; default `pt`) e só define o `<html lang>` — a tradução mora no arquivo
+que você passa e os rótulos dos exemplos vêm prontos no HTML dos exemplos. Blocos de código
 ` ```{.graph} ` (fonte graphviz DOT) viram **SVG** via `dot` (lua-filter `graphviz.lua`) —
 ver **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**.
 

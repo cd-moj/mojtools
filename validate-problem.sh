@@ -11,7 +11,10 @@
 # Checagens (hard, salvo indicado):
 #   has_author        — existe ./author (o Makefile exige p/ descobrir o problema)
 #   has_statement     — existe docs/enunciado.{md,org,tex}
-#   html_builds       — make <problema>.html sai 0 (stderr do pandoc vai p/ detail)
+#   html_builds       — o render-statement.sh renderiza o enunciado PT
+#   html_builds_<lang>, secao_entrada_<lang>, secao_saida_<lang> — idem p/ cada tradução
+#                       docs/enunciado.<lang>.md presente (statement-langs.sh); nota de exemplo sem
+#                       tradução é aviso soft `nota-sem-traducao(<sample>,<lang>)` (cai na PT)
 #   examples_present  — >=1 par tests/input|output (exemplos sempre aparentes)
 #   tests_paired      — todo input tem output e vice-versa
 #   score_file_sane   — (se tests/score existe) toda linha é '<globs> - N pontos' (ou "#"),
@@ -27,6 +30,7 @@ PKG="$(cd "$PKG" 2>/dev/null && pwd)" || { echo "validate: pkg '$1' inexistente"
 REPODIR="$(dirname "$PKG")"; PROB="$(basename "$PKG")"; REPO="$(basename "$REPODIR")"
 ID="${2:-$REPO#$PROB}"
 SELF="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+source "$SELF/statement-langs.sh"
 
 : "${RUNDIR:=/home/ribas/moj/run}"
 : "${VALDIR:=$RUNDIR/validation}"
@@ -42,16 +46,17 @@ add(){ # add <name> <ok 0|1> [detail]
 # --- has_author ---
 [[ -f "$PKG/author" ]] && add has_author 1 || add has_author 0 "falta o arquivo 'author'"
 
-# --- has_statement ---
-stmt=""; for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && stmt="$e" && break; done
-[[ -n "$stmt" ]] && add has_statement 1 "enunciado.$stmt" || add has_statement 0 "sem docs/enunciado.{md,org,tex}"
+# --- has_statement (PT = docs/enunciado.{md,org,tex}; a descoberta é a do statement-langs.sh) ---
+enunf="$(stmt_file "$PKG" pt)" || enunf=""
+[[ "$enunf" == "$PKG/docs/"* ]] || enunf=""
+efmt=md; [[ -n "$enunf" ]] && efmt="$(stmt_fmt "$enunf")"
+[[ -n "$enunf" ]] && add has_statement 1 "enunciado.$efmt" || add has_statement 0 "sem docs/enunciado.{md,org,tex}"
 
 # --- html_builds (MESMO renderizador do "Pré-visualizar": render-statement.sh — pandoc
 #     standalone, sem o Makefile/scaffolding do repo; funciona p/ legados e problemas atuais) ---
-html_built=false; render_leak=""; enunf=""; efmt=md
-for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && { enunf="$PKG/docs/enunciado.$e"; efmt="$e"; break; }; done
+html_built=false; render_leak=""
 if [[ -n "$enunf" ]]; then
-  rendered="$(bash "$SELF/render-statement.sh" "$enunf" "$efmt" 2>/dev/null)"
+  rendered="$(bash "$SELF/render-statement.sh" "$enunf" "$efmt" "" "" pt 2>/dev/null)"
   if printf '%s' "$rendered" | grep -qi '</body>'; then
     html_built=true; add html_builds 1
     # vaza LaTeX de PROSA no HTML? (informativo — math via mathml é OK)
@@ -66,7 +71,23 @@ fi
 # --- seções esperadas no enunciado (OBRIGATÓRIAS p/ liberar): ## Entrada e ## Saída ---
 ebody=""; [[ -n "$enunf" ]] && ebody="$(cat "$enunf" 2>/dev/null)"
 if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)' <<<"$ebody"; then add secao_entrada 1; else add secao_entrada 0 "falta a seção '## Entrada'"; fi
-if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|output)' <<<"$ebody"; then add secao_saida 1; else add secao_saida 0 "falta a seção '## Saída'"; fi
+if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|salida|output)' <<<"$ebody"; then add secao_saida 1; else add secao_saida 0 "falta a seção '## Saída'"; fi
+# --- traduções (docs/enunciado.<lang>.md): cada uma renderiza e tem as seções (HARD, como a PT) ---
+for _tl in $(stmt_langs_of "$PKG"); do
+  [[ "$_tl" == pt ]] && continue
+  _tf="$(stmt_file "$PKG" "$_tl")"
+  if bash "$SELF/render-statement.sh" "$_tf" md "" "" "$_tl" 2>/dev/null | grep -qi '</body>'; then add "html_builds_$_tl" 1 "enunciado.$_tl.md"
+  else add "html_builds_$_tl" 0 "pandoc não renderizou docs/enunciado.$_tl.md"; fi
+  _tb="$(cat "$_tf" 2>/dev/null)"
+  if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)' <<<"$_tb"; then add "secao_entrada_$_tl" 1; else add "secao_entrada_$_tl" 0 "falta a seção de entrada (## Input / ## Entrada) em enunciado.$_tl.md"; fi
+  if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|salida|output)' <<<"$_tb"; then add "secao_saida_$_tl" 1; else add "secao_saida_$_tl" 0 "falta a seção de saída (## Output / ## Salida) em enunciado.$_tl.md"; fi
+  # nota PT sem tradução: o aluno que lê em $_tl vê a explicação em PT (soft)
+  for _nf in "$PKG/docs/notes"/*.md; do
+    [[ -e "$_nf" ]] || continue; _nb="$(basename "$_nf" .md)"
+    [[ "$_nb" == *.* ]] && continue                       # já é uma nota traduzida
+    [[ -f "$PKG/docs/notes/$_nb.$_tl.md" ]] || render_leak="${render_leak}nota-sem-traducao($_nb,$_tl) "
+  done
+done
 # --- aviso SOFT (não bloqueia): exemplo embutido no texto -> deve vir da lista de exemplos ---
 if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
   render_leak="${render_leak}exemplo-no-texto? "
@@ -78,7 +99,9 @@ if [[ -d "$PKG/docs/notes" ]]; then
   for _nf in "$PKG/docs/notes"/*.md; do
     [[ -e "$_nf" ]] || continue
     _nb="$(basename "$_nf" .md)"
-    [[ -f "$PKG/tests/input/$_nb" ]] || render_leak="${render_leak}nota-sem-sample($_nb) "
+    # sufixo de idioma (sample1.en.md): o sample é o que vem antes do último ponto
+    _ns="$_nb"; if [[ "$_nb" == *.* ]] && stmt_lang_ok "${_nb##*.}"; then _ns="${_nb%.*}"; fi
+    [[ -f "$PKG/tests/input/$_ns" ]] || render_leak="${render_leak}nota-sem-sample($_nb) "
   done
 elif [[ -f "$PKG/docs/sample-notes.json" ]]; then
   _nn="$(jq 'length' "$PKG/docs/sample-notes.json" 2>/dev/null)"

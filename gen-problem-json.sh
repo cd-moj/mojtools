@@ -8,7 +8,13 @@
 
 # gen-problem-json.sh — gera o índice servível do treino a partir de um pacote de
 # problema: contests/treino/var/jsons/<id>.json = {id,title,time_limits,tags,collections,
-# statement_html_b64,author}. Fecha o passo que faltava (o synctreino só fazia git pull + make).
+# statement_html_b64,author,statement_langs,statements}. Fecha o passo que faltava (o synctreino
+# só fazia git pull + make).
+#
+# IDIOMAS (2026-09-15, ver statement-langs.sh): PT segue em `title`/`statement_html_b64` (compat
+# total); cada tradução docs/enunciado.<lang>.md vira `statements.<lang> = {title, html_b64}`
+# (título de `.moj-meta.json` `titles[lang]`, senão o PT) e `statement_langs` lista os idiomas
+# servidos, PT primeiro. Notas de exemplo por idioma (docs/notes/<sample>.<lang>.md) com fallback PT.
 #
 #   uso:  gen-problem-json.sh <pkgdir> [<id>]
 #         <pkgdir> = .../<repo>/<problema>   (o pai é o repo, com o Makefile)
@@ -34,11 +40,12 @@ ID="${2:-$REPO#$PROB}"
 HOSTNAME="${HOSTNAME:-$(hostname)}"
 
 esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+source "$MOJTOOLS_DIR/statement-langs.sh"
 
 # ----- 1. detecta o enunciado + formato (o HTML é renderizado no passo 6) -----
-ENUNF=""; FMT=md
-for e in md org tex; do [[ -f "$PKG/docs/enunciado.$e" ]] && { ENUNF="$PKG/docs/enunciado.$e"; FMT="$e"; break; }; done
-[[ -n "$ENUNF" ]] || { echo "gen-problem-json: sem docs/enunciado.{md,org,tex} p/ $ID" >&2; exit 2; }
+ENUNF="$(stmt_file "$PKG" pt)" || ENUNF=""
+[[ -n "$ENUNF" && "$ENUNF" == "$PKG/docs/"* ]] || { echo "gen-problem-json: sem docs/enunciado.{md,org,tex} p/ $ID" >&2; exit 2; }
+FMT="$(stmt_fmt "$ENUNF")"
 
 # ----- 2. título -----
 title=""
@@ -123,52 +130,41 @@ if [[ -n "$ov_json" && "$ov_json" != '{}' ]]; then
   [[ -n "$tl_json" ]] || tl_json='{}'
 fi
 
-# ----- 5. exemplos a partir dos testes (sempre aparentes, batendo com os testes) -----
-samples_html=""
-declare -a SAMPLES
-if [[ -f "$PKG/samples" ]]; then
-  mapfile -t SAMPLES < <(grep -vE '^[[:space:]]*$' "$PKG/samples")
-elif compgen -G "$PKG/tests/input/sample*" >/dev/null 2>&1; then
-  mapfile -t SAMPLES < <(cd "$PKG/tests/input" && ls -1v sample* 2>/dev/null)   # exemplos = sample* (todos)
-else
-  mapfile -t SAMPLES < <(ls -1 "$PKG/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT")
-fi
-# explicação por exemplo (na ordem dos exemplos): docs/sample-notes.json = ["nota1", "nota2", ...]
-# Lidas por ÍNDICE com jq (não 'mapfile', que quebraria notas multi-linha em várias entradas).
-NOTESF="$PKG/docs/sample-notes.json"
-n=0; i=0
-for s in "${SAMPLES[@]}"; do
-  in="$PKG/tests/input/$s"; out="$PKG/tests/output/$s"
-  if [[ -f "$in" && -f "$out" ]]; then
-    samples_html+="<div class=\"moj-exemplo\"><h3>Entrada</h3><pre>$(esc < "$in")</pre>"
-    samples_html+="<h3>Saída</h3><pre>$(esc < "$out")</pre>"
-    # nota: formato de autoria docs/notes/<sample>.md (pareia pelo NOME; markdown puro);
-    # legado sample-notes.json por índice. --embed-resources/resource-path: `![](fig.png)`
-    # com a figura em docs/ funciona TAMBÉM na nota (mesma regra do enunciado).
-    note=""
-    if [[ -f "$PKG/docs/notes/$s.md" ]]; then note="$(cat "$PKG/docs/notes/$s.md")"
-    elif [[ -f "$NOTESF" ]]; then note="$(jq -r --argjson k "$i" '.[$k] // ""' "$NOTESF" 2>/dev/null)"; fi
-    if [[ -n "$note" ]]; then
-      nh="$(printf '%s' "$note" | pandoc -f markdown -t html --embed-resources --resource-path="$PKG/docs" 2>/dev/null)"
-      [[ -n "$nh" ]] || nh="<p>$(printf '%s' "$note" | esc)</p>"
-      samples_html+="<div class=\"moj-exemplo-nota\">$nh</div>"
-    fi
-    samples_html+="</div>"; (( n++ ))
-  fi
-  (( i++ ))
-done
-if [[ -n "$samples_html" ]]; then
-  samples_html="<section class=\"moj-exemplos\"><h2>Exemplos</h2>$samples_html</section>"
-fi
-
-# ----- 6. renderiza (MESMO renderizador do "Pré-visualizar") + injeta exemplos + base64 -----
-exf="$(mktemp)"; [[ -n "$samples_html" ]] && printf '%s' "$samples_html" > "$exf"
-tmp_html="$(mktemp)"
-bash "$MOJTOOLS_DIR/render-statement.sh" "$ENUNF" "$FMT" "$exf" "$title" > "$tmp_html" 2>/dev/null
-[[ -s "$tmp_html" ]] || { echo "gen-problem-json: render do enunciado FALHOU p/ $ID" >&2; rm -f "$exf" "$tmp_html"; exit 2; }
+# ----- 5+6. exemplos (por idioma) + render (MESMO renderizador do "Pré-visualizar") + base64 -----
+# Os exemplos vêm dos testes (sempre aparentes, batendo com os testes reais); o HTML deles é o do
+# `stmt_samples_html` (statement-langs.sh) — o mesmo do preview do editor. Um render por idioma.
 # b64 do HTML em ARQUIVO (entra no jq por --rawfile): statement grande estourava o ARG_MAX no
 # --arg -> jq falhava -> json VAZIO -> o problema sumia do treino (jq -s pula arquivo vazio).
-b64f="$(mktemp)"; base64 -w0 < "$tmp_html" | tr -d '\n' > "$b64f"; rm -f "$exf" "$tmp_html"
+LANGS="$(stmt_langs_of "$PKG")"
+declare -A B64F=() LTITLE=()
+n=0
+for lang in $LANGS; do
+  lf="$(stmt_file "$PKG" "$lang")"; lfmt="$(stmt_fmt "$lf")"
+  ltitle="$title"
+  if [[ "$lang" != pt ]]; then
+    lt="$(jq -r --arg l "$lang" '.titles[$l] // ""' "$meta" 2>/dev/null)"; [[ -n "$lt" ]] && ltitle="$lt"
+  fi
+  exf="$(mktemp)"; stmt_samples_html "$PKG" "$lang" > "$exf"; (( n == 0 )) && n="${STMT_SAMPLES_N:-0}"
+  tmp_html="$(mktemp)"
+  bash "$MOJTOOLS_DIR/render-statement.sh" "$lf" "$lfmt" "$exf" "$ltitle" "$lang" > "$tmp_html" 2>/dev/null
+  if [[ ! -s "$tmp_html" ]]; then
+    rm -f "$exf" "$tmp_html"
+    [[ "$lang" == pt ]] && { echo "gen-problem-json: render do enunciado FALHOU p/ $ID" >&2; exit 2; }
+    echo "gen-problem-json: render do enunciado $lang FALHOU p/ $ID (idioma pulado)" >&2; continue
+  fi
+  b64f="$(mktemp)"; base64 -w0 < "$tmp_html" | tr -d '\n' > "$b64f"; rm -f "$exf" "$tmp_html"
+  B64F[$lang]="$b64f"; LTITLE[$lang]="$ltitle"
+done
+[[ -n "${B64F[pt]:-}" ]] || { echo "gen-problem-json: sem enunciado PT renderizado p/ $ID" >&2; exit 2; }
+b64f="${B64F[pt]}"
+# statements (só os idiomas não-PT) montado em ARQUIVO, um --rawfile por idioma (nunca argv)
+stmts_f="$(mktemp)"; printf '{}' > "$stmts_f"; langs_json='["pt"]'
+for lang in $LANGS; do
+  [[ "$lang" == pt || -z "${B64F[$lang]:-}" ]] && continue
+  jq -c --arg l "$lang" --arg t "${LTITLE[$lang]}" --rawfile h "${B64F[$lang]}" '. + {($l): {title:$t, html_b64:$h}}' "$stmts_f" > "$stmts_f.n" && mv -f "$stmts_f.n" "$stmts_f"
+  langs_json="$(jq -c --arg l "$lang" '. + [$l]' <<<"$langs_json")"
+  rm -f "${B64F[$lang]}"
+done
 
 # ----- 7. público? FAIL-CLOSED: só é público se o .moj-meta.json disser public:true -----
 # ESTE É O PORTÃO DA LISTA PÚBLICA DO TREINO (var/jsons/ é servido SEM login: lista + enunciado).
@@ -190,9 +186,11 @@ mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 # ainda não é servido (defesa em profundidade; json legado sem o campo continua passando).
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
-  --argjson pub "$public" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub, statement_html_b64:$html}')"
-rm -f "$b64f"
+  --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
+    statement_langs:$slangs, statement_html_b64:$html}
+   + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"
+rm -f "$b64f" "$stmts_f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$(dirname "$priv")/.$ID.tmp"                                 # tmp no dir PRIVADO: um mv falho
 printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"         # não deixa lixo no dir PÚBLICO
@@ -204,7 +202,7 @@ if [[ "$public" == true ]]; then
   ptmp="$TREINO_JSONS/.$ID.pub.tmp"
   cp -f "$priv" "$ptmp" && mv -f "$ptmp" "$TREINO_JSONS/$ID.json"  # publicação ATÔMICA (rename)
   rm -f "$CACHE"
-  echo "gen-problem-json: $ID publicado (title='$title', exemplos=$n)"
+  echo "gen-problem-json: $ID publicado (title='$title', exemplos=$n, idiomas=${langs_json})"
 else
   rm -f "$TREINO_JSONS/$ID.json" "$CACHE"
   echo "gen-problem-json: $ID privado (fora do treino; cópia em jsons-private)"

@@ -41,7 +41,14 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   (mktemp+mv) e `.calib-reports/` troca por rename no fim — outro slot julgando o mesmo
   problema nunca vê placeholder/tabela parcial. Nunca reintroduzir escrita direta no
   diretório compartilhado do pacote durante a calibração (raiz de veredicto errado).
-- `render-statement.sh <enunf> [fmt=md] [exemplos.html] [titulo]` — **renderizador único** do
+- `statement-langs.sh` (sourceável) — **FONTE ÚNICA dos idiomas do enunciado** (2026-09-15):
+  `stmt_langs_all` (pt en es), `stmt_file <pkg> <lang>` (PT = enunciado.{md,org,tex}; outro =
+  `docs/enunciado.<lang>.md`), `stmt_langs_of`, `stmt_note_file` (nota do idioma › PT),
+  `stmt_label` (Exemplos/Examples/Ejemplos…), `stmt_title` (titles[lang] › display_title) e
+  **`stmt_samples_html <pkg> <lang> [samples…]`** — o ÚNICO gerador do HTML dos exemplos (h3 +
+  nota por idioma), usado pelo `gen-problem-json.sh` E pelo `problems/preview.sh` do cdmoj (a cópia
+  do preview usava h4 e divergia). Quem procura arquivo de enunciado por idioma chama isto.
+- `render-statement.sh <enunf> [fmt=md] [exemplos.html] [titulo] [lang=pt]` — **renderizador único** do
   enunciado (pandoc standalone, `--mathml --embed-resources`). **= o "Pré-visualizar" do editor
   = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado. Blocos
   ` ```{.graph} ` (fonte graphviz DOT) viram **SVG inline** via `dot` (lua-filter `graphviz.lua`;
@@ -51,10 +58,14 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   tags + **coleções** (`.moj-meta.json` `collections`, verbatim — um problema pode estar em várias) +
   HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
   (`docs/sample-notes.json`).
-  **Ignora `docs/solucao.md`** (editorial não vai ao aluno).
+  **Ignora `docs/solucao.md`** (editorial não vai ao aluno). **Um render por idioma**: PT em
+  `title`/`statement_html_b64` (compat), traduções em `statements{<lang>:{title,html_b64}}` +
+  `statement_langs`; a nota de exemplo sem tradução cai na PT.
 - `validate-problem.sh <pkg> [id]` — **portão de qualidade** (relatório em
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
-  `## Entrada` e `## Saída`. Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
+  `## Entrada` e `## Saída` (aceita Input/Output e Salida); cada tradução ganha
+  `html_builds_<lang>`/`secao_*_<lang>` HARD e o aviso soft `nota-sem-traducao(<sample>,<lang>)`.
+  Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
 - **Transporte de `scripts/`**: o `moj push`/`clone` fazem round-trip COMPLETO da correção
   especial (conteúdo+`+x`+symlinks, campo `scripts_files` da API) — `moj upload <id> <dir>`
