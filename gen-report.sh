@@ -31,6 +31,10 @@ CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS=""
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
+# Teto por BYTES de cada bloco embutido (entrada do teste, stderr, diff, logs) — o corte por
+# linhas não bastava: uma linha de 1,2 MB entrava inteira e havia report de 17 MB (LATAM 2026:
+# 38 GB de mojlog). 64 KB por bloco preserva o que o time precisa ler; o resto vira o aviso.
+: "${REPORT_MAX_BYTES:=65536}"
 
 declare -A VERDICT
 [[ -e "$wb/log.verdictall" ]] && source "$wb/log.verdictall"
@@ -85,26 +89,30 @@ pct_of(){ local t="$1" tl="${TL_LANG:-1}"; [[ -z "$t" ]] && { echo 0; return; }
     if(v>100)v=100; if(v<2)v=2; printf "%.1f", v }' 2>/dev/null || echo 2; }
 
 # <pre> com conteúdo de arquivo escapado e truncado. $1=arq $2=classe $3=maxlinhas
-prefile(){ local f="$1" cls="${2:-}" max="${3:-200}" n
+prefile(){ local f="$1" cls="${2:-}" max="${3:-200}" n bytes
   [[ -s "$f" ]] || return 1
-  n=$(wc -l < "$f")
-  raw "<pre class=\"$cls\">"; head -n "$max" "$f" | esc >> "$ORG"; raw "</pre>"
-  (( n > max )) && raw "<p class=\"muted\">… truncado: mostrando $max de $n linhas.</p>"
+  n=$(wc -l < "$f"); bytes=$(stat -c%s "$f" 2>/dev/null || wc -c < "$f")
+  # bytes ANTES das linhas: `head -c` corta a linha-monstro; o `head -n` segue valendo
+  raw "<pre class=\"$cls\">"; head -c "$REPORT_MAX_BYTES" "$f" | head -n "$max" | esc >> "$ORG"; raw "</pre>"
+  if (( bytes > REPORT_MAX_BYTES )); then raw "<p class=\"muted\">… truncado: mostrando $(( REPORT_MAX_BYTES / 1024 )) KB de $(( bytes / 1024 )) KB ($n linhas).</p>"
+  elif (( n > max )); then raw "<p class=\"muted\">… truncado: mostrando $max de $n linhas.</p>"; fi
   raw $'\n'; return 0; }
 
 # diff colorido (linhas </- = esperado, >/+ = obtido). $1=arq $2=maxlinhas
-difffmt(){ local f="$1" max="${2:-400}" n line c cls e
+difffmt(){ local f="$1" max="${2:-400}" n line c cls e bytes
   [[ -s "$f" ]] || return 1
-  n=$(wc -l < "$f")
+  n=$(wc -l < "$f"); bytes=$(stat -c%s "$f" 2>/dev/null || wc -c < "$f")
   raw '<pre class="diff">'
+  # bytes antes das linhas: o `while read` + escs por linha era O(n) numa linha de MB
   while IFS= read -r line; do
     c="${line:0:1}"
     case "$c" in '<'|'-') cls="d-old";; '>'|'+') cls="d-new";; *) cls="";; esac
     e="$(escs "$line")"
     if [[ -n "$cls" ]]; then o "<span class=\"$cls\">$e</span>"; else o "$e"; fi
-  done < <(head -n "$max" "$f")
+  done < <(head -c "$REPORT_MAX_BYTES" "$f" | head -n "$max")
   raw "</pre>"
-  (( n > max )) && raw "<p class=\"muted\">… diff truncado: $max de $n linhas.</p>"
+  if (( bytes > REPORT_MAX_BYTES )); then raw "<p class=\"muted\">… diff truncado: mostrando $(( REPORT_MAX_BYTES / 1024 )) KB de $(( bytes / 1024 )) KB ($n linhas).</p>"
+  elif (( n > max )); then raw "<p class=\"muted\">… diff truncado: $max de $n linhas.</p>"; fi
   raw $'\n'; return 0; }
 
 # ------------------------------------------------- lista de casos de teste ----

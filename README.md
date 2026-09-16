@@ -877,4 +877,11 @@ Licença: GPLv3 ou posterior. Ver [LICENSE](LICENSE).
 `gen-problem-json.sh` grava no json servível o campo `samples` (`[{name, input, output}]`), com os mesmos
 exemplos que o enunciado mostra (`stmt_sample_names`, em `statement-langs.sh`). Um teste oculto nunca
 entra nesse campo. O servidor serve esse campo em `/treino/problem` e `/contest/samples`; a CLI
-`moj-comp samples` e o botão **Exemplos** da web leem dali.
+`moj-comp samples` e o botão **Exemplos** da web leem dali. Tetos: `STMT_SAMPLE_MAX_BYTES` (256 KB)
+trunca o bloco no HTML com o aviso "Exemplo grande"; `STMT_SAMPLE_JSON_MAX_BYTES` (4 MB) troca o dado
+por `{name, size, too_big:true}`.
+
+### Tamanho do report
+
+`gen-report.sh` corta cada bloco embutido (entrada, stderr, diff, logs) em `REPORT_MAX_BYTES`
+(64 KB) além do corte por linhas — uma linha de 1 MB não entra inteira.

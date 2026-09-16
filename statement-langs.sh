@@ -64,6 +64,10 @@ stmt_label(){ # <lang> <chave>
     pt:input)    printf 'Entrada';;     en:input)    printf 'Input';;       es:input)    printf 'Entrada';;
     pt:output)   printf 'Saída';;       en:output)   printf 'Output';;      es:output)   printf 'Salida';;
     pt:note)     printf 'Explicação';;  en:note)     printf 'Explanation';; es:note)     printf 'Explicación';;
+    # `%s` são placeholders p/ o printf do CHAMADOR (tamanho mostrado, tamanho real): `printf '%s'` os preserva
+    pt:truncated) printf '%s' 'Exemplo grande: mostrando %s de %s — baixe o arquivo inteiro pelo botão Exemplos.';;
+    en:truncated) printf '%s' 'Large sample: showing %s of %s — download the whole file with the Samples button.';;
+    es:truncated) printf '%s' 'Ejemplo grande: mostrando %s de %s — descargue el archivo completo con el botón Ejemplos.';;
     *) printf '%s' "$2";;
   esac
 }
@@ -98,13 +102,26 @@ stmt_sample_names(){
 # stmt_samples_json <pkg> — [{name,input,output}] dos exemplos (texto cru, bytes preservados —
 # jq --rawfile), só os pares com input E output, na mesma seleção do HTML. É o que /treino/problem
 # e /contest/samples servem (botão ⬇ Exemplos e `moj-comp samples`). Vazio = [].
+# Tetos (2026-09-16 — um sample de 214 MB virou um json de 856 MB servido a anônimos):
+#   STMT_SAMPLE_MAX_BYTES      (256 KB) — o HTML mostra só o começo + aviso (label `truncated`);
+#   STMT_SAMPLE_JSON_MAX_BYTES (4 MB)   — acima disso o json leva {name,size,too_big:true} sem os bytes
+#                                          (o botão Exemplos e o moj-comp pulam com aviso).
+: "${STMT_SAMPLE_MAX_BYTES:=262144}"
+: "${STMT_SAMPLE_JSON_MAX_BYTES:=4194304}"
+_stmt_fsize(){ stat -c%s "$1" 2>/dev/null || wc -c < "$1"; }
+_stmt_human(){ local b="$1"; if (( b >= 1048576 )); then printf '%d MB' $(( b / 1048576 )); elif (( b >= 1024 )); then printf '%d KB' $(( b / 1024 )); else printf '%d B' "$b"; fi; }
 stmt_samples_json(){
-  local pkg="$1" s in out acc; acc="$(mktemp)"; : > "$acc"
+  local pkg="$1" s in out acc si so; acc="$(mktemp)"; : > "$acc"
   while IFS= read -r s; do
     [[ -n "$s" && "$s" != */* ]] || continue
     in="$pkg/tests/input/$s"; out="$pkg/tests/output/$s"
     [[ -f "$in" && -f "$out" ]] || continue
-    jq -cn --arg n "$s" --rawfile i "$in" --rawfile o "$out" '{name:$n, input:$i, output:$o}' >> "$acc"
+    si="$(_stmt_fsize "$in")"; so="$(_stmt_fsize "$out")"
+    if (( si > STMT_SAMPLE_JSON_MAX_BYTES || so > STMT_SAMPLE_JSON_MAX_BYTES )); then
+      jq -cn --arg n "$s" --argjson sz "$(( si + so ))" '{name:$n, size:$sz, too_big:true}' >> "$acc"
+    else
+      jq -cn --arg n "$s" --rawfile i "$in" --rawfile o "$out" '{name:$n, input:$i, output:$o}' >> "$acc"
+    fi
   done < <(stmt_sample_names "$pkg")
   jq -cs '.' "$acc" 2>/dev/null || echo '[]'
   rm -f "$acc"; return 0
@@ -114,14 +131,20 @@ stmt_samples_html(){
   local -a S=("$@")
   (( ${#S[@]} == 0 )) && mapfile -t S < <(stmt_sample_names "$pkg")
   local notesf="$pkg/docs/sample-notes.json" s in out note nf nh i=0 n=0 body="" sa
-  local l_in l_out l_note; l_in="$(stmt_label "$lang" input)"; l_out="$(stmt_label "$lang" output)"; l_note="$(stmt_label "$lang" note)"
+  local l_in l_out l_note l_tr; l_in="$(stmt_label "$lang" input)"; l_out="$(stmt_label "$lang" output)"; l_note="$(stmt_label "$lang" note)"; l_tr="$(stmt_label "$lang" truncated)"
+  # _blk <arquivo> <kind>: o <pre> (cortado em STMT_SAMPLE_MAX_BYTES) + o aviso DEPOIS do </pre> —
+  # o botão Copiar da web casa `h3+pre`; o texto copiado nunca leva o aviso
+  _blk(){ local f="$1" k="$2" sz; sz="$(_stmt_fsize "$f")"
+    printf '<pre data-sample="%s" data-kind="%s">' "$sa" "$k"; head -c "$STMT_SAMPLE_MAX_BYTES" "$f" | _stmt_esc; printf '</pre>'
+    (( sz > STMT_SAMPLE_MAX_BYTES )) && printf '<p class="moj-exemplo-trunc">'"$l_tr"'</p>' "$(_stmt_human "$STMT_SAMPLE_MAX_BYTES")" "$(_stmt_human "$sz")"
+    return 0; }
   for s in "${S[@]}"; do
     in="$pkg/tests/input/$s"; out="$pkg/tests/output/$s"
     if [[ -f "$in" && -f "$out" ]]; then
       # data-sample/data-kind: o gancho do botão "Copiar" da web (só marcação; o nome saneado p/ atributo)
       sa="${s//[^A-Za-z0-9._-]/_}"
-      body+="<div class=\"moj-exemplo\"><h3>$l_in</h3><pre data-sample=\"$sa\" data-kind=\"input\">$(_stmt_esc < "$in")</pre>"
-      body+="<h3>$l_out</h3><pre data-sample=\"$sa\" data-kind=\"output\">$(_stmt_esc < "$out")</pre>"
+      body+="<div class=\"moj-exemplo\"><h3>$l_in</h3>$(_blk "$in" input)"
+      body+="<h3>$l_out</h3>$(_blk "$out" output)"
       note=""
       if nf="$(stmt_note_file "$pkg" "$s" "$lang")"; then note="$(cat "$nf")"
       elif [[ -f "$notesf" ]]; then note="$(jq -r --argjson k "$i" '.[$k] // ""' "$notesf" 2>/dev/null)"; fi   # legado, por índice

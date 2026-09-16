@@ -197,3 +197,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   do json servível gerado pelo `gen-problem-json.sh`) usam a mesma. Por construção o dado exposto pela
   API (`/treino/problem`, `/contest/samples`) é o que o enunciado já mostra — nunca varra `tests/input`
   inteiro em nenhum dos dois.
+
+- **Tetos de tamanho (2026-09-16)**: `gen-report.sh` `REPORT_MAX_BYTES` (64 KB por bloco — antes o corte
+  era só por linhas e havia report de 17 MB); `statement-langs.sh` `STMT_SAMPLE_MAX_BYTES` (256 KB no HTML,
+  aviso `stmt_label truncated` DEPOIS do `</pre>` — o botão Copiar da web casa `h3+pre`) e
+  `STMT_SAMPLE_JSON_MAX_BYTES` (4 MB; acima = `too_big` sem bytes). `gen-problem-json.sh` publica por
+  HARDLINK (`ln -f`) do json privado. Teste: `cdmoj/server/test/smoke-report-caps.sh`.

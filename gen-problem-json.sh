@@ -204,7 +204,9 @@ printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"         # não deixa 
 CACHE="$(dirname "$TREINO_JSONS")/problems.json"
 if [[ "$public" == true ]]; then
   ptmp="$TREINO_JSONS/.$ID.pub.tmp"
-  cp -f "$priv" "$ptmp" && mv -f "$ptmp" "$TREINO_JSONS/$ID.json"  # publicação ATÔMICA (rename)
+  # HARDLINK (2026-09-16), não cópia: eram 2 GB duplicados. Seguro porque TODO escritor dos dois
+  # caminhos grava tmp+mv (nunca em lugar) — o link se desfaz sozinho na próxima escrita.
+  { ln -f "$priv" "$ptmp" 2>/dev/null || cp -f "$priv" "$ptmp"; } && mv -f "$ptmp" "$TREINO_JSONS/$ID.json"  # publicação ATÔMICA (rename)
   rm -f "$CACHE"
   echo "gen-problem-json: $ID publicado (title='$title', exemplos=$n, idiomas=${langs_json})"
 else
