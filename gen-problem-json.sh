@@ -156,6 +156,10 @@ for lang in $LANGS; do
   B64F[$lang]="$b64f"; LTITLE[$lang]="$ltitle"
 done
 [[ -n "${B64F[pt]:-}" ]] || { echo "gen-problem-json: sem enunciado PT renderizado p/ $ID" >&2; exit 2; }
+# samples como DADO ([{name,input,output}]): a MESMA seleção do HTML (stmt_sample_names) — nunca
+# tests/input inteiro; é o que /treino/problem e /contest/samples servem (2026-09-16). Em arquivo
+# (--slurpfile), como o resto: nada de dado de pacote em argv do jq.
+samples_f="$(mktemp)"; stmt_samples_json "$PKG" > "$samples_f"
 b64f="${B64F[pt]}"
 # statements (só os idiomas não-PT) montado em ARQUIVO, um --rawfile por idioma (nunca argv)
 stmts_f="$(mktemp)"; printf '{}' > "$stmts_f"; langs_json='["pt"]'
@@ -186,11 +190,11 @@ mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 # ainda não é servido (defesa em profundidade; json legado sem o campo continua passando).
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
-  --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" \
+  --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
-    statement_langs:$slangs, statement_html_b64:$html}
+    statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // [])}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"
-rm -f "$b64f" "$stmts_f"
+rm -f "$b64f" "$stmts_f" "$samples_f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"
 tmpj="$(dirname "$priv")/.$ID.tmp"                                 # tmp no dir PRIVADO: um mv falho
 printf '%s' "$out_json" > "$tmpj" && mv -f "$tmpj" "$priv"         # não deixa lixo no dir PÚBLICO

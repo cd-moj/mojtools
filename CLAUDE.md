@@ -190,3 +190,10 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   aponta p/ ele, nunca se redescreve (a divergência de cópias já gerou o bug do título vazio).
   Lembre: o **título** vem do campo `display_title` (o `% Título` do enunciado é legado — o
   `render-statement.sh` o remove e injeta o `<h1>` a partir do campo).
+
+- **Exemplos como dado (2026-09-16)**: `stmt_sample_names <pkg>` é a SELEÇÃO ÚNICA dos exemplos (arquivo
+  `samples` › `tests/input/sample*` › primeiros `SAMPLE_LIMIT`); `stmt_samples_html` (HTML, agora com
+  `data-sample`/`data-kind` nos `<pre>`) e `stmt_samples_json` (`[{name,input,output}]`, campo `samples`
+  do json servível gerado pelo `gen-problem-json.sh`) usam a mesma. Por construção o dado exposto pela
+  API (`/treino/problem`, `/contest/samples`) é o que o enunciado já mostra — nunca varra `tests/input`
+  inteiro em nenhum dos dois.

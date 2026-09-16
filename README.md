@@ -871,3 +871,10 @@ make check          # bash -n em todos os .sh
 ```
 
 Licença: GPLv3 ou posterior. Ver [LICENSE](LICENSE).
+
+### Exemplos como dado
+
+`gen-problem-json.sh` grava no json servível o campo `samples` (`[{name, input, output}]`), com os mesmos
+exemplos que o enunciado mostra (`stmt_sample_names`, em `statement-langs.sh`). Um teste oculto nunca
+entra nesse campo. O servidor serve esse campo em `/treino/problem` e `/contest/samples`; a CLI
+`moj-comp samples` e o botão **Exemplos** da web leem dali.

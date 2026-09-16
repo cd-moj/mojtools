@@ -81,24 +81,47 @@ _stmt_esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
 # stmt_samples_html <pkg> <lang> [sample...] — o ÚNICO gerador do HTML dos exemplos (o gen-problem-json
 # e o preview do editor chamam isto; antes cada um tinha o seu e divergiam em h3×h4). Sem a lista de
-# samples, descobre: arquivo `samples` > tests/input/sample* (ls -1v) > primeiros SAMPLE_LIMIT de tests/input.
+# samples: a seleção é de `stmt_sample_names` (arquivo `samples` > tests/input/sample* > primeiros SAMPLE_LIMIT).
 # A nota vem de stmt_note_file (idioma > PT) e passa pelo pandoc com resource-path em docs/ (figura na
 # nota funciona como no enunciado). Rótulo "Explicação" só quando há nota. Vazio se não há par input/output.
+# stmt_sample_names <pkg> — A SELEÇÃO dos exemplos, um nome por linha (fonte única: o HTML dos
+# exemplos E o campo `samples` do json servível saem DAQUI — por construção o dado exposto é o
+# mesmo conjunto que o enunciado já mostra; teste oculto nunca entra). Ordem: arquivo `samples` ›
+# tests/input/sample* (ls -1v) › primeiros SAMPLE_LIMIT de tests/input (legado sem `sample*`).
+stmt_sample_names(){
+  local pkg="$1"
+  if [[ -f "$pkg/samples" ]]; then grep -vE '^[[:space:]]*$' "$pkg/samples"
+  elif compgen -G "$pkg/tests/input/sample*" >/dev/null 2>&1; then (cd "$pkg/tests/input" && ls -1v sample* 2>/dev/null)
+  else ls -1 "$pkg/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT"; fi
+  return 0
+}
+# stmt_samples_json <pkg> — [{name,input,output}] dos exemplos (texto cru, bytes preservados —
+# jq --rawfile), só os pares com input E output, na mesma seleção do HTML. É o que /treino/problem
+# e /contest/samples servem (botão ⬇ Exemplos e `moj-comp samples`). Vazio = [].
+stmt_samples_json(){
+  local pkg="$1" s in out acc; acc="$(mktemp)"; : > "$acc"
+  while IFS= read -r s; do
+    [[ -n "$s" && "$s" != */* ]] || continue
+    in="$pkg/tests/input/$s"; out="$pkg/tests/output/$s"
+    [[ -f "$in" && -f "$out" ]] || continue
+    jq -cn --arg n "$s" --rawfile i "$in" --rawfile o "$out" '{name:$n, input:$i, output:$o}' >> "$acc"
+  done < <(stmt_sample_names "$pkg")
+  jq -cs '.' "$acc" 2>/dev/null || echo '[]'
+  rm -f "$acc"; return 0
+}
 stmt_samples_html(){
   local pkg="$1" lang="${2:-pt}"; shift 2 || shift $#
   local -a S=("$@")
-  if (( ${#S[@]} == 0 )); then
-    if [[ -f "$pkg/samples" ]]; then mapfile -t S < <(grep -vE '^[[:space:]]*$' "$pkg/samples")
-    elif compgen -G "$pkg/tests/input/sample*" >/dev/null 2>&1; then mapfile -t S < <(cd "$pkg/tests/input" && ls -1v sample* 2>/dev/null)
-    else mapfile -t S < <(ls -1 "$pkg/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT"); fi
-  fi
-  local notesf="$pkg/docs/sample-notes.json" s in out note nf nh i=0 n=0 body=""
+  (( ${#S[@]} == 0 )) && mapfile -t S < <(stmt_sample_names "$pkg")
+  local notesf="$pkg/docs/sample-notes.json" s in out note nf nh i=0 n=0 body="" sa
   local l_in l_out l_note; l_in="$(stmt_label "$lang" input)"; l_out="$(stmt_label "$lang" output)"; l_note="$(stmt_label "$lang" note)"
   for s in "${S[@]}"; do
     in="$pkg/tests/input/$s"; out="$pkg/tests/output/$s"
     if [[ -f "$in" && -f "$out" ]]; then
-      body+="<div class=\"moj-exemplo\"><h3>$l_in</h3><pre>$(_stmt_esc < "$in")</pre>"
-      body+="<h3>$l_out</h3><pre>$(_stmt_esc < "$out")</pre>"
+      # data-sample/data-kind: o gancho do botão "Copiar" da web (só marcação; o nome saneado p/ atributo)
+      sa="${s//[^A-Za-z0-9._-]/_}"
+      body+="<div class=\"moj-exemplo\"><h3>$l_in</h3><pre data-sample=\"$sa\" data-kind=\"input\">$(_stmt_esc < "$in")</pre>"
+      body+="<h3>$l_out</h3><pre data-sample=\"$sa\" data-kind=\"output\">$(_stmt_esc < "$out")</pre>"
       note=""
       if nf="$(stmt_note_file "$pkg" "$s" "$lang")"; then note="$(cat "$nf")"
       elif [[ -f "$notesf" ]]; then note="$(jq -r --argjson k "$i" '.[$k] // ""' "$notesf" 2>/dev/null)"; fi   # legado, por índice
