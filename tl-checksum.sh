@@ -11,10 +11,23 @@
 # juiz julgando com tests/score de uma iteração anterior p/ sempre). Enunciado e tags NÃO
 # entram. Mudou a cobertura? re-stampar os checksums guardados (run/tl/*.json) em vez de
 # recalibrar tudo — o pacote não mudou, só a função de hash.
-#   uso: tl-checksum.sh <pkgdir>     ->  ex.: 3f9a1c0b8e7d6a5b
+#   uso: tl-checksum.sh <pkgdir>                ->  ex.: 3f9a1c0b8e7d6a5b
+#
+# `--all-sols` = VERSÃO DO PACOTE (pkg_version): o mesmo stream mais `sols/` INTEIRO (pass, slow,
+# wrong, upcoming). É a chave com que o JUIZ decide re-baixar o pacote e a identidade de uma
+# calibração. Por que separada: o checksum de cima só pode mudar quando o TL/veredicto muda (senão
+# o contest esconde o tempo-limite até alguém recalibrar), mas TODA mexida em solução tem de chegar
+# ao juiz — sem isto ele recalibrava o `sols/` do cache velho, julgando solução apagada e ignorando
+# a nova (relato do Arthur Botelho, 2026-09-20: o mesmo checksum em 3 juízes com 3 conjuntos
+# diferentes de solução).
+#   uso: tl-checksum.sh --all-sols <pkgdir>
 set -u
-pkg="${1:?uso: tl-checksum.sh <pkgdir>}"
+ALL_SOLS=0
+[[ "${1:-}" == --all-sols ]] && { ALL_SOLS=1; shift; }
+pkg="${1:?uso: tl-checksum.sh [--all-sols] <pkgdir>}"
 [[ -d "$pkg" ]] || { echo "tl-checksum: pacote inexistente: $pkg" >&2; exit 1; }
+SOLDIRS=(sols/good)
+(( ALL_SOLS )) && SOLDIRS+=(sols/pass sols/slow sols/wrong sols/upcoming)
 {
   # conf: calibrafactor/ULIMITS/CALIBRATIONTL/ALLOWPARALLELTEST/etc. mudam o TL
   if [[ -f "$pkg/conf" ]]; then printf '=conf\n'; cat "$pkg/conf"; printf '\n'; fi
@@ -23,7 +36,7 @@ pkg="${1:?uso: tl-checksum.sh <pkgdir>}"
   # saída esperada (o árbitro corrige) e um push que materializasse outputs vazios mudava
   # o hash ⇒ recalibração espúria eterna. Vazio não muda veredicto nem TL de ninguém:
   # p/ quem compara com diff, expected vazio ausente e presente são o mesmo julgamento.
-  for d in tests/input tests/output tests/score sols/good; do
+  for d in tests/input tests/output tests/score "${SOLDIRS[@]}"; do
     if [[ -f "$pkg/$d" ]]; then   # tests/score é ARQUIVO
       printf '=%s\n' "$d"; cat "$pkg/$d"; printf '\n'; continue
     fi

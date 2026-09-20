@@ -107,10 +107,15 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   compila ⇒ **UE em todo teste**) nasceu replicado em **198 pacotes** — o conserto no mojtools
   não alcançava nenhum. O `+x` dos stubs é load-bearing (o `make check` confere no índice do
   git): o handler de `script-templates` do cdmoj copia p/ o pacote o bit **do alvo** do symlink.
-- `tl-checksum.sh` — checksum do pacote p/ invalidar o TL **e o cache do juiz** quando muda: cobre
-  `conf` + `tests/{input,output,score}` + `sols/good` + `scripts` (tudo que muda TL OU veredicto —
-  `tests/score`/`output` entraram em 2026-07-19: fora do hash, um score corrigido nunca chegava ao
-  juiz; mudou a cobertura? RE-STAMPE os checksums de `run/tl/*.json` em vez de recalibrar tudo).
+- `tl-checksum.sh` — **DOIS carimbos, um programa**. Sem flag = o ESTREITO (`tl_checksum`, o que
+  invalida o TL): `conf` + `tests/{input,output,score}` + `sols/good` + `scripts` (tudo que muda TL
+  OU veredicto — `tests/score`/`output` entraram em 2026-07-19: fora do hash, um score corrigido
+  nunca chegava ao juiz; mudou a cobertura? RE-STAMPE os checksums de `run/tl/*.json` em vez de
+  recalibrar tudo). Com **`--all-sols`** = a VERSÃO do pacote (`pkg_version`), que soma
+  `sols/{pass,slow,wrong,upcoming}` e é a **chave do cache do juiz** (`/judge/package-meta`).
+  ⚠ Os dois papéis não cabem num carimbo só: alargar o estreito faria o TL sumir da prova a cada
+  solução salva, e mantê-lo estreito fazia o "Calibrar" rodar o `sols/` do cache velho — julgando
+  solução apagada e ignorando a nova (2026-09-20). Detalhes: `cdmoj/docs/PACOTE.md` §10.
   Também é **carimbado no
   índice de donos** por `gen-problem-owners.sh` (campo `tl_checksum`, SÓ p/ problemas já calibrados
   — têm `run/tl/<id>.json`) p/ a gestão comparar com o checksum calibrado e marcar "precisa

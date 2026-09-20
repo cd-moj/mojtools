@@ -617,22 +617,28 @@ o que saiu e o que era esperado. O HTML é autocontido.
 
 Você não costuma chamar este script: o `build-and-test.sh` já o chama no fim.
 
-### `tl-checksum.sh`: o checksum que invalida o tempo-limite
+### `tl-checksum.sh`: os dois carimbos do pacote
 
 ```
-tl-checksum.sh <pacote>      # imprime 16 dígitos hexadecimais
+tl-checksum.sh <pacote>              # 16 dígitos hex — o carimbo ESTREITO (tl_checksum)
+tl-checksum.sh --all-sols <pacote>   # 16 dígitos hex — a VERSÃO do pacote (pkg_version)
 ```
 
-O checksum cobre **o que pode mudar o tempo de execução OU o veredicto**: o `conf`, os
+O **estreito** cobre *o que pode mudar o tempo de execução ou o veredicto*: o `conf`, os
 `tests/{input,output,score}`, as `sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução).
 Em `tests/output`, arquivo **vazio conta como ausente** — sem isso um problema interativo (que não
 tem saída esperada) pedia recalibração para sempre.
 Não cobre o enunciado, as tags nem o autor.
 
 É por isso que **corrigir um typo no enunciado não força recalibração**, mas trocar um teste (entrada
-ou saída esperada), o `tests/score`, uma solução `good`, o `conf` ou um script força — o juiz usa
-este checksum para saber quando **re-baixar o pacote**, então tudo que muda o julgamento tem de
-entrar nele (fora dele, um `tests/score` corrigido nunca chegava ao juiz).
+ou saída esperada), o `tests/score`, uma solução `good`, o `conf` ou um script força.
+
+Com **`--all-sols`** entram também as `sols/{pass,slow,wrong,upcoming}`, e o resultado é a **versão
+do pacote**: é ela que o servidor devolve ao juiz em `/judge/package-meta`, e é comparando-a que o
+agente decide **re-baixar o pacote**. Por que dois carimbos: o estreito também é o que diz se o TL
+medido ainda vale, então ele não pode mudar quando o autor salva uma solução `wrong` (o tempo-limite
+sumiria da prova); mas o juiz precisa enxergar QUALQUER mudança em `sols/`, senão o "Calibrar" roda
+o `sols/` do cache velho — julgando solução já apagada e ignorando a recém-escrita (2026-09-20).
 
 ### `score-summary.sh`: pontuação por grupos
 
