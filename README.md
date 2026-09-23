@@ -101,6 +101,7 @@ Repare em duas coisas que **não** estão no arquivo:
   `% Soma` na primeira linha, o renderizador vai apagar (é um formato legado).
 - **Não há exemplo.** Os exemplos são montados a partir dos arquivos de teste, no passo seguinte, e
   injetados no fim do enunciado. Se você escrever um exemplo à mão aqui, ele vai aparecer duas vezes.
+  A exceção é o problema **sem exemplo** (`SAMPLE=no`, fim do Passo 3): nele o exemplo vai no texto.
 
 #### Enunciado em outros idiomas (opcional)
 
@@ -141,6 +142,23 @@ printf '5\n'    > tests/output/sample1
 
 O nome do arquivo de entrada e o do arquivo de saída têm que ser **iguais**. A validação confere isso
 nos dois sentidos.
+
+#### Problema sem exemplo: `SAMPLE=no`
+
+Em alguns problemas, entrada e saída de exemplo não fazem sentido para o aluno: submissão de
+função (a entrada é o formato interno do driver), problema interativo (a entrada é o cenário
+secreto do árbitro) e problema com linguagem própria, entre outros. Nesses casos:
+
+1. Não crie `tests/input/sample*`.
+2. Ponha a linha `SAMPLE=no` no `conf`. No editor web, é a opção **Sem exemplos** da aba
+   **Limites**. O `moj interactive` já grava essa linha.
+3. Explique o exemplo no texto do enunciado, numa seção `## Exemplo` (uma figura, uma chamada da
+   função, a transcrição da conversa com o árbitro).
+
+Com `SAMPLE=no`, o enunciado não mostra a caixa de exemplos e não há exemplo para baixar, nem se
+existirem arquivos `sample*` (eles continuam corrigindo, como qualquer teste). A validação exige
+uma das duas coisas: pelo menos um `sample*`, ou `SAMPLE=no`. **Teste oculto nunca aparece como
+exemplo.** A linha `SAMPLE` não entra no tl-checksum: marcar ou desmarcar não pede recalibração.
 
 ### Passo 4: criar os testes ocultos
 

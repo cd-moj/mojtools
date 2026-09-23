@@ -15,7 +15,9 @@
 #   html_builds_<lang>, secao_entrada_<lang>, secao_saida_<lang> — idem p/ cada tradução
 #                       docs/enunciado.<lang>.md presente (statement-langs.sh); nota de exemplo sem
 #                       tradução é aviso soft `nota-sem-traducao(<sample>,<lang>)` (cai na PT)
-#   examples_present  — >=1 par tests/input|output (exemplos sempre aparentes)
+#   examples_present  — >=1 exemplo tests/input/sample* com a saída, OU `SAMPLE=no` no conf (o
+#                       problema declarou que não tem exemplos: função, interativo, linguagem
+#                       própria… — o exemplo vai no texto). Teste oculto NUNCA conta como exemplo.
 #   tests_paired      — todo input tem output e vice-versa
 #   score_file_sane   — (se tests/score existe) toda linha é '<globs> - N pontos' (ou "#"),
 #                       todo teste casa um grupo e todo grupo de peso>0 casa >=1 teste
@@ -89,7 +91,8 @@ for _tl in $(stmt_langs_of "$PKG"); do
   done
 done
 # --- aviso SOFT (não bloqueia): exemplo embutido no texto -> deve vir da lista de exemplos ---
-if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
+# (com SAMPLE=no o texto É o lugar do exemplo: sem aviso)
+if ! stmt_no_samples "$PKG" && grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
   render_leak="${render_leak}exemplo-no-texto? "
 fi
 # --- aviso SOFT: notas de exemplo desemparelhadas (nota truncada/deslocada passava MUDA) ---
@@ -150,7 +153,15 @@ if [[ -d "$PKG/tests/output" ]]; then
   for f in "$PKG/tests/output/"*; do [[ -e "$f" ]] || continue; b="$(basename "$f")"
     [[ -f "$PKG/tests/input/$b" ]] || unpaired+="out:$b "; done
 fi
-(( npair >= 1 )) && add examples_present 1 "$npair par(es)" || add examples_present 0 "sem pares input/output"
+nsample=0
+if [[ -d "$PKG/tests/input" ]]; then
+  for f in "$PKG/tests/input/"sample*; do [[ -e "$f" && -f "$PKG/tests/output/$(basename "$f")" ]] && ((nsample++)); done
+fi
+if stmt_no_samples "$PKG"; then
+  add examples_present 1 "sem exemplos (SAMPLE=no no conf)"
+  (( nsample > 0 )) && render_leak="${render_leak}sample-oculto-por-SAMPLE=no($nsample) "
+elif (( nsample >= 1 )); then add examples_present 1 "$nsample exemplo(s)"
+else add examples_present 0 "sem exemplos: crie tests/input/sample1 e tests/output/sample1, ou declare SAMPLE=no no conf se o problema não tem exemplo (função, interativo…)"; fi
 [[ -z "$unpaired" ]] && add tests_paired 1 "$npair par(es)" || add tests_paired 0 "sem par: $unpaired"
 
 # --- score_file_sane (HARD): tests/score que não casa os testes vira grupo-fantasma "-1"/

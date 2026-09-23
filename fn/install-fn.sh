@@ -57,6 +57,9 @@ próximos passos:
   3. sols/good/ recebe SÓ a função (sem main); uma good POR linguagem liberada;
   4. restrinja `languages` do problema às linguagens COM driver (senão trocar de
      linguagem burla o esquema);
-  5. mexer em scripts/ muda o tl-checksum => o Painel vai pedir recalibração (correto).
+  5. mexer em scripts/ muda o tl-checksum => o Painel vai pedir recalibração (correto);
+  6. exemplo: se mostrar a entrada do driver não faz sentido p/ o aluno, declare SAMPLE=no no
+     conf e explique a chamada no texto do enunciado (seção ## Exemplo). Com exemplo, use um
+     tests/input/sample1 + uma nota docs/notes/sample1.md dizendo o que o driver faz com ele.
 guia completo: mojtools/docs/submissao-de-funcao.md
 DICAS

@@ -34,7 +34,6 @@ ID="${2:-$REPO#$PROB}"
 
 : "${CONTESTSDIR:=/home/ribas/moj/contests}"
 : "${TREINO_JSONS:=$CONTESTSDIR/treino/var/jsons}"
-: "${SAMPLE_LIMIT:=2}"                 # nº máximo de exemplos a injetar
 : "${MOJTOOLS_DIR:=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}"
 : "${MOJ_TL_STORE:=${RUNDIR:-/home/ribas/moj/run}/tl}"   # TLs reportados pelos juízes
 HOSTNAME="${HOSTNAME:-$(hostname)}"

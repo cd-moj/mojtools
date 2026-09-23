@@ -176,7 +176,10 @@ bash mojtools/interactive/install-interactive.sh <pacote> arbitro.py --score   #
 #    -> scripts/arbitro.*, scripts/c/{prep,run}.sh + symlinks p/ TODAS as linguagens,
 #       scripts/compare.sh (e scripts/summary.sh com --score); roda um smoke do árbitro
 
-# 3. conf recomendado (o instalador avisa se faltar):
+# 3. conf recomendado (o instalador grava o SAMPLE=no e avisa se faltar o resto):
+#    SAMPLE=no                      # sem caixa de exemplo: a "entrada" é o cenário SECRETO do
+#                                   # árbitro. O exemplo vai no TEXTO (## Exemplo, a conversa
+#                                   # juiz↔jogador em duas colunas). Não crie tests/input/sample*.
 #    ULIMITS[-u]=10000              # interativo roda 2+ processos
 #    TLMOD[calibrafactor]="10+1.5"  # o tempo do ÁRBITRO entra no TL: calibre com folga
 #    CALIBRATIONTL=5                # TL usado na calibração antes de existir tl

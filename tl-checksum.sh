@@ -29,8 +29,17 @@ pkg="${1:?uso: tl-checksum.sh [--all-sols] <pkgdir>}"
 SOLDIRS=(sols/good)
 (( ALL_SOLS )) && SOLDIRS+=(sols/pass sols/slow sols/wrong sols/upcoming)
 {
-  # conf: calibrafactor/ULIMITS/CALIBRATIONTL/ALLOWPARALLELTEST/etc. mudam o TL
-  if [[ -f "$pkg/conf" ]]; then printf '=conf\n'; cat "$pkg/conf"; printf '\n'; fi
+  # conf: calibrafactor/ULIMITS/CALIBRATIONTL/ALLOWPARALLELTEST/etc. mudam o TL. A linha SAMPLE
+  # (exemplos no enunciado, statement-langs.sh) NÃO muda julgamento nem TL: fica de fora, senão
+  # marcar "sem exemplos" pediria recalibração e o TL sumiria da prova até o juiz refazer. Só
+  # filtra quando a linha EXISTE (conf sem SAMPLE dá o MESMO hash de antes, byte a byte — 1.500
+  # pacotes carimbados), e com `sed`, não `grep -v`: o grep repõe o \n final que falte e mudaria o
+  # hash de conf sem \n no fim. Por isso quem ACRESCENTA a linha num conf assim a põe no COMEÇO
+  # (server/bin/sample-flag-migrate.sh); o editor/API já normalizam o \n final ao gravar.
+  if [[ -f "$pkg/conf" ]]; then printf '=conf\n'
+    if grep -qE '^[[:space:]]*SAMPLE[[:space:]]*=' "$pkg/conf"; then sed -E '/^[[:space:]]*SAMPLE[[:space:]]*=/d' "$pkg/conf"
+    else cat "$pkg/conf"; fi
+    printf '\n'; fi
   # testes (entrada + saída esperada + grupos do score) + soluções "good".
   # Em tests/output, arquivo VAZIO ≡ AUSENTE (find -size +0c): interativo puro não tem
   # saída esperada (o árbitro corrige) e um push que materializasse outputs vazios mudava

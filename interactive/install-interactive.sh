@@ -82,8 +82,14 @@ if (( SCORE )); then
   chmod +x "$PKG/scripts/summary.sh"
 fi
 
-# conf: só AVISA (não edita) sobre o que interativo costuma precisar
+# conf: interativo NÃO tem exemplo de entrada/saída (a "entrada" é o cenário secreto do árbitro):
+# grava SAMPLE=no (o exemplo vai no texto, como transcrição da conversa — docs/problema-interativo.md).
+# O resto só AVISA (não edita).
 conf="$PKG/conf"
+if ! grep -qE '^[[:space:]]*SAMPLE[[:space:]]*=' "$conf" 2>/dev/null; then
+  { [[ -s "$conf" && -n "$(tail -c1 "$conf")" ]] && printf '\n'; printf 'SAMPLE=no\n'; } >> "$conf"
+  echo "conf: SAMPLE=no (interativo não mostra caixa de exemplo; ponha o exemplo no texto, seção ## Exemplo)"
+fi
 grep -q 'ULIMITS\[-u\]' "$conf" 2>/dev/null || \
   echo "aviso: conf sem ULIMITS[-u] — interativo roda 2+ processos; recomende ULIMITS[-u]=10000"
 grep -q 'TLMOD\[calibrafactor\]' "$conf" 2>/dev/null || \

@@ -42,7 +42,14 @@ Depois:
 2. todo `tests/input/*` termina com a linha da **sentinela** `424242` (abaixo);
 3. restrinja **`languages`** do problema às linguagens COM driver;
 4. `moj push` + `moj validate`/`calibrate` como sempre (mexer em `scripts/` muda o
-   tl-checksum ⇒ o Painel pede recalibração — correto, aceite).
+   tl-checksum ⇒ o Painel pede recalibração — correto, aceite);
+5. **exemplo**: a entrada do teste é o formato INTERNO do driver, que o aluno não lê. Escolha um:
+   - **sem exemplo**: `SAMPLE=no` no `conf` (no editor web, **Sem exemplos** na aba Limites) e o
+     exemplo no TEXTO do enunciado — uma figura, uma chamada da função e o que ela devolve ou
+     imprime. Não crie `tests/input/sample*`;
+   - **com exemplo**: um `tests/input/sample1` no formato do driver + `docs/notes/sample1.md`
+     dizendo o que o corretor faz com aquela entrada ("monta esta árvore e chama `bfs(t)`").
+   Sem `sample*` e sem `SAMPLE=no` a validação reprova — teste oculto nunca vira exemplo.
 
 ## Compõe com checker (e o que NÃO compõe)
 

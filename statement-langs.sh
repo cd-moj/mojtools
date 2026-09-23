@@ -23,10 +23,10 @@
 #   stmt_label <lang> <chave>         -> rótulo fixo dos exemplos (examples|input|output|note)
 #   stmt_html_lang <lang>             -> valor do atributo <html lang=…>
 #   stmt_samples_html <pkg> <lang> [samples...] -> HTML da seção de exemplos (stdout)
+#   stmt_no_samples <pkg>             -> 0 se o conf declara SAMPLE=no (problema SEM exemplos)
 #   stmt_title <pkg> <lang>           -> titles[lang] // display_title // "" (do .moj-meta.json)
 
 : "${STMT_LANGS_ALL:=pt en es}"
-: "${SAMPLE_LIMIT:=2}"
 
 stmt_langs_all(){ printf '%s' "$STMT_LANGS_ALL"; }
 stmt_lang_ok(){ case " $STMT_LANGS_ALL " in *" $1 "*) return 0;; *) return 1;; esac; }
@@ -85,18 +85,29 @@ _stmt_esc(){ sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
 # stmt_samples_html <pkg> <lang> [sample...] — o ÚNICO gerador do HTML dos exemplos (o gen-problem-json
 # e o preview do editor chamam isto; antes cada um tinha o seu e divergiam em h3×h4). Sem a lista de
-# samples: a seleção é de `stmt_sample_names` (arquivo `samples` > tests/input/sample* > primeiros SAMPLE_LIMIT).
+# samples: a seleção é de `stmt_sample_names` (tests/input/sample*, ou nada com SAMPLE=no no conf).
 # A nota vem de stmt_note_file (idioma > PT) e passa pelo pandoc com resource-path em docs/ (figura na
 # nota funciona como no enunciado). Rótulo "Explicação" só quando há nota. Vazio se não há par input/output.
+# stmt_no_samples <pkg> — o autor declarou `SAMPLE=no` no conf: o problema NÃO tem exemplos
+# (submissão de função, interativo, linguagem própria… — onde entrada/saída de exemplo não fazem
+# sentido; o exemplo, se houver, vai no TEXTO do enunciado). Aceita no|n|nao|não|false|0, com ou
+# sem aspas. O conf é código do AUTOR e isto roda no servidor: lido por grep, NUNCA source.
+stmt_no_samples(){
+  [[ -f "$1/conf" ]] || return 1
+  grep -qiE '^[[:space:]]*SAMPLE[[:space:]]*=[[:space:]]*["'"'"']?(no|n|nao|não|false|0)["'"'"']?[[:space:]]*(#.*)?$' "$1/conf"
+}
 # stmt_sample_names <pkg> — A SELEÇÃO dos exemplos, um nome por linha (fonte única: o HTML dos
 # exemplos E o campo `samples` do json servível saem DAQUI — por construção o dado exposto é o
-# mesmo conjunto que o enunciado já mostra; teste oculto nunca entra). Ordem: arquivo `samples` ›
-# tests/input/sample* (ls -1v) › primeiros SAMPLE_LIMIT de tests/input (legado sem `sample*`).
+# mesmo conjunto que o enunciado já mostra). Exemplo é SÓ tests/input/sample* (ls -1v); com
+# `SAMPLE=no` no conf, NADA (nem os sample* que existirem: eles seguem sendo testes). Teste oculto
+# NUNCA vira exemplo: até 2026-09-23 havia um fallback de legado que mostrava os 2 primeiros testes
+# quando faltava `sample*` — em problema de função ele exibia o formato interno do driver (relato do
+# Daniel Saad, saad-arvores-bfs-fn). O arquivo `samples` (lista) também saiu: nunca teve conteúdo em
+# produção, só servia de "sem exemplos" — papel que agora é do SAMPLE=no.
 stmt_sample_names(){
   local pkg="$1"
-  if [[ -f "$pkg/samples" ]]; then grep -vE '^[[:space:]]*$' "$pkg/samples"
-  elif compgen -G "$pkg/tests/input/sample*" >/dev/null 2>&1; then (cd "$pkg/tests/input" && ls -1v sample* 2>/dev/null)
-  else ls -1 "$pkg/tests/input" 2>/dev/null | head -n "$SAMPLE_LIMIT"; fi
+  stmt_no_samples "$pkg" && return 0
+  if compgen -G "$pkg/tests/input/sample*" >/dev/null 2>&1; then (cd "$pkg/tests/input" && ls -1v sample* 2>/dev/null); fi
   return 0
 }
 # stmt_samples_json <pkg> — [{name,input,output}] dos exemplos (texto cru, bytes preservados —

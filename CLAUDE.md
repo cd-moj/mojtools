@@ -48,6 +48,15 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   **`stmt_samples_html <pkg> <lang> [samples…]`** — o ÚNICO gerador do HTML dos exemplos (h3 +
   nota por idioma), usado pelo `gen-problem-json.sh` E pelo `problems/preview.sh` do cdmoj (a cópia
   do preview usava h4 e divergia). Quem procura arquivo de enunciado por idioma chama isto.
+  **EXEMPLO = SÓ `tests/input/sample*`** (`stmt_sample_names`, fonte única do HTML E do campo
+  `samples` do json — botão Exemplos, `/contest/samples`, `moj-comp samples`). Problema sem exemplo
+  (função, interativo, linguagem própria…) declara **`SAMPLE=no` no `conf`** (`stmt_no_samples`, lido
+  por grep — NUNCA source; aceita no|n|nao|não|false|0): nada vira exemplo, nem os `sample*` que
+  existam. **Teste oculto nunca vira exemplo** — em 2026-09-23 saíram o fallback que mostrava os 2
+  primeiros testes quando faltava `sample*` (em função, o formato interno do driver: relato do Daniel
+  Saad) e o arquivo `samples` (lista; vazio = sem exemplos). O validador exige `sample*` OU `SAMPLE=no`
+  (`examples_present`); `install-interactive.sh` grava `SAMPLE=no`. A mesma regra está no editor web
+  (`sampleOff`) e na CLI (`sample_off`) — mexeu numa, mexa nas três.
 - `render-statement.sh <enunf> [fmt=md] [exemplos.html] [titulo] [lang=pt]` — **renderizador único** do
   enunciado (pandoc standalone, `--mathml --embed-resources`). **= o "Pré-visualizar" do editor
   = o HTML servido.** Injeta `<h1 class="moj-title">` do título e remove `% Título` legado. Blocos
@@ -108,7 +117,8 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   não alcançava nenhum. O `+x` dos stubs é load-bearing (o `make check` confere no índice do
   git): o handler de `script-templates` do cdmoj copia p/ o pacote o bit **do alvo** do symlink.
 - `tl-checksum.sh` — **DOIS carimbos, um programa**. Sem flag = o ESTREITO (`tl_checksum`, o que
-  invalida o TL): `conf` + `tests/{input,output,score}` + `sols/good` + `scripts` (tudo que muda TL
+  invalida o TL): `conf` (menos a linha `SAMPLE`, que não muda julgamento — filtrada por `sed`, só
+  quando existe, p/ conf sem ela e sem `\n` final dar o hash de sempre) + `tests/{input,output,score}` + `sols/good` + `scripts` (tudo que muda TL
   OU veredicto — `tests/score`/`output` entraram em 2026-07-19: fora do hash, um score corrigido
   nunca chegava ao juiz; mudou a cobertura? RE-STAMPE os checksums de `run/tl/*.json` em vez de
   recalibrar tudo). Com **`--all-sols`** = a VERSÃO do pacote (`pkg_version`), que soma
