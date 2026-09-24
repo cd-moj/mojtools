@@ -16,12 +16,27 @@
 # CWD (set -f) — o casamento é determinístico, independente de onde rodamos.
 #
 # Pontuação TUDO-OU-NADA por grupo: o grupo só vale seus pontos se TODOS os seus
-# testes derem AC. FINALRESP é sobrescrito com os pontos somados dos grupos 100%
-# aceitos (Accepted,100p quando completo; senão Wrong,<ganhos>p + detalhamento).
+# testes derem AC. Os grupos decidem só a NOTA; o VEREDICTO é o mesmo que os testes dariam
+# sem grupos — o pior veredicto por teste (SMALLRESP → VERDICTCANON, a MESMA conta do
+# build-and-test.sh). FINALRESP = "<veredicto canônico>,<pontos>p. Pontos | … [quantitativos …]":
+#     Accepted,100p. Pontos | 30 | 70 |                              (todos os grupos aceitos)
+#     Time Limit Exceeded,30p. Pontos | 30 | 0 | quantitativos TLE(2) AC(8)
+#     Wrong Answer,30p. … · Runtime Error,30p. … · Memory Limit Exceeded,30p. …
+# Até 24/09/2026 a falha saía SEMPRE "Wrong,<pontos>p" com VERDICT_CANON="Wrong Answer": o aluno
+# lia "resposta errada" num TLE/RE/MLE (relato do Ribas). O que o aluno vê é o PREFIXO desta string
+# (o history a guarda e o canon() do cdmoj corta na 1ª vírgula) — por isso FINALRESP e VERDICT_CANON
+# mudam JUNTOS. O history antigo fica como está ("Wrong,…"/"Wrong. Pontos …" → Wrong Answer).
+# O rótulo nunca tem dígito+"p": o 1º "NNp" da string É a nota (é o que o metrics do servidor lê).
+# PACOTE QUEBRADO (teste sem grupo; grupo de peso>0 sem teste com todos os testes AC) = Judge Error,
+# nota 0 — erro do pacote, não do aluno; o validate-problem.sh (score_file_sane) já barra os dois.
+# Grupo de peso 0 sem nenhum teste executado é VÁCUO: não derruba a submissão (o validate o aceita).
+# NUNCA um prefixo "Accepted" com grupo falho: ~20 leitores tratam "Accepted*" como resolvido.
 #
-# Variáveis de ambiente esperadas (já definidas por build-and-test.sh):
+# Variáveis de ambiente esperadas (já definidas por build-and-test.sh, que faz o `source`):
 #   PROBLEMTEMPLATEDIR  - diretório do pacote do problema (tem tests/score)
 #   workdirbase         - diretório de trabalho (tem log.verdictall: VERDICT[in]=..)
+#   SMALLRESP           - o pior veredicto por teste (código curto: AC/WA/TLE/MLE/RE/RE_NZEC/TMT/UE)
+#   VERDICTCANON        - mapa código curto -> veredicto canônico (o do caminho sem grupos)
 #   LOG()               - função de log (stderr)
 
 declare -A GROUPFFS      # nome-do-grupo  -> índice do grupo em GROUP[]
@@ -101,7 +116,11 @@ for (( g=0; g<${#GROUP[@]}; g++ )); do
   elif (( ${SOMA[$g,WRONG]:-0} > 0 )); then
     (( FAILED++ )); BREAK+=" 0 |"; GEARNED=0
   else
-    (( FAILED++ )); BREAK+=" -1 |"; GEARNED=null            # grupo sem nenhum teste executado
+    # grupo sem NENHUM teste executado. De peso 0 é VÁCUO (ex.: "sample* - 0 pontos" num problema
+    # SAMPLE=no — o validate-problem.sh o aceita, e contá-lo como falha derrubava TODA submissão
+    # perfeita). Não esconde falha: teste que falha sempre derruba o PRÓPRIO grupo, seja qual for o peso.
+    (( ${GROUP[$g]} == 0 )) && continue
+    (( FAILED++ )); BREAK+=" -1 |"; GEARNED=null            # de peso>0: pontos inalcançáveis
   fi
   (( ${GROUP[$g]} > 0 )) && GJSON+="${GJSON:+,}{\"earned\":$GEARNED,\"max\":${GROUP[$g]}}"
 done
@@ -113,19 +132,29 @@ if (( FAILED > 0 )); then
 fi
 
 # Accepted só quando NENHUM grupo falhou (todos com >=1 teste e todos AC); o valor é a soma
-# total dos pesos. Senão, soma dos pesos dos grupos 100% aceitos (pontuação parcial).
+# total dos pesos. Senão, soma dos pesos dos grupos 100% aceitos (pontuação parcial) com o
+# veredicto REAL do pior teste (ver o cabeçalho).
 # score estruturado por pontos (subtask): o backend casa pelo VERDICT_CANON e o treino mostra E/T pontos
 SCORE_KIND=points; SCORE_MAX=$TOTAL
 SCORE_GROUPS="[$GJSON]"; [[ -n "$NOGROUP" ]] && SCORE_GROUPS=""   # NOGROUP = erro de config, sem grupos
 if [[ -n "$NOGROUP" ]]; then
-  FINALRESP="Wrong,0p. teste '$NOGROUP' sem grupo em tests/score"
-  VERDICT_CANON="Wrong Answer"; SCORE=0
+  # pacote quebrado: não dá p/ pontuar. SMALLRESP=UE só pinta o banner do report de cinza (seria verde)
+  FINALRESP="Judge Error,0p. teste '$NOGROUP' sem grupo em tests/score (erro do pacote)"
+  VERDICT_CANON="Judge Error"; SCORE=0; SMALLRESP=UE
 elif (( FAILED == 0 )); then
   FINALRESP="Accepted,${TOTAL}p. $BREAK"
   VERDICT_CANON="Accepted"; SCORE=$TOTAL
 else
-  FINALRESP="Wrong,${EARNED}p. $BREAK$QUANT"
-  VERDICT_CANON="Wrong Answer"; SCORE=$EARNED
+  VERDICT_CANON="${VERDICTCANON[$SMALLRESP]:-}"
+  if [[ -z "$VERDICT_CANON" || "$VERDICT_CANON" == Accepted ]]; then
+    # todos os testes passaram e mesmo assim um grupo falhou: grupo de peso>0 sem teste = pacote
+    # quebrado. Nunca "Accepted" com grupo falho — e nunca culpa do aluno.
+    FINALRESP="Judge Error,0p. grupo sem teste em tests/score (erro do pacote). $BREAK$QUANT"
+    VERDICT_CANON="Judge Error"; SCORE=0; SMALLRESP=UE
+  else
+    FINALRESP="${VERDICT_CANON},${EARNED}p. $BREAK$QUANT"
+    SCORE=$EARNED
+  fi
 fi
 LOG ""
 LOG "- score-summary FINALRESP: $FINALRESP"

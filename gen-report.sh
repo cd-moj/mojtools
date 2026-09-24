@@ -242,7 +242,8 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
   total=${#FILES[@]}
   raw '<h3 style="margin:.4rem 0">Distribuição de veredictos</h3>'$'\n'
   raw '<div class="hbars">'$'\n'
-  for v in AC "AC,PE" WA TLE RE RE_NZEC TMT UE NT; do
+  # MLE entrou em 24/09/2026: faltava na lista e teste MLE sumia do gráfico (o mapa e a lista o mostravam)
+  for v in AC "AC,PE" WA TLE MLE RE RE_NZEC TMT UE NT; do
     c=${CNT[$v]:-0}; (( c == 0 )) && continue
     w=$(awk -v c="$c" -v t="$total" 'BEGIN{v=c/t*100; if(v<1.5)v=1.5; printf "%.1f", v}')
     raw "<div class=\"hbar-row\"><div class=\"hbar-label\">$(escs "$(fullname "$v")")</div>"
@@ -261,7 +262,7 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
   done
   raw $'\n''</div>'$'\n'
   raw '<div class="legend">'
-  for v in AC WA TLE RE NT; do
+  for v in AC WA TLE MLE RE NT; do
     raw "<span><span class=\"sw\" style=\"background:$(vcolor "$v")\"></span>$(fullname "$v")</span>"
   done
   raw '</div>'$'\n'

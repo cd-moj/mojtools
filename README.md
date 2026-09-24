@@ -338,6 +338,11 @@ mesmo (`aula_*` casa `aula_2_1`) e **todo teste precisa cair num grupo** — o `
 confere (check `score_file_sane`). Quem interpreta o arquivo é o `score-summary.sh`, sozinho, sem
 você precisar chamar nada.
 
+Os grupos decidem só a **nota**. O **veredito** que o aluno recebe é o mesmo que os testes dariam
+sem grupos — o pior teste: um grupo que caiu por estouro de tempo sai **Time Limit Exceeded** (com a
+nota dos grupos que passaram), não "resposta errada". Um grupo de peso 0 sem nenhum teste (ex.:
+`sample* - 0 pontos` num problema `SAMPLE=no`) não derruba nada.
+
 ### Checker (quando há mais de uma resposta certa)
 
 Se a resposta não é única (tolerância de ponto flutuante, várias ordens válidas, qualquer caminho
@@ -465,7 +470,9 @@ calibrar e para pontuação por grupos).
 
 - a **primeira linha** do stdout é o **diretório de trabalho**, onde ficam todos os artefatos;
 - a **última linha** do stdout é o **veredito**, com a nota embutida (`Accepted,100p`,
-  `Wrong Answer,40p`).
+  `Wrong Answer,40p`). Em problema **pontuado por grupos** vem o detalhe dos grupos depois da nota:
+  `Time Limit Exceeded,30p. Pontos | 30 | 0 | quantitativos TLE(2) AC(8)` (seção do
+  `score-summary.sh`, abaixo).
 
 Artefatos que ficam no diretório de trabalho (ele **não** é apagado; quem chamou é que recolhe):
 
@@ -731,6 +738,23 @@ o `sols/` do cache velho — julgando solução já apagada e ignorando a recém
 Não é um comando: é um trecho que o `build-and-test.sh` carrega sozinho quando o pacote tem
 `tests/score` (e não tem um `scripts/summary.sh` próprio). Interpreta os grupos, aplica o tudo ou nada
 por grupo, soma os pesos e reescreve o veredito com a nota.
+
+O veredito é o do **pior teste**, como no problema sem grupos (a mesma conta do `build-and-test.sh`:
+`SMALLRESP` → `VERDICT_CANON`); os grupos decidem só a nota. A última linha fica
+`<veredito canônico>,<pontos>p. Pontos | <por grupo> | [quantitativos <código>(<n>) …]`:
+
+| Situação | Última linha (exemplo) |
+|---|---|
+| todos os grupos aceitos | `Accepted,100p. Pontos \| 30 \| 70 \|` |
+| um grupo caiu; pior teste WA / TLE / MLE / RE | `Wrong Answer,30p. …` · `Time Limit Exceeded,30p. …` · `Memory Limit Exceeded,30p. …` · `Runtime Error,30p. …` |
+| pacote quebrado: teste sem grupo, ou grupo de peso>0 sem teste com todos os testes aceitos | `Judge Error,0p. teste 'x' sem grupo em tests/score (erro do pacote)` |
+
+O rótulo é o **canônico** (nunca `Possible Runtime Error, non-zero return`, que tem vírgula) e nunca
+tem dígito seguido de `p`: o primeiro `NNp` da linha é a nota, e é assim que o servidor a lê. Até
+24/09/2026 toda falha de grupo saía `Wrong,<n>p` — o aluno lia "resposta errada" num TLE. O
+histórico gravado antes disso fica como está (o servidor lê `Wrong` como Wrong Answer). Pacote
+quebrado é **Judge Error com nota 0**: erro do pacote, não do aluno (o `validate-problem.sh` já barra
+os dois casos). Teste: `make test-score` (`test-score-summary.sh`).
 
 ### `gen-problem-owners.sh`: o índice de donos (roda no servidor)
 

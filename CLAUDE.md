@@ -28,8 +28,8 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   **`SCORE_GROUPS`** (grupos estruturados: JSON `[{"earned":N|null,"max":N},…]` na ordem do
   `tests/score`, só grupos de peso>0 — `earned`=peso (passou) | `0` (falhou) | `null` (não
   executado); vazio = sem grupos) e `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout
-  **não muda** (compat). O banner do `report.html` mostra o **`VERDICT_CANON`** + detalhe
-  (pct de testes ou pontos/grupos).
+  **não muda** (compat; em problema com grupos a forma é a do `score-summary.sh`, abaixo). O banner
+  do `report.html` mostra o **`VERDICT_CANON`** + detalhe (pct de testes ou pontos/grupos).
 - **Paralelismo dos testes (24/09/2026)** no `build-and-test.sh`: cada teste roda em **k CPUs**
   (`CPUNEEDED` do conf, 1..64, default 1) e até **P** ao mesmo tempo. O AGENTE manda pelo ambiente
   e o ambiente VENCE conf/nproc: `MOJ_TEST_CPUS=k`, `MOJ_PARALLEL=P`, `MOJ_CPU_GROUPS="c0,c1|c2,c3|…"`
@@ -180,8 +180,17 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   checksum velho p/ sempre ⇒ "precisa recalibrar" fantasma no painel.
   (O antigo mirror/LFS/serviço externo foi removido no cut-over — ver `cdmoj`.)
   `score-summary.sh` — pontuação por grupos (o valor do problema é a **soma dos pesos**; pode
-  passar de 100). Além do `FINALRESP` legado (`Wrong,60p. Pontos | 30 | 0 |…`), emite o
-  **`SCORE_GROUPS`** estruturado (acima) p/ o backend servir grupos por submissão.
+  passar de 100). Os grupos decidem só a NOTA; o **veredicto é o do pior teste**, como sem grupos
+  (`VERDICTCANON[$SMALLRESP]`, do escopo do `build-and-test.sh`): `FINALRESP` =
+  `<veredicto canônico>,<n>p. Pontos | … quantitativos …` e `VERDICT_CANON` mudam JUNTOS — o que o
+  aluno vê é o PREFIXO do `FINALRESP` (o history o guarda e o `canon()` do cdmoj corta na 1ª vírgula).
+  Até 24/09/2026 era SEMPRE `Wrong,<n>p` + "Wrong Answer" (TLE/RE/MLE chegavam ao aluno como WA —
+  relato do Ribas). Regras: rótulo canônico (sem vírgula, sem dígito+`p` — o 1º `NNp` é a nota);
+  NUNCA prefixo `Accepted` com grupo falho; pacote quebrado (teste sem grupo; grupo de peso>0 sem teste
+  com tudo AC) = `Judge Error,0p. …` (e `SMALLRESP=UE`, só p/ a cor do banner); grupo de peso 0 sem
+  teste = vácuo. Emite também o **`SCORE_GROUPS`** estruturado (acima). Teste: `test-score-summary.sh`
+  (`make test-score`; cage-run FALSO: `xwa/xtle/xrte/xnz/xmle` no nome do teste). O `gen-report.sh`
+  ganhou MLE nas barras/legenda (testes MLE sumiam do gráfico).
 
 ## Regras
 
