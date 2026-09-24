@@ -30,7 +30,14 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   executado); vazio = sem grupos) e `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout
   **não muda** (compat). O banner do `report.html` mostra o **`VERDICT_CANON`** + detalhe
   (pct de testes ou pontos/grupos).
-- `gen-report.sh` — gera o `report.html` por submissão.
+- `gen-report.sh` — gera o `report.html` por submissão. O gráfico de tempo pinta pelo VEREDICTO e pela
+  tolerância: azul (≤ TL), amarelo (acima do TL e não-TLE = passou pela tolerância, `TL_DRIFT` do
+  `report.env`), cor de TLE (estourou) — nunca o vermelho do WA (um AC na tolerância saía vermelho, relato do
+  Daniel Saad 24/09/2026). Teste: `cdmoj/server/test/smoke-report-timing.sh`.
+- **Tolerância (drift)** no `build-and-test.sh`: `TLMOD[<lang>.drift]` › `TLMOD[default.drift]` (toda
+  linguagem sem a sua — pedido do Ribas) › 0, resolvida UMA vez em `TLDRIFT` (valor não-numérico = 0) e
+  gravada de volta em `TLMOD[<lang>.drift]`; TLE só quando `tempo − TL > TLDRIFT`. O servidor espelha a regra
+  por grep no juízo das soluções (`cdmoj lib/calib-expect.sh` `calx_drift`): mexeu numa, mexa na outra.
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL**, grava o
   vetor ESTRUTURADO **`.calib-sols.json`** (por solução, `{file,lang,category,verdict,tests:
   [{name,code,time,tl}]}` — mesmo formato do `tests` de submissão; o agente sobe como `sols`

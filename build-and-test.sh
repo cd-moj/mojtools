@@ -35,6 +35,7 @@ function write_report_env()
     printf 'TOOLCHAIN_VER=%q\n'      "${TOOLCHAIN_VER:-}"
     printf 'SRCBASENAME=%q\n'        "$(basename "$SRCCODE")"
     printf 'TL_LANG=%q\n'            "${TL[$LANGUAGE]:-}"
+    printf 'TL_DRIFT=%q\n'           "${TLDRIFT:-0}"   # tolerância acima do TL antes de TLE
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
     printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
     # veredicto CANÔNICO limpo (sem score) + score estruturado, p/ o backend casar/montar strings
@@ -408,9 +409,16 @@ if [[ -z "${MOJ_CALIBRATING:-}" ]]; then
   fi
 fi
 
-if [[ ! -n "${TLMOD[$LANGUAGE.drift]}" ]]; then
-  TLMOD[$LANGUAGE.drift]=0
-fi
+# TOLERÂNCIA (drift): quanto o tempo pode passar do TL antes de virar TLE (a decisão em run-testinput).
+# TLMOD[<lang>.drift] vence; sem ela vale TLMOD[default.drift] (uma tolerância p/ toda linguagem sem a
+# sua — pedido do Ribas, 2026-09-24); sem as duas, 0. Valor que não é número vira 0: o `bc` da decisão
+# morreria calado e ninguém tomaria TLE. Resolvida UMA vez e gravada de volta na chave da linguagem, que
+# é a que o resto do script (ETL, decisão) lê; o report.env leva o valor (TL_DRIFT) p/ o gen-report.sh
+# pintar de amarelo o teste aceito acima do limite.
+TLDRIFT="${TLMOD[$LANGUAGE.drift]:-${TLMOD[default.drift]:-0}}"
+[[ "$TLDRIFT" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]] || TLDRIFT=0
+TLMOD[$LANGUAGE.drift]="$TLDRIFT"
+LOG " - Drift (tolerância): ${TLDRIFT}s"
 
 ETL=$(echo 2+${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
 RESP=""

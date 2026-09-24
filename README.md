@@ -651,6 +651,16 @@ Recebe o diretório que o `build-and-test.sh` imprimiu na primeira linha e gera 
 veredito, barra de tempo de cada teste em relação ao limite, pico de memória, e o diff colorido entre
 o que saiu e o que era esperado. O HTML é autocontido.
 
+A barra de tempo tem três cores, com legenda própria:
+- **azul**: dentro do limite;
+- **amarelo**: acima do limite, mas o teste não é TLE, porque passou pela tolerância (`TL_DRIFT` do
+  `report.env`, que o `build-and-test.sh` grava a partir de `TLMOD[<lang>.drift]` › `TLMOD[default.drift]`
+  › 0);
+- **a cor de TLE do mapa de testes**: estourou.
+
+O vermelho do Wrong Answer não aparece no gráfico: antes um AC dentro da tolerância saía vermelho (relato
+do Daniel Saad, 24/09/2026).
+
 Você não costuma chamar este script: o `build-and-test.sh` já o chama no fim.
 
 ### `tl-checksum.sh`: os dois carimbos do pacote
