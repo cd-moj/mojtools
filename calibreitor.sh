@@ -114,6 +114,20 @@ WORSTTIME=0.01
 declare -A WORSTTIMEPERLANG
 declare -A LANGOK          # linguagens que tiveram >=1 solução good Accepted neste host
 
+# VALIDADOR DE ENTRADA (scripts/validator.cpp, testlib): só na calibração COMPLETA (o modo rápido é o da
+# 1ª submissão — não pode atrasar julgamento). A linha vai no MESMO vetor das soluções (category
+# "validator"): o agente sobe o `sols` inteiro e o servidor a separa (lib/calib-expect.sh) — nenhuma
+# mudança no agente. Tem orçamento próprio (testlib/validator-run.sh), então não come o teto da calibração.
+if [[ -z "$CALIBRATE_ONLY_GOOD" ]]; then
+  VJ="$(bash "$PWD/testlib/validator-run.sh" "$PROBLEMDIR" 2>/dev/null)"
+  if jq -e '.category == "validator"' >/dev/null 2>&1 <<<"$VJ"; then
+    printf '%s\n' "$VJ" >> "$TEMP.sols.jsonl"
+    echo "Input validator: $(jq -r '.verdict + (if (.tests|length) > 0 then " (\([.tests[] | select(.code != "OK")] | length) de \(.tests|length) entradas reprovadas)" else "" end)' <<<"$VJ")"
+    jq -r '.tests[] | select(.code != "OK") | "  \(.name): \(.code) \(.msg)"' <<<"$VJ" | head -20
+    echo
+  fi
+fi
+
 echo "AC solutions:"
 for AC in $PROBLEMDIR/sols/good/*; do
   echo "${AC##*/}:"

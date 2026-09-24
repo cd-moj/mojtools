@@ -171,6 +171,18 @@ printf '1000\n1000\n' > tests/input/test-002
 printf '2000\n'       > tests/output/test-002
 ```
 
+#### Validador de entrada (recomendado)
+
+Um validador confere se cada teste segue o formato e os limites do enunciado. Escreva
+`scripts/validator.cpp` com a testlib (`registerValidation`, `inf.readInt(1, 1000, "N")`, …) e rode:
+
+```sh
+bash mojtools/testlib/install-validator.sh <pacote> validator.cpp   # ou: moj validator . validator.cpp
+```
+
+Ele compila com o seu `g++` e mostra, por entrada, ✓ ou a mensagem da testlib. A calibração completa
+roda o mesmo validador no juiz. Guia: **[docs/validador-testlib.md](docs/validador-testlib.md)**.
+
 ### Passo 5: escrever a solução de referência
 
 Pelo menos **uma** solução correta em `sols/good/` é obrigatória. **A extensão do arquivo é o que
@@ -513,7 +525,13 @@ tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** 
 vive no limite de propósito). A conta exata é `calibrafactor × pior_tempo_AC + 0,02`.
 
 Depois, roda as soluções de `pass/`, `slow/` e `wrong/` para conferência (o `CALIBRATE_ONLY_GOOD=1`
-pula essa parte, e é o que o agente do juiz usa quando está com pressa).
+pula essa parte, e é o que o agente do juiz usa quando está com pressa). O calibreitor só roda e
+registra; quem decide se cada solução fez o que a categoria pede é o **servidor**
+(`cdmoj/server/api/v1/lib/calib-expect.sh`, tabela em `cdmoj/docs/PACOTE.md` §10).
+
+Antes das soluções, a calibração completa roda o **validador de entrada** do pacote
+(`scripts/validator.cpp`, via `testlib/validator-run.sh`) e anexa o resultado ao `.calib-sols.json`
+como uma entrada `category:"validator"` (o modo `CALIBRATE_ONLY_GOOD` não roda o validador).
 
 Grava também um `report.html` por solução em `.calib-reports/`, que o agente sobe para o servidor,
 e o vetor **ESTRUTURADO** da calibração em **`.calib-sols.json`**: por solução executada,
@@ -643,7 +661,9 @@ tl-checksum.sh --all-sols <pacote>   # 16 dígitos hex — a VERSÃO do pacote (
 ```
 
 O **estreito** cobre *o que pode mudar o tempo de execução ou o veredicto*: o `conf`, os
-`tests/{input,output,score}`, as `sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução).
+`tests/{input,output,score}`, as `sols/good/*` e o `scripts/*` (conteúdo **e** bit de execução),
+**menos** `scripts/validator.cpp` (o validador de entrada não julga solução; ele entra só na versão do
+pacote, abaixo).
 Em `tests/output`, arquivo **vazio conta como ausente** — sem isso um problema interativo (que não
 tem saída esperada) pedia recalibração para sempre.
 Não cobre o enunciado, as tags nem o autor.
@@ -881,6 +901,7 @@ juiz.
 - **[SANDBOX.md](SANDBOX.md)**: como a jaula funciona, como escolher a raiz, o endurecimento.
 - **[docs/correcao-especial.md](docs/correcao-especial.md)**: `scripts/` por problema.
 - **[docs/checker-testlib.md](docs/checker-testlib.md)**: escrever um checker.
+- **[docs/validador-testlib.md](docs/validador-testlib.md)**: escrever um validador de entrada.
 - **[docs/problema-interativo.md](docs/problema-interativo.md)**: escrever um problema interativo.
 - **[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**: problema de submissão de função.
 - **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**: desenhar grafo no enunciado (graphviz).

@@ -1,0 +1,8 @@
+{
+  "name": "Validador de entrada (testlib)",
+  "description": "scripts/validator.cpp confere se CADA teste de tests/input respeita o formato e os limites do enunciado (padrão Polygon: registerValidation + inf.readInt(lo, hi) + readEoln/readEof). A calibração roda o validador no juiz e o resultado aparece em Entradas. Não muda o julgamento das soluções.",
+  "conf_hints": "Guia: mojtools/docs/validador-testlib.md. Na sua máquina: moj validator (compila com o seu g++ e roda sobre tests/input). Mexer no validador não pede recalibração do tempo-limite.",
+  "slots": [
+    "validator"
+  ]
+}

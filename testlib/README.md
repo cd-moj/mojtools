@@ -12,6 +12,8 @@ Suporte de PRIMEIRA CLASSE a corretores especiais escritos com a
 | `checker-bridge.sh` | **a bridge, e ela mora AQUI** (fonte única): compila o `scripts/checker.cpp` do pacote no juiz sob demanda (cache fora de `scripts/`) e mapeia a interface testlib PADRÃO → contrato do MOJ. |
 | `compare-stub.sh` | o que o PACOTE carrega como `scripts/compare.sh`: 10 linhas que chamam a bridge (`--pkg <dir do pacote>`). |
 | `install-checker.sh` | instala fonte+stub num pacote (`install-checker.sh <pkg> <checker.cpp>`) e roda um smoke (gabarito×gabarito ⇒ Accepted). |
+| `validator-run.sh` | roda o **validador de ENTRADA** do pacote (`scripts/validator.cpp`, `registerValidation`) sobre cada `tests/input/*` e imprime uma linha JSON (`category:"validator"`) — a calibração completa a anexa ao `.calib-sols.json`. Compila como a bridge (cópia de propósito: a bridge não tem teste da rota bwrap). Guia: [`docs/validador-testlib.md`](../docs/validador-testlib.md). |
+| `install-validator.sh` | instala (`<pkg> [validator.cpp]`) e roda o validador na máquina do autor pelo MESMO `validator-run.sh`; sai 1 se há entrada inválida. Atalho: `moj validator`. |
 
 ## Por que o pacote leva um STUB (e não a bridge)
 

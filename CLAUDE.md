@@ -98,6 +98,16 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   py/java/rs) trazem a **SENTINELA anti-IO** (última linha de todo teste = 424242; função que
   consome a entrada ⇒ SENTINELA-VIOLADA ⇒ WA determinístico). Guia:
   `docs/submissao-de-funcao.md`; atalho da CLI: `moj fn`.
+- **Validador de ENTRADA** (`scripts/validator.cpp`, 2026-09-24): `testlib/validator-run.sh <pkg>` roda o
+  validador (testlib `registerValidation`) sobre cada `tests/input/*` e imprime UMA linha JSON
+  `category:"validator"` (`verdict` none|ok|invalid|error, `tests[{name,code:OK|INVALID|FAIL,msg}]`); a
+  calibração COMPLETA a anexa ao `.calib-sols.json` (o agente sobe o `sols` inteiro — o repo `judge` não
+  mudou) e o servidor a separa (`cdmoj lib/calib-expect.sh`). Freios: 5 s por entrada, 60 s de orçamento
+  total — validador em laço não pode comer o teto da calibração. Compila como a `checker-bridge.sh` (CÓPIA
+  de propósito: a bridge roda em ~200 pacotes e não tem teste da rota bwrap — unificar pede esse teste
+  antes; mexeu numa, confira a outra). `install-validator.sh` (= `moj validator`) roda o MESMO script na
+  máquina do autor (portável: sem flock/timeout/sha256sum no Mac). `tl-checksum.sh` deixa o
+  `scripts/validator.cpp` FORA do estreito e DENTRO do `--all-sols`. Guia: `docs/validador-testlib.md`.
 - `testlib/` — **checkers testlib normalizados**: `testlib.h` vendorada + `checker-bridge.sh`
   (compila `scripts/checker.cpp` no juiz sob demanda, cache FORA de `scripts/` p/ não poluir o
   tl-checksum) + `compare-stub.sh` + `install-checker.sh <pkg> <checker.cpp>`.

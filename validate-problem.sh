@@ -141,6 +141,13 @@ if [[ -f "$PKG/scripts/compare.sh" && "$compare_elf" == false ]] \
     || add checker_src 0 "compare.sh é o checker testlib, mas falta scripts/checker.cpp"
 fi
 
+# --- aviso SOFT: validador de ENTRADA (scripts/validator.cpp, testlib/validator-run.sh) sem
+#     registerValidation — a testlib não entra no modo validador e o validador não confere nada.
+#     Quem RODA o validador é a calibração (no juiz); aqui só a forma. ---
+if [[ -f "$PKG/scripts/validator.cpp" ]] && ! grep -q 'registerValidation' "$PKG/scripts/validator.cpp" 2>/dev/null; then
+  render_leak="${render_leak}validador-sem-registerValidation "
+fi
+
 # --- examples / tests pairing ---
 ninput=0; npair=0; unpaired=""
 if [[ -d "$PKG/tests/input" ]]; then

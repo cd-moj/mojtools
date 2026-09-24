@@ -21,6 +21,7 @@
 # a nova (relato do Arthur Botelho, 2026-09-20: o mesmo checksum em 3 juízes com 3 conjuntos
 # diferentes de solução).
 #   uso: tl-checksum.sh --all-sols <pkgdir>
+# O validador de entrada (scripts/validator.cpp) entra só na versão do pacote (ver o laço de scripts).
 set -u
 ALL_SOLS=0
 [[ "${1:-}" == --all-sols ]] && { ALL_SOLS=1; shift; }
@@ -58,8 +59,13 @@ SOLDIRS=(sols/good)
   # scripts de correção especial (compile/run/compare/prep por linguagem): mudam a
   # COMPILAÇÃO/EXECUÇÃO/comparação das soluções — logo podem mudar o TL e EXIGEM que o
   # juiz re-baixe o pacote. Inclui o MODO (bit de execução, ex.: chmod +x do compile.sh).
+  # EXCEÇÃO: scripts/validator.cpp (o validador de ENTRADA, testlib/validator-run.sh) não julga
+  # solução nenhuma — fica FORA do carimbo estreito (mexer nele não pede recalibração nem esconde o
+  # TL da prova) e DENTRO da versão do pacote (--all-sols: o juiz tem de baixar o validador novo
+  # para a próxima calibração rodá-lo). Pacote sem o arquivo dá o mesmo hash de antes.
   if [[ -d "$pkg/scripts" ]]; then
     while IFS= read -r f; do
+      (( ALL_SOLS )) || [[ "$f" != "$pkg/scripts/validator.cpp" ]] || continue
       printf '=%s mode=%s\n' "${f#"$pkg"/}" "$(stat -c '%a' "$f" 2>/dev/null)"; cat "$f"; printf '\n'
     done < <(find "$pkg/scripts" -type f 2>/dev/null | LC_ALL=C sort)
   fi

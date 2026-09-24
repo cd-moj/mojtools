@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -47,6 +47,11 @@ check:
 	  echo "  conserte: git update-index --chmod=+x <arquivo>"; exit 1; \
 	else echo "bits de execução ok (lang/*, testlib/*, interactive/*)"; fi
 	@bash check-quoting.sh
+
+## test-validator — o validador de ENTRADA (testlib/validator-run.sh, install-validator.sh) e a regra do
+##                  tl-checksum p/ scripts/validator.cpp (precisa de g++; sem ele, pula)
+test-validator:
+	@bash testlib/test-validator.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:
