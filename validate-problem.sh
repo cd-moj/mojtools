@@ -92,7 +92,8 @@ for _tl in $(stmt_langs_of "$PKG"); do
 done
 # --- aviso SOFT (não bloqueia): exemplo embutido no texto -> deve vir da lista de exemplos ---
 # (com SAMPLE=no o texto É o lugar do exemplo: sem aviso)
-if ! stmt_no_samples "$PKG" && grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; then
+# (chaves: sem elas o `||` escapava da condição e um bloco de código avisava mesmo com SAMPLE=no)
+if ! stmt_no_samples "$PKG" && { grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(exemplos?|examples?|sample)' <<<"$ebody" || grep -qE '^[[:space:]]*```' <<<"$ebody"; }; then
   render_leak="${render_leak}exemplo-no-texto? "
 fi
 # --- aviso SOFT: notas de exemplo desemparelhadas (nota truncada/deslocada passava MUDA) ---

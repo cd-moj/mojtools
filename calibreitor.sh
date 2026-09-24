@@ -146,9 +146,12 @@ for AC in $PROBLEMDIR/sols/good/*; do
     LANGOK[$LANG]=1
   else
     # ROBUSTEZ: NÃO aborta a calibração inteira por uma solução (toolchain ausente no
-    # juiz, erro de ambiente, ou solução realmente quebrada). Pula a linguagem e segue —
-    # o juiz reporta a falha ao MOJ (visível sem ssh). Só emite TL p/ linguagens que passaram.
-    echo "$AC got '${A:-<sem veredito>}', was waiting Accepted (linguagem $LANG NÃO calibrada neste host). Check ${T}"
+    # juiz, erro de ambiente, ou solução realmente quebrada). Segue — o juiz reporta a falha
+    # ao MOJ (visível sem ssh). Só emite TL p/ linguagens em que ALGUMA good passou: se outra
+    # good da mesma linguagem foi aceita, a linguagem calibra (a mensagem dizia "NÃO
+    # calibrada" mesmo assim). Quem diz quais linguagens ficaram sem TL é o resumo no fim.
+    # ⚠ "was waiting Accepted" é contrato: o agente do juiz conta as falhas por essa frase.
+    echo "$AC got '${A:-<sem veredito>}', was waiting Accepted. Check ${T}"
   fi
   echo "Verdict: $A"
   echo
@@ -194,6 +197,9 @@ publish_tl "$PROBLEMDIR/tl"
 
 echo "Calibrated TL ($HOSTNAME):"
 tail -n+1 "$TLHOST"
+for t in ${!WORSTTIMEPERLANG[@]}; do
+  [[ -n "${LANGOK[$t]}" ]] || echo "linguagem $t NÃO calibrada neste host (nenhuma solução good $t foi aceita)"
+done
 
 # Modo rápido (calibração sob demanda no modelo cache): só as good bastam p/ o TL.
 # Pular pass/slow/wrong evita rodar dezenas de soluções/linguagens a cada 1ª submissão.
