@@ -49,10 +49,14 @@ Usage: $0 <options>
 -M, --memlimit            Memory limit, in MB. As root: cgroup v1 do shield (cset). Sem
               root: cgroup v2 via systemd-run --user (MemoryMax; degrada com
               aviso se não houver user manager)
+-C, --cpus                Lista de CPUs (formato do taskset: "0,1" ou "4-7") onde a jaula
+              roda PINADA (taskset -c antes do bwrap; só sem root — como root
+              quem manda é o shield -S). É como o build-and-test dá a cada
+              teste o seu grupo de k CPUs (CPUNEEDED).
 EOF
 }
 
-TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:M:b:R:' -l 'bind:,memlimit:,shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:,cage-root:' -n "$0" -- "$@")
+TEMP=$(getopt -a -o 'hd:i:o:s:t:r:T:B:w:S:U:M:b:R:C:' -l 'bind:,memlimit:,shield-cpu:,shield-user:,rw-dir:,help,directory:,input-file:,output-file:,stderr-log-file:,time-log-file:,run-script-file:,time-limit:,bwrap-time-file:,cage-root:,cpus:' -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 unset TEMP
@@ -75,6 +79,11 @@ while [[ "$1" != "--" ]]; do
     ;;
     '-M'|'--memlimit')
       MEMLIMIT="$2"
+      shift 2
+      continue
+    ;;
+    '-C'|'--cpus')
+      CPUS="$2"
       shift 2
       continue
     ;;
@@ -269,6 +278,18 @@ fi
 
 SAFETLE=$(echo "$TLE + 1"|bc -l)
 
+# PIN de CPU sem root (-C): `taskset -c` na frente do bwrap — a afinidade herda p/ o time, o
+# script e o binário do aluno; dentro da jaula `nproc` = k. Formato inválido = sem pin (o
+# taskset recusaria e a jaula não rodaria). Como root o shield (-S) é quem pina.
+PIN=""
+if [[ -n "${CPUS:-}" && "$USER" != root ]]; then
+  if [[ "$CPUS" =~ ^[0-9]+([,-][0-9]+)*$ ]] && command -v taskset >/dev/null 2>&1; then
+    PIN="taskset -c $CPUS"
+  else
+    echo "cage-run: -C '$CPUS' inválido ou sem taskset — rodando sem pin" >&2
+  fi
+fi
+
 # Montagem da RAIZ da jaula + mounts dinâmicos/IO. Default (CAGEROOT vazio) = userland do
 # host (igual a sempre). Com CAGEROOT setado, a jaula usa o rootfs inteiro como '/' (ro) e só
 # sobrepõe /proc,/dev,/tmp,/var,/run/user — todo o toolchain (/usr,/lib,/etc/...) vem do rootfs.
@@ -314,7 +335,7 @@ done
 # próprio julgamento com SIGXFSZ quando o trace ingeria stderr gigante do time (Maratona
 # 29/08). Sem a env (standalone/calibração) nada muda.
 ([[ "${MOJ_CAGE_FSIZE:-}" =~ ^[0-9]+$ ]] && ulimit -f "$MOJ_CAGE_FSIZE" 2>/dev/null
- exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $SCOPE bwrap $ROOTBINDS \
+ exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $PIN $SCOPE bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \

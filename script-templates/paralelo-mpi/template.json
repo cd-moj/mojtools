@@ -1,0 +1,9 @@
+{
+  "name": "Problema paralelo: MPI (C/C++)",
+  "description": "Cada teste roda em CPUNEEDED CPUs (declare no conf, aba Limites › Problemas paralelos). O compile.sh usa mpicc/mpicxx (OpenMPI da rootfs); o run.sh lança `mpirun -np $MOJ_TEST_CPUS` — o número de processos é o de CPUs do problema, nunca um número fixo. Apague a linguagem que não for liberar.",
+  "conf_hints": "Obrigatório no conf: CPUNEEDED=<k> (nº de processos MPI = CPUs por teste; o tempo-limite é medido com k CPUs). Recomendado: ULIMITS[-u]=10000 (o mpirun cria processos auxiliares). Opcional: SAMENUMA=y. Restrinja `languages` a c/cpp. Guia: mojtools/docs/problema-paralelo.md.",
+  "slots": [
+    "compile",
+    "run"
+  ]
+}

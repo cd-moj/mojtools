@@ -53,7 +53,9 @@ function write_report_env()
     printf 'HOSTBT=%q\n'             "${HOSTNAME:-}"
     printf 'STARTDATE=%q\n'          "${STARTDATE:-}"
     printf 'RUNALL=%q\n'             "${RUNALL:-}"
-    printf 'NPROCINFO=%q\n'          "${NPROC:-}"
+    printf 'NPROCINFO=%q\n'          "${NPROC:-}"          # P: testes ao mesmo tempo
+    printf 'CPUNEEDEDINFO=%q\n'      "${K:-}"              # k: CPUs por teste
+    printf 'CPUGROUPSINFO=%q\n'      "${MOJ_CPU_GROUPS:-}" # grupos de CPU do agente (vazio = sem pin)
     printf 'REPORTMODE=%q\n'         "${1:-normal}"
   } > "$workdirbase/report.env"
 }
@@ -214,6 +216,35 @@ LOG ""
 # aplica em si mesmo antes do bwrap — compile, run e checker continuam limitados como sempre;
 # o gerador de log/trace pode crescer além do limite do problema.
 export MOJ_CAGE_FSIZE="${ULIMITS[-f]:-}"
+
+# ---- PARALELISMO DOS TESTES: k CPUs por teste × P testes ao mesmo tempo (24/09/2026) -----------
+# k = CPUNEEDED do conf (requisito DURO de cada teste; default 1; 1..64). Quem sabe quantas CPUs
+# este julgamento ganhou é o AGENTE do juiz, que manda pelo ambiente e VENCE conf e nproc:
+#   MOJ_TEST_CPUS=k   MOJ_PARALLEL=P   MOJ_CPU_GROUPS="c0,c1|c2,c3|…" (P grupos de k CPUs; cada
+#   worker pina a jaula no seu grupo com cage-run -C)   MOJ_RELEASE_FILE=<arq> (grupo que ficou
+#   sem teste é anotado aqui p/ o agente liberar os slots ANTES do fim — liberação de cauda).
+# Sem env (local, `moj test --run`, agente/servidor antigos): P = min(nproc/k, MAXPARALLELTESTS),
+# ALLOWPARALLELTEST=n ⇒ P=1, sem pin (a semântica de sempre, agora com teto). A calibração exporta
+# MOJ_PARALLEL=1: o TL é medido com UM teste por vez em k CPUs — a mesma forma do julgamento.
+CPUNEEDED="${CPUNEEDED:-1}"
+[[ "$CPUNEEDED" =~ ^[0-9]+$ && "$CPUNEEDED" -ge 1 && "$CPUNEEDED" -le 64 ]] || CPUNEEDED=1
+K="${MOJ_TEST_CPUS:-$CPUNEEDED}"; [[ "$K" =~ ^[0-9]+$ && "$K" -ge 1 ]] || K="$CPUNEEDED"
+CPU_GROUPS=()
+[[ -n "${MOJ_CPU_GROUPS:-}" ]] && IFS='|' read -ra CPU_GROUPS <<<"$MOJ_CPU_GROUPS"
+if [[ "${MOJ_PARALLEL:-}" =~ ^[0-9]+$ && "${MOJ_PARALLEL:-0}" -ge 1 ]]; then
+  NPROC="$MOJ_PARALLEL"
+  LOG " - Paralelismo dado pelo agente: $NPROC teste(s) ao mesmo tempo × $K CPU(s) por teste${MOJ_CPU_GROUPS:+ [grupos: $MOJ_CPU_GROUPS]}"
+else
+  HOSTCPUS="$(nproc 2>/dev/null)"; [[ "$HOSTCPUS" =~ ^[0-9]+$ ]] || HOSTCPUS=1
+  NPROC=$(( HOSTCPUS / K )); (( NPROC < 1 )) && NPROC=1
+  (( HOSTCPUS < K )) && LOG " - AVISO: CPUNEEDED=$K mas só há $HOSTCPUS CPU(s) aqui — o teste roda com MENOS CPU do que o problema pede (o tempo medido aqui não vale como TL)"
+  [[ "${ALLOWPARALLELTEST:-y}" == "n" ]] && NPROC=1 && LOG " - Parallel Test not allowed in this problem"
+  if [[ "${MAXPARALLELTESTS:-}" =~ ^[0-9]+$ && "$MAXPARALLELTESTS" -ge 1 ]] && (( NPROC > MAXPARALLELTESTS )); then
+    NPROC=$MAXPARALLELTESTS; LOG " - Setting MAX Parallel Tests to $MAXPARALLELTESTS"
+  fi
+fi
+(( ${#CPU_GROUPS[@]} > 0 && NPROC > ${#CPU_GROUPS[@]} )) && NPROC=${#CPU_GROUPS[@]}
+LOG " - NPROC: $NPROC (CPUs por teste: $K)"
 for l in ${!ULIMITS[@]}; do
   [[ "$l" == -f ]] && { LOG "set: ulimit -f ${ULIMITS[$l]} (só na jaula, via cage-run)"; continue; }
   ulimit $l ${ULIMITS[$l]}
@@ -328,6 +359,12 @@ BIN+=( "${_binline#BIN=}" )
 { printf 'BIN=%q\n' "${BIN[0]}"
   echo "MOJ_MEMLIMITMB=${MEMLIMITMB:-}"
   echo "MOJ_STACKKB=${ULIMITS[-s]}"
+  # CPUs deste teste (CPUNEEDED / o que o agente deu): o run.sh de MPI faz `mpirun -np
+  # "$MOJ_TEST_CPUS"`; o OpenMP se dimensiona sozinho pelo OMP_NUM_THREADS (exportados: o
+  # run.sh sourceia isto e dá exec no binário do aluno). Com k=1 é 1 — um OpenMP num slot
+  # de 1 CPU não fica criando threads que só se revezam.
+  echo "export MOJ_TEST_CPUS=${K:-1}"
+  echo "export OMP_NUM_THREADS=${K:-1}"
 } > $workdir/binfile.sh
 
 LOG ""
@@ -430,7 +467,8 @@ function run-testinput()
 {
   local INPUT=$1
   local FILE=$(basename $INPUT)
-  bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+  # CAGE_CPUS (do worker, ou o grupo 0 no rerun): a jaula deste teste fica PINADA nessas CPUs
+  bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
        -r $LANGRUN \
        -t $workdirbase/$FILE-log.timelog\
@@ -477,31 +515,58 @@ function run-testinput()
   return $ERR
 }
 
-JOBSCOUNT=0
-NPROC=$(nproc)
-[[ "$ALLOWPARALLELTEST" == "n" ]] && NPROC=1 && LOG " - Parallel Test not allowed in this problem"
-[[ -n "$MAXPARALLELTESTS" ]] && NPROC=$MAXPARALLELTESTS && LOG " - Setting MAX Parallel Tests to $MAXPARALLELTESTS"
-LOG " - NPROC: $NPROC"
+# POOL DE P WORKERS sobre a fila de testes (24/09/2026; antes: `run-testinput &` + `wait -n`).
+# Cada worker é um subshell dono de UM grupo de CPUs (CPU_GROUPS[g], vazio = sem pin) e consome
+# a fila até acabar: a reivindicação do teste i é um `mkdir .claim/i` (atômico em qualquer fs;
+# sem flock, sem FIFO — dois `read` concorrentes num pipe se embaralham byte a byte). STOPWHEN/
+# RUNALL viram um flag `.stop` que TODO worker confere antes de pegar o próximo (o de antes só
+# via o job que o `wait -n` colheu). Worker que fica sem teste anota o grupo em MOJ_RELEASE_FILE
+# (liberação de cauda: o agente devolve os slots antes do fim do job); o grupo 0 fica p/ o rerun.
+TESTS=()
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   if [[ ! -e "$INPUT" ]]; then
     echo "Wrong package format. No input found"
     LOG "$INPUT not found"
     exit 3
   fi
-  run-testinput $INPUT &
-  ((JOBSCOUNT++))
-  if (( JOBSCOUNT > NPROC-1 )); then
-    wait -n
-    RET=$?
-    (( RET == 6 )) && [[ "$STOPWHEN_WA" == "y" ]] && break
-    (( RET == 3 )) && [[ "$STOPWHEN_TLE" == "y" ]] && break
-    (( RET >= 126 )) && [[ "$STOPWHEN_RE" == "y" ]] && break
-    (( RET != 0 )) && [[ "$RUNALL" != "y" ]] && break
-    ((JOBSCOUNT--))
-  fi
+  TESTS+=("$INPUT")
 done
-
+mkdir -p "$workdirbase/.claim"
+BAT_PID=$$; export BAT_PID
+_release_group() {  # anota em MOJ_RELEASE_FILE que o grupo $1 acabou (append-only; o agente dedupa)
+  [[ -n "${MOJ_RELEASE_FILE:-}" ]] || return 0
+  echo "$1" >> "$MOJ_RELEASE_FILE" 2>/dev/null
+  return 0
+}
+_test_worker() {  # $1 = índice do grupo (0..P-1)
+  local g="$1" i=0 n=${#TESTS[@]} RET
+  local CAGE_CPUS="${CPU_GROUPS[$g]:-}"   # run-testinput (escopo dinâmico) passa -C ao cage
+  while (( i < n )); do
+    [[ -e "$workdirbase/.stop" ]] && break
+    [[ -d "/proc/$BAT_PID" ]] || exit 0     # o harness morreu: worker órfão não roda mais nada
+    if mkdir "$workdirbase/.claim/$i" 2>/dev/null; then
+      run-testinput "${TESTS[$i]}"; RET=$?
+      { (( RET == 6 ))   && [[ "${STOPWHEN_WA:-}" == "y" ]];  } && : > "$workdirbase/.stop"
+      { (( RET == 3 ))   && [[ "${STOPWHEN_TLE:-}" == "y" ]]; } && : > "$workdirbase/.stop"
+      { (( RET >= 126 )) && [[ "${STOPWHEN_RE:-}" == "y" ]];  } && : > "$workdirbase/.stop"
+      { (( RET != 0 ))   && [[ "$RUNALL" != "y" ]];           } && : > "$workdirbase/.stop"
+    fi
+    ((i++))
+  done
+  (( g > 0 )) && _release_group "$g"
+  return 0
+}
+for (( g=0; g<NPROC; g++ )); do _test_worker "$g" & done
 wait
+
+# Antes do rerun SERIAL de TLE: os grupos ≥ 1 não são mais usados — libera todos p/ o agente
+# (idempotente: quem já liberou na cauda só repete a linha) e re-pina o HARNESS no grupo 0 (o
+# rerun herda a afinidade; o cage também recebe -C pelo CAGE_CPUS global).
+if (( ${#CPU_GROUPS[@]} > 1 )); then
+  for (( g=1; g<${#CPU_GROUPS[@]}; g++ )); do _release_group "$g"; done
+  taskset -pc "${CPU_GROUPS[0]}" $$ >/dev/null 2>&1
+fi
+CAGE_CPUS="${CPU_GROUPS[0]:-}"
 
 TLERERUN=${TLERERUN:=y}
 

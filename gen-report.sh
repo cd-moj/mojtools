@@ -28,7 +28,7 @@ wb="${1:?uso: gen-report.sh <workdirbase>}"
 # defaults — tolera report.env incompleto (ex.: regeneração manual)
 PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
-RUNALL="" NPROCINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
+RUNALL="" NPROCINFO="" CPUNEEDEDINFO="" CPUGROUPSINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT=""
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 # tolerância (drift) acima do TL antes de TLE (build-and-test.sh: TLMOD[<lang>.drift] › TLMOD[default.drift]).
@@ -413,7 +413,7 @@ for kv in \
   "Toolchain:${TOOLCHAIN_VER}" "Ambiente (raiz da jaula):${TOOLCHAIN_ROOT}" \
   "Limite de tempo:$(secs "$TL_LANG")s" "Tolerância acima do limite (drift):${TL_DRIFT:+$(secs "$TL_DRIFT")s}" \
   "Veredicto final:${FINALRESP}" \
-  "Rodar tudo (RUNALL):${RUNALL}" "Paralelismo:${NPROCINFO}" \
+  "Rodar tudo (RUNALL):${RUNALL}" "Paralelismo:${NPROCINFO:+$NPROCINFO teste(s) ao mesmo tempo}${NPROCINFO:+${CPUNEEDEDINFO:+ × $CPUNEEDEDINFO CPU(s) por teste}}${CPUGROUPSINFO:+ (CPUs: $CPUGROUPSINFO)}" \
   "Host:${HOSTBT}" "Início:${STARTDATE}" "Tempo total:${TOTALTIME}s"; do
   k="${kv%%:*}"; val="${kv#*:}"; [[ -z "$val" || "$val" == "s" ]] && continue
   raw "<tr><td class=\"k\">$(escs "$k")</td><td>$(escs "$val")</td></tr>"$'\n'

@@ -401,6 +401,17 @@ moj fn <dir> [--langs c,cpp,py,java,rs]    # ou: bash fn/install-fn.sh <dir> [--
 Guia de autoria (anatomia por linguagem, boas práticas, erros comuns):
 **[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**.
 
+### Problema paralelo (OpenMP / MPI)
+
+Quando cada teste precisa de **várias CPUs** (OpenMP, MPI, pthreads), declare no `conf`
+**`CPUNEEDED=<k>`** — o juiz junta k slots para cada teste, mede o tempo-limite **com k CPUs, um
+teste por vez**, e entrega k à jaula por `MOJ_TEST_CPUS`/`OMP_NUM_THREADS` (o `run.sh` de MPI faz
+`mpirun -np "$MOJ_TEST_CPUS"`; nunca um número fixo). `SAMENUMA=y` pede as k CPUs no mesmo nó NUMA.
+Templates prontos: `paralelo-openmp` e `paralelo-mpi` (seletor do editor web). Guia:
+**[docs/problema-paralelo.md](docs/problema-paralelo.md)**. E, para QUALQUER problema, o juiz
+pode rodar **vários testes ao mesmo tempo** quando tem CPU ociosa (`ALLOWPARALLELTEST`,
+`MAXPARALLELTESTS`) — a mesma seção do guia explica o que isso muda (nada no tempo-limite).
+
 ### Outros ajustes de correção
 
 Proibir uma função da biblioteca para forçar a implementação na mão, comparador com tolerância
@@ -480,6 +491,24 @@ linguagem específica), `MOJ_PROBLEM_ID`, **`MOJ_TLFILE`** (aponta uma tabela de
 vence `tl.<máquina>`/`tl` — é como o calibreitor isola os filhos dele) e **`MOJ_CALIBRATING`**
 (setado, desliga o `TLOVERRIDE` do conf: durante a calibração se mede de verdade).
 
+**Paralelismo dos testes** (24/09/2026): cada teste roda em **k CPUs** (`CPUNEEDED` do conf, default 1)
+e até **P testes rodam ao mesmo tempo**. Quem decide P e quais CPUs é o **agente do juiz**, pelo
+ambiente — e o ambiente **vence** o conf e o `nproc`:
+
+| Variável | Significado |
+|---|---|
+| `MOJ_TEST_CPUS=k` | CPUs por teste que este julgamento ganhou (normalmente = `CPUNEEDED`) |
+| `MOJ_PARALLEL=P` | testes ao mesmo tempo (P workers). O calibreitor exporta `1` |
+| `MOJ_CPU_GROUPS="0,1\|2,3\|…"` | P grupos de k CPUs; o worker g pina a jaula no grupo g (`cage-run -C`) |
+| `MOJ_RELEASE_FILE=<arq>` | o worker que fica sem teste anota o índice do grupo aqui (append-only); o agente devolve esses slots antes do fim do job. Antes do **rerun serial de TLE** todos os grupos ≥ 1 são liberados e o harness se re-pina no grupo 0 |
+
+Sem essas variáveis (rodando à mão, `moj test --run`, agente antigo): `P = min(nproc/k,
+MAXPARALLELTESTS)`, `ALLOWPARALLELTEST=n` força `P = 1`, e nada é pinado — a semântica de sempre,
+agora com teto (`MAXPARALLELTESTS` não passa mais de `nproc/k`). Os P workers consomem a fila de
+testes com uma reivindicação atômica por teste (`mkdir`), todo worker confere o `STOPWHEN_*`/`RUNALL`
+antes de pegar o próximo, e o `report.env` leva `NPROCINFO=P` e `CPUNEEDEDINFO=k` (o report mostra
+"P teste(s) ao mesmo tempo × k CPU(s) por teste"). Teste: `make test-parallel`.
+
 Lê do `conf` do problema: todas as chaves de limite (ver `cdmoj/docs/PACOTE.md`).
 
 ### `cage-run.sh`: a jaula
@@ -493,7 +522,7 @@ compilar e uma vez por teste.
 
 ```
 cage-run.sh -d <dir> -i <entrada> -o <saída> -s <log-stderr> -t <log-tempo> -r <script> -T <limite> -B <arq>
-            [-w <dir-rw>] [-b <bind>]... [-R <rootfs>] [-M <MB>] [-S <cpus> -U <user>]
+            [-w <dir-rw>] [-b <bind>]... [-R <rootfs>] [-M <MB>] [-C <cpus>] [-S <cpus> -U <user>]
 ```
 
 | Flag | O que faz |
@@ -506,7 +535,8 @@ cage-run.sh -d <dir> -i <entrada> -o <saída> -s <log-stderr> -t <log-tempo> -r 
 | `-M` | limite de memória, em MB |
 | `-R` | a raiz do sistema de arquivos da jaula (o rootfs). Também vem da variável `CAGE_ROOT` |
 | `-b` | um bind extra para dentro da jaula (usado pelos `prep.sh` das linguagens) |
-| `-S` / `-U` | fixa CPU e usuário (só como root; os dois têm que vir juntos) |
+| `-C` | lista de CPUs (formato do `taskset`: `0,1` ou `4-7`) onde a jaula roda **pinada** (`taskset -c` antes do `bwrap`, só sem root). É como cada teste recebe o seu grupo de k CPUs; dentro da jaula `nproc` = k |
+| `-S` / `-U` | fixa CPU e usuário (só como root; os dois têm que vir juntos — e aí o `-C` é ignorado) |
 
 O `/etc` entra inteiro na jaula, mas com **máscaras**: `shadow`, `sudoers`, chaves de `ssh` e afins
 são zerados, e `passwd`/`group` viram arquivos sintéticos de uma linha. Detalhes em
@@ -519,7 +549,11 @@ calibreitor.sh <pacote>
 ```
 
 Roda cada solução de `sols/good/`, pega o pior tempo por linguagem, multiplica pelo
-`TLMOD[calibrafactor]` (1.35 por padrão) e grava `tl.<máquina>` e `tl` dentro do pacote. Só emite
+`TLMOD[calibrafactor]` (1.35 por padrão) e grava `tl.<máquina>` e `tl` dentro do pacote. Roda
+**um teste por vez** (exporta `MOJ_PARALLEL=1`; o `ALLOWPARALLELTEST=n` de antes era vencido pelo
+conf do pacote), cada um com as **k CPUs** do problema (`CPUNEEDED`; o agente dá o grupo de CPUs
+via `MOJ_CPU_GROUPS`) — o tempo-limite é medido na MESMA forma em que o julgamento roda cada
+teste. Só emite
 tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** naquela máquina — com
 `ALLOWTLEDURINGCALIBRATION=y` no conf, um **TLE** também conta como calibrada (para a `good` que
 vive no limite de propósito). A conta exata é `calibrafactor × pior_tempo_AC + 0,02`.
@@ -807,7 +841,7 @@ em `/tmp/out`.
 ```sh
 exec &>/tmp/stderrlog
 cd /tmp/dir
-source binfile.sh                  # define BIN, MOJ_MEMLIMITMB, MOJ_STACKKB
+source binfile.sh                  # define BIN, MOJ_MEMLIMITMB, MOJ_STACKKB; exporta MOJ_TEST_CPUS, OMP_NUM_THREADS
 exec ./$BIN < /tmp/in > /tmp/out
 ```
 
@@ -818,6 +852,12 @@ O `binfile.sh` **não é um arquivo deste repositório**: ele é gerado em tempo
 ```sh
 exec java -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k $(basename $BIN .class) < /tmp/in > /tmp/out
 ```
+
+E é por ele que um problema paralelo sabe **quantas CPUs o teste tem**: `MOJ_TEST_CPUS` (= `CPUNEEDED`
+do conf, ou o que o agente deu) e `OMP_NUM_THREADS` com o mesmo valor, já **exportados** — um
+programa OpenMP se dimensiona sozinho, e o `run.sh` de MPI faz `mpirun -np "$MOJ_TEST_CPUS"`
+(template `paralelo-mpi`). Com k = 1 os dois valem 1: um OpenMP num slot de uma CPU não fica criando
+threads que só se revezam.
 
 ### `lang/<lang>/prep.sh`
 
@@ -914,6 +954,7 @@ juiz.
 - **[docs/validador-testlib.md](docs/validador-testlib.md)**: escrever um validador de entrada.
 - **[docs/problema-interativo.md](docs/problema-interativo.md)**: escrever um problema interativo.
 - **[docs/submissao-de-funcao.md](docs/submissao-de-funcao.md)**: problema de submissão de função.
+- **[docs/problema-paralelo.md](docs/problema-paralelo.md)**: problema paralelo (OpenMP/MPI): `CPUNEEDED`, `SAMENUMA`, como o TL é medido, o que o `run.sh` deve fazer.
 - **[docs/enunciado-grafos.md](docs/enunciado-grafos.md)**: desenhar grafo no enunciado (graphviz).
 - **`cdmoj/docs/PACOTE.md`** (no repositório `cdmoj`): o **formato do pacote**, orgs, coleções e
   metadados. É a referência.

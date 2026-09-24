@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -52,6 +52,11 @@ check:
 ##                  tl-checksum p/ scripts/validator.cpp (precisa de g++; sem ele, pula)
 test-validator:
 	@bash testlib/test-validator.sh
+
+## test-parallel — o pool de testes do build-and-test (P workers × k CPUs, -C, STOPWHEN, liberação de
+##                 cauda, fallback sem env, canal p/ a jaula) com cage-run e nproc FALSOS
+test-parallel:
+	@bash test-parallel.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:

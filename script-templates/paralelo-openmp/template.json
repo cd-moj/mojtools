@@ -1,0 +1,8 @@
+{
+  "name": "Problema paralelo: OpenMP (C/C++)",
+  "description": "Cada teste roda em CPUNEEDED CPUs (declare no conf, aba Limites › Problemas paralelos). O compile.sh compila com -fopenmp; o run.sh não precisa de nada: a jaula já entra com OMP_NUM_THREADS = CPUNEEDED (e MOJ_TEST_CPUS, se o programa quiser ler). Apague a linguagem que não for liberar.",
+  "conf_hints": "Obrigatório no conf: CPUNEEDED=<k> (CPUs por teste; o tempo-limite é medido com k CPUs, um teste por vez). Opcional: SAMENUMA=y (as k CPUs no mesmo nó NUMA). Restrinja `languages` a c/cpp. Guia: mojtools/docs/problema-paralelo.md.",
+  "slots": [
+    "compile"
+  ]
+}

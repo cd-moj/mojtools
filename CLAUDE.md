@@ -30,6 +30,27 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   executado); vazio = sem grupos) e `CORRECT`/`TOTALTESTS`. O `FINALRESP`/contrato do stdout
   **não muda** (compat). O banner do `report.html` mostra o **`VERDICT_CANON`** + detalhe
   (pct de testes ou pontos/grupos).
+- **Paralelismo dos testes (24/09/2026)** no `build-and-test.sh`: cada teste roda em **k CPUs**
+  (`CPUNEEDED` do conf, 1..64, default 1) e até **P** ao mesmo tempo. O AGENTE manda pelo ambiente
+  e o ambiente VENCE conf/nproc: `MOJ_TEST_CPUS=k`, `MOJ_PARALLEL=P`, `MOJ_CPU_GROUPS="c0,c1|c2,c3|…"`
+  (P grupos; o worker g pina a jaula no grupo g via `cage-run.sh -C`), `MOJ_RELEASE_FILE` (worker
+  sem teste anota o grupo — liberação de cauda; antes do rerun serial de TLE todos os grupos ≥1 são
+  liberados e o harness se re-pina no grupo 0). Sem env: `P = min(nproc/k, MAXPARALLELTESTS)`,
+  `ALLOWPARALLELTEST=n` ⇒ 1, sem pin. **Pool**: P workers (subshells) sobre a fila de testes,
+  reivindicação por `mkdir .claim/<i>` (atômico; NUNCA FIFO com vários `read` — o bash lê pipe
+  byte a byte e as linhas se embaralham), `.stop` conferido por todo worker (STOPWHEN/RUNALL),
+  `/proc/$BAT_PID` sumiu ⇒ worker sai. O `binfile.sh` EXPORTA `MOJ_TEST_CPUS` e
+  `OMP_NUM_THREADS` (= k) p/ a jaula; o `run.sh` de MPI faz `mpirun -np "$MOJ_TEST_CPUS"`.
+  `report.env`: `NPROCINFO=P`, `CPUNEEDEDINFO=k`, `CPUGROUPSINFO`. O `calibreitor.sh` exporta
+  `MOJ_PARALLEL=1` (um teste por vez em k CPUs = a forma do julgamento; o `ALLOWPARALLELTEST=n`
+  de antes era vencido pelo conf sourced depois — bug (f)). `validate-problem.sh` reprova valor
+  inválido das 4 chaves (`conf_parallel_sane`, por grep) e avisa soft quando nenhum juiz do
+  registry tem k CPUs (num nó, com `SAMENUMA=y`). Templates `script-templates/paralelo-openmp`
+  (compile `-fopenmp`) e `paralelo-mpi` (`mpirun --bind-to none --oversubscribe -np
+  "$MOJ_TEST_CPUS"`, `set -o pipefail` — o `| grep -v UCX` legado mascarava o exit). Modo root
+  do cage-run ignora `-C` (single-slot; ver SANDBOX.md). Guia: `docs/problema-paralelo.md`.
+  Teste: `test-parallel.sh` (`make test-parallel`; cage-run FALSO + `nproc` falso). ⚠ Os
+  templates ainda não foram provados na ROOTFS (dev sem podman): passo 3 do rollout, no juiz.
 - `gen-report.sh` — gera o `report.html` por submissão. O gráfico de tempo pinta pelo VEREDICTO e pela
   tolerância: azul (≤ TL), amarelo (acima do TL e não-TLE = passou pela tolerância, `TL_DRIFT` do
   `report.env`), cor de TLE (estourou) — nunca o vermelho do WA (um AC na tolerância saía vermelho, relato do

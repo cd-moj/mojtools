@@ -96,6 +96,11 @@ CALTL="$TEMP.tl"
 echo "TL[default]=$CALIBRATIONTL" > "$CALTL"
 export MOJ_TLFILE="$CALTL"       # build-and-test filhos leem daqui (vence tl.<host>/tl)
 export MOJ_CALIBRATING=1         # a CALIBRAÇÃO mede de verdade: TLOVERRIDE não se aplica aqui
+# UM teste por vez, em k CPUs (CPUNEEDED): o TL é medido na MESMA forma em que o julgamento roda
+# cada teste. O `export ALLOWPARALLELTEST=n` de antes era vencido pelo conf do pacote (sourced
+# depois) — a calibração rodava testes em paralelo sem querer (bug (f), 24/09/2026). A env do
+# agente (MOJ_TEST_CPUS/MOJ_CPU_GROUPS, largura k) atravessa; MOJ_PARALLEL é sempre 1 aqui.
+export MOJ_PARALLEL=1
 # temps de um run morto (kill -9) + o vetor estruturado ANTERIOR: sols é sempre da calibração
 # corrente — run abortado deixa sols AUSENTE (o agente não o manda e o servidor preserva/zera
 # pelo checksum), nunca dado velho com cara de novo

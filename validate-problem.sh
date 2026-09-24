@@ -240,6 +240,31 @@ elif (( ngood >= 1 )); then
   add good_sol_accepts 1 "verificado na calibração (juiz)"   # sem sandbox real aqui -> defere
 fi
 
+# --- conf_parallel_sane: as chaves de paralelismo do conf (cdmoj/docs/PACOTE.md "Problemas
+#     paralelos"), lidas por GREP — conf de autor nunca é sourced aqui. HARD quando o valor é
+#     inválido (o juiz cairia no default calado e o TL seria medido de outra forma). Soft:
+#     CPUNEEDED>1 sem juiz registrado com essa largura (o problema ficaria esperando p/ sempre).
+cpv(){ sed -n "s/^[[:space:]]*$1=[\"']\{0,1\}\([^\"'#[:space:]]*\).*/\1/p" "$PKG/conf" 2>/dev/null | tail -1; }
+pbad=""
+_cpun="$(cpv CPUNEEDED)"; _snuma="$(cpv SAMENUMA)"; _mpt="$(cpv MAXPARALLELTESTS)"; _apt="$(cpv ALLOWPARALLELTEST)"
+[[ -z "$_cpun" || ( "$_cpun" =~ ^[0-9]+$ && "$_cpun" -ge 1 && "$_cpun" -le 64 ) ]] || pbad+="CPUNEEDED=$_cpun (inteiro 1..64) "
+[[ -z "$_snuma" || "$_snuma" =~ ^[yn]$ ]] || pbad+="SAMENUMA=$_snuma (y|n) "
+[[ -z "$_mpt" || ( "$_mpt" =~ ^[0-9]+$ && "$_mpt" -ge 1 ) ]] || pbad+="MAXPARALLELTESTS=$_mpt (inteiro >= 1) "
+[[ -z "$_apt" || "$_apt" =~ ^[yn]$ ]] || pbad+="ALLOWPARALLELTEST=$_apt (y|n) "
+if [[ -n "$pbad" ]]; then add conf_parallel_sane 0 "valor inválido no conf: $pbad"
+else
+  add conf_parallel_sane 1 "${_cpun:+CPUNEEDED=$_cpun }${_snuma:+SAMENUMA=$_snuma }${_mpt:+MAXPARALLELTESTS=$_mpt }${_apt:+ALLOWPARALLELTEST=$_apt }"
+  # largura pedida × juízes registrados (run/registry; ausente = não sabemos, sem aviso)
+  if [[ "${_cpun:-1}" -gt 1 && -d "$RUNDIR/registry" ]]; then
+    _fit="$(find "$RUNDIR/registry" -maxdepth 1 -name '*.json' -exec cat {} + 2>/dev/null \
+      | jq -s --argjson k "$_cpun" --arg numa "${_snuma:-n}" '
+          def ncpus: split(",") | map(if test("-") then (split("-") | ((.[1]|tonumber) - (.[0]|tonumber) + 1)) else 1 end) | add;
+          [ .[] | (if $numa == "y" then ([.topology[]? | .cpus | ncpus] | max // .ncpu // 0) else (.ncpu // 0) end) ]
+          | map(select(. >= $k)) | length' 2>/dev/null)"
+    [[ "$_fit" =~ ^[0-9]+$ && "$_fit" -eq 0 ]] && render_leak="${render_leak}nenhum-juiz-com-${_cpun}-cpus$([[ "${_snuma:-n}" == y ]] && printf '-num-no-numa') "
+  fi
+fi
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 

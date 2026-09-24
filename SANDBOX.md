@@ -91,7 +91,10 @@ extensões legadas normalizadas p/ `py` (o lang-dir `py3` é só um symlink de c
   invocação** (`mojtools.$$`, removido no fim), não muda o fato de o shield ser compartilhado.
   Jamais rode um juiz **particionado** (multi-slot) como root — o agente força 1 slot nesse
   caso. Produção roda o agente como usuário comum (caminho cgroup v2 acima, escopo por
-  invocação, seguro p/ N slots).
+  invocação, seguro p/ N slots). O mesmo vale p/ o **pin por teste** (`cage-run -C <cpus>`,
+  `taskset -c` na frente do bwrap, como o build-and-test dá a cada teste o seu grupo de k CPUs
+  — `CPUNEEDED`): só sem root; como root quem pina é o shield, e problema com `CPUNEEDED>1`
+  não tem como ser servido por um juiz root.
 - **JVM respeita o MEMLIMITMB:** o `binfile.sh` (que todo `run.sh` sourceia) carrega
   `MOJ_MEMLIMITMB`/`MOJ_STACKKB` p/ dentro da jaula; `lang/java`, `lang/kt` e o driver
   interativo dimensionam **`-Xmx = MEMLIMITMB`** (heap tão grande quanto o limite; 500m sem
