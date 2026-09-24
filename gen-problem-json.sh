@@ -113,6 +113,11 @@ if [[ "$tl_json" == '{}' ]]; then
     unset TL TLMOD
   fi
 fi
+# CPUNEEDED/SAMENUMA (problema paralelo): vão ao json servível p/ quem NÃO abre pacote (o preflight
+# do contest avisa quando nenhum juiz do pool tem k CPUs). Mesmo parse por sed do TLOVERRIDE abaixo.
+cpun="$(sed -nE 's/^[[:space:]]*CPUNEEDED=["'"'"']?([0-9]+).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
+[[ "$cpun" =~ ^[0-9]+$ && "$cpun" -ge 1 && "$cpun" -le 64 ]] || cpun=1
+snuma=false; grep -qE '^[[:space:]]*SAMENUMA=["'"'"']?y' "$PKG/conf" 2>/dev/null && snuma=true
 # TLOVERRIDE do conf do PACOTE: o autor decide o TL na marra e o treino exibe o EFETIVO
 # (override[lang] // override[default] // calibrado[lang]). O conf é CÓDIGO do autor e este
 # script roda no SERVIDOR: parse por sed, NUNCA source. Espelho de tl_conf_overrides/
@@ -190,8 +195,9 @@ mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
   --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
+  --argjson cpun "$cpun" --argjson snuma "$snuma" \
   '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
-    statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // [])}
+    statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"
 rm -f "$b64f" "$stmts_f" "$samples_f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"

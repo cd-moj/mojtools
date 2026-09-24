@@ -612,6 +612,10 @@ Variáveis: `VALIDATE_RUN_SOLS=0` pula a execução das soluções; `RUNDIR` diz
 
 ### `gen-problem-json.sh`: gerar o índice do aluno
 
+Além de título/autor/TL/tags/coleções/idiomas/exemplos, o json leva **`cpu_needed`** e **`same_numa`**
+(o `CPUNEEDED`/`SAMENUMA` do conf, lidos por sed): é por ele que o checklist pré-prova do contest sabe
+que um problema paralelo precisa de juiz com k CPUs, sem abrir pacote.
+
 ```
 gen-problem-json.sh <pacote> [<id>]
 ```
