@@ -92,7 +92,7 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   precisa do `graphviz` na imagem do servidor — degrada p/ código se faltar) — guia `docs/enunciado-grafos.md`.
 - `gen-problem-json.sh <pkg> [id]` — gera o índice servível do treino
   (`contests/treino/var/jsons/<id>.json`): título + autor (arquivo `author`, verbatim) + TL +
-  tags + **coleções** (`.moj-meta.json` `collections`, verbatim — um problema pode estar em várias) +
+  tags + **coleções** (`.moj-meta.json` `collections` — um problema pode estar em várias; VAZIO = a coleção homônima da org, a MESMA regra do `gen-problem-owners.sh`, desde 25/09/2026) +
   HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
   (`docs/sample-notes.json`).
   **Ignora `docs/solucao.md`** (editorial não vai ao aluno). **Um render por idioma**: PT em

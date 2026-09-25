@@ -108,7 +108,10 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
       mapfile -t _M < <(jq -r '
         (.owner // .gitea.owner // ""),
         ((.collaborators // []) | join(",")),
-        ((.collections // []) | join(",")),
+        # coleções: só nome não-vazio, separadas por \u001f — nome de coleção é TEXTO LIVRE (o registro aceita
+        # vírgula) e a vírgula de antes partia "A, B" em duas coleções; lixo ("", null) virava um "," não-vazio
+        # que escondia o default da org. A MESMA regra do gen-problem-json.sh (vazio = a coleção da org).
+        ((.collections // []) | if type == "array" then map(select(type == "string" and length > 0)) else [] end | join("\u001f")),
         (.display_title // ""),
         (if .public==true then "1" elif .public==false then "0" else "" end),
         (.public_at // ""),
@@ -171,7 +174,7 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         public:(.[6]=="1"), html:((.[13] // .[6])=="1"),
         owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
         collaborators:(if (.[8]//"")=="" then ($rr.collaborators // []) else (.[8]|split(",")|map(select(length>0))) end),
-        collections:((.[9]//"")|split(",")|map(select(length>0))),
+        collections:((.[9]//"")|split("\u001f")|map(select(length>0))),
         tl_checksum:(.[10] // ""),
         public_at:((.[11] // "")|if .=="" then null else tonumber end),
         good_langs:((.[12] // "")|split(",")|map(select(length>0))),

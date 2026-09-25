@@ -62,9 +62,14 @@ dt=""; [[ -f "$meta" ]] && dt="$(jq -r '.display_title // empty' "$meta" 2>/dev/
 [[ -n "$title" ]] || title="$PROB"
 
 # ----- 2b. coleções (do .moj-meta.json; um problema pode estar em várias) -----
-# Verbatim do meta (como o editor via read_problem_source); sem inventar default de nome-de-repo.
+# SEM coleção no meta = a coleção homônima da ORG (o agrupamento padrão que o /problems/create registra) —
+# a MESMA regra do índice de donos (gen-problem-owners.sh: `colls="$repo"`), que é o que a gestão mostra.
+# Até 25/09/2026 este arquivo copiava o `[]` verbatim: a gestão dizia que os problemas da org `grub`
+# estavam na coleção "grub" e o treino não a listava (21 problemas públicos em 5 orgs). Mexeu numa regra,
+# mexa na outra — o cdmoj/server/test/smoke-public-index.sh compara as duas.
 colls='[]'
-[[ -f "$meta" ]] && colls="$(jq -c '(.collections // [])' "$meta" 2>/dev/null)"; [[ -n "$colls" ]] || colls='[]'
+[[ -f "$meta" ]] && colls="$(jq -c '(.collections // []) | if type == "array" then map(select(type == "string" and length > 0)) else [] end' "$meta" 2>/dev/null)"
+[[ -n "$colls" && "$colls" != '[]' ]] || colls="$(jq -cn --arg r "$REPO" '[$r]')"
 
 # ----- 2c. linguagens de submissão (restrição por-problema; []/ausente = todas) -----
 # Servido no json do treino p/ o dropdown filtrar (web/treino/problema) e p/ ser o último elo
