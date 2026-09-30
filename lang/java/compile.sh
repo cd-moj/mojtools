@@ -4,7 +4,9 @@ exec 2>/tmp/stderrlog > /tmp/out
 cd /tmp/rwdir
 
 export _JAVA_OPTIONS="-Xmx300M -Xms50M -Xss10M"
-javac *java
+# -encoding UTF-8: o javac lê o .java no charset do locale da jaula; sem locale UTF-8, o literal
+# acentuado ("Média") já sai corrompido no .class, antes de qualquer execução (ver o run.sh).
+javac -encoding UTF-8 *java
 RET=$?
 #java -Xms10m -Xmx500m -Xss10m
 
