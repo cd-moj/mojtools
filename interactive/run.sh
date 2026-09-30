@@ -41,12 +41,13 @@ source binfile.sh
 
 # dispatch de linguagem pela extensão do binário/fonte (testado: compilados ELF, py, sh,
 # java, kt; melhor esforço: js — ver limitações no tutorial). Os ramos da JVM espelham
-# lang/java/run.sh e lang/kt/run.sh (mesmas flags de heap/stack): java roda a CLASSE
+# lang/java/run.sh e lang/kt/run.sh (mesmas flags de heap/stack, locale e charset): java roda a CLASSE
 # (compile.sh elege a que tem main), kotlin roda o JAR (kotlinc -include-runtime já põe o
 # Main-Class no manifest). ⚠ na JVM o `stdbuf -oL` abaixo é NO-OP (I/O próprio, não libc):
 # a solução TEM de dar flush a cada resposta — está no enunciado/tutorial.
 CMD=(/tmp/dir/"$BIN")
-_JVM=(-Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k)
+_JVM=(-Duser.language=en -Duser.country=US -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+      -Xms10m -Xmx${MOJ_MEMLIMITMB:-500}m -Xss${MOJ_STACKKB:-131072}k)
 case "$BIN" in
   *.py|*.py2|*.py3) CMD=(python3 /tmp/dir/"$BIN") ;;
   *.sh)             CMD=(bash /tmp/dir/"$BIN") ;;
