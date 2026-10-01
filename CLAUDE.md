@@ -125,7 +125,15 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   web) em `scripts/<lang>/compile.sh` (cópia real +x — roda NA JAULA). Os 5 drivers (c/cpp/
   py/java/rs) trazem a **SENTINELA anti-IO** (última linha de todo teste = 424242; função que
   consome a entrada ⇒ SENTINELA-VIOLADA ⇒ WA determinístico). Guia:
-  `docs/submissao-de-funcao.md`; atalho da CLI: `moj fn`.
+  `docs/submissao-de-funcao.md`; atalho da CLI: `moj fn`. **`FUNCTION_LANGS=c,py` no conf**
+  (30/09/2026) DECLARA as linguagens de função: o `install-fn.sh` a grava (união, ids canônicos, no
+  COMEÇO do conf, sem `sed -i` — roda no Mac do autor), o `gen-problem-json.sh` a serve como
+  `function_langs` e o editor do aluno (treino e o módulo `esqueletos` do contest) abre VAZIO nelas.
+  Ter `scripts/<lang>/compile.sh` NÃO é o sinal (o slot COMPILE também é ban e OpenMP/MPI): a
+  heurística `fn/driver-langs.sh` (main num heredoc; 156/45 no acervo, sem ambíguo) só serve ao aviso
+  do `validate-problem.sh` (`conf_function_sane` reprova linguagem sem driver) e à migração do cdmoj.
+  O `tl-checksum.sh` ignora a linha, como o `SAMPLE`. ⚠ `lang-canon.sh` sourced sob `set -e`: a última
+  linha é `if`, não `&&` (o `[[ ]]` falso virava o rc do `source`).
 - **Validador de ENTRADA** (`scripts/validator.cpp`, 2026-09-24): `testlib/validator-run.sh <pkg>` roda o
   validador (testlib `registerValidation`) sobre cada `tests/input/*` e imprime UMA linha JSON
   `category:"validator"` (`verdict` none|ok|invalid|error, `tests[{name,code:OK|INVALID|FAIL,msg}]`); a

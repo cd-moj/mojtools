@@ -43,6 +43,33 @@ for l in $langs; do
   n=$((n+1))
 done
 (( n > 0 )) || { echo "install-fn: nenhuma linguagem instalada" >&2; exit 1; }
+
+# FUNCTION_LANGS no conf (cdmoj/docs/PACOTE.md): é ELA que diz ao editor (treino e o módulo `esqueletos`
+# do contest) que nessas linguagens o aluno escreve SÓ a função — sem ela o editor mostraria o
+# esqueleto com main (CE por main duplicado). União com o que já estava declarado; ids canônicos.
+# A linha entra no COMEÇO do conf (o tl-checksum a ignora; no começo, o conf filtrado fica byte a byte o
+# de antes) ou troca no lugar (o awk normaliza o \n final — sem efeito prático: instalar driver já
+# mexeu em scripts/, e o problema recalibra de todo jeito). Sem `sed -i`: o `moj fn` roda isto na
+# máquina do autor, que pode ser um Mac (o -i do BSD é outro).
+source "$HERE/../lang-canon.sh"
+_cur="$(sed -nE 's/^[[:space:]]*FUNCTION_LANGS=["'"'"']?([^"'"'"'#]*).*/\1/p' "$pkg/conf" 2>/dev/null | tail -1 || true)"
+_all=""; IFS=', ' read -ra _decl <<<"$_cur"; _dirs=()
+while IFS= read -r _d; do _dirs+=("$_d"); done < <(find "$pkg/scripts" -mindepth 2 -maxdepth 2 -name compile.sh 2>/dev/null | sed 's@/compile.sh$@@; s@.*/@@' | sort)
+for _l in "${_decl[@]}" "${_dirs[@]}"; do
+  _c="$(lang_canon "$_l")"
+  [[ "$_c" =~ ^[a-z0-9]{1,16}$ && ",$_all," != *",$_c,"* ]] || continue
+  # só entra linguagem declarada antes OU instalada agora (o compile.sh de ban/OpenMP não é de função)
+  [[ " ${_decl[*]} " == *" $_l "* || " $langs " == *" $_l "* ]] && _all+="${_all:+,}$_c"
+done
+if [[ -n "$_all" ]]; then
+  _tmp="$pkg/.conf.install-fn.$$"
+  if grep -qE '^[[:space:]]*FUNCTION_LANGS[[:space:]]*=' "$pkg/conf" 2>/dev/null; then
+    awk -v v="FUNCTION_LANGS=$_all" '/^[[:space:]]*FUNCTION_LANGS[[:space:]]*=/ && !d { print v; d = 1; next } { print }' "$pkg/conf" > "$_tmp"
+  else
+    { printf 'FUNCTION_LANGS=%s\n' "$_all"; if [[ -f "$pkg/conf" ]]; then cat "$pkg/conf"; fi; } > "$_tmp"
+  fi
+  mv -f "$_tmp" "$pkg/conf" && echo "conf: FUNCTION_LANGS=$_all (o editor abre vazio nessas linguagens)"
+fi
 _pres=""
 [[ -f "$pkg/scripts/compare.sh" ]] && _pres+=" compare.sh(checker)"
 [[ -f "$pkg/scripts/summary.sh" ]] && _pres+=" summary.sh"
@@ -60,6 +87,8 @@ próximos passos:
   5. mexer em scripts/ muda o tl-checksum => o Painel vai pedir recalibração (correto);
   6. exemplo: se mostrar a entrada do driver não faz sentido p/ o aluno, declare SAMPLE=no no
      conf e explique a chamada no texto do enunciado (seção ## Exemplo). Com exemplo, use um
-     tests/input/sample1 + uma nota docs/notes/sample1.md dizendo o que o driver faz com ele.
+     tests/input/sample1 + uma nota docs/notes/sample1.md dizendo o que o driver faz com ele;
+  7. FUNCTION_LANGS no conf já lista as linguagens com driver: se apagar o compile.sh de uma
+     delas, tire-a da linha também (a validação reprova linguagem listada sem driver).
 guia completo: mojtools/docs/submissao-de-funcao.md
 DICAS

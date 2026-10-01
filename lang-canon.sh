@@ -14,4 +14,6 @@ lang_canon(){
     *)              printf '%s' "$t";;
   esac
 }
-[[ "${BASH_SOURCE[0]}" == "$0" ]] && lang_canon "${1:-}"
+# `if`, não `&&`: sourced, o `[[ ]]` falso virava o rc do `source` e matava quem roda com `set -e`
+# (fn/install-fn.sh).
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then lang_canon "${1:-}"; fi

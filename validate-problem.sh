@@ -265,6 +265,32 @@ else
   fi
 fi
 
+# --- conf_function_sane: FUNCTION_LANGS (submissão de FUNÇÃO, cdmoj/docs/PACOTE.md), lida por GREP.
+#     HARD: id inválido, ou linguagem listada SEM scripts/<lang>/compile.sh — o editor abriria vazio,
+#     o aluno mandaria só a função e, sem o driver, não haveria main (CE garantido). Soft
+#     (render_warnings): um compile.sh que escreve um main num heredoc (fn/driver-langs.sh) numa
+#     linguagem FORA da lista — o editor mostraria o esqueleto com main e o aluno levaria CE por main
+#     duplicado. A heurística só AVISA; quem decide é a linha, declarada pelo autor.
+source "$SELF/lang-canon.sh"
+_fnraw="$(sed -nE 's/^[[:space:]]*FUNCTION_LANGS=["'"'"']?([^"'"'"'#]*).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
+IFS=', ' read -ra _fnl <<<"$_fnraw"
+_cdirs=" "
+while IFS= read -r _f; do _cdirs+="$(lang_canon "$(basename "$(dirname "$_f")")") "
+done < <(find "$PKG/scripts" -mindepth 2 -maxdepth 2 -name compile.sh 2>/dev/null)
+fbad=""; _fdecl=" "
+for _l in "${_fnl[@]}"; do
+  _c="$(lang_canon "$_l")"
+  [[ "$_c" =~ ^[a-z0-9]{1,16}$ ]] || { fbad+="'$_l'(id inválido) "; continue; }
+  _fdecl+="$_c "
+  [[ "$_cdirs" == *" $_c "* ]] || fbad+="$_c(sem scripts/$_c/compile.sh) "
+done
+if [[ -n "$fbad" ]]; then add conf_function_sane 0 "FUNCTION_LANGS inválida no conf: $fbad"
+else add conf_function_sane 1 "$([[ "$_fdecl" != " " ]] && printf 'FUNCTION_LANGS=%s' "$(echo $_fdecl | tr ' ' ',')")"; fi
+_fmiss=""
+while IFS= read -r _d; do [[ -n "$_d" && "$_fdecl" != *" $_d "* ]] && _fmiss+="${_fmiss:+,}$_d"
+done < <(bash "$SELF/fn/driver-langs.sh" "$PKG" 2>/dev/null)
+[[ -n "$_fmiss" ]] && render_leak="${render_leak}driver-de-funcao-fora-do-FUNCTION_LANGS($_fmiss) "
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 

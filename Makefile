@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel test-score test-fn deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -62,6 +62,11 @@ test-parallel:
 ##              nunca "Wrong" fixo; pacote quebrado = Judge Error (build-and-test real, cage-run FALSO)
 test-score:
 	@bash test-score-summary.sh
+
+## test-fn — FUNCTION_LANGS (submissão de função): tl-checksum a ignora, gen-problem-json a serve,
+##           validate-problem a confere, install-fn a grava, driver-langs.sh (a heurística)
+test-fn:
+	@bash fn/test-function-langs.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:

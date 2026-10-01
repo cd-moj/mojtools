@@ -41,9 +41,16 @@ Depois:
 1. `sols/good/` recebe **só a função** (sem main), uma por linguagem liberada;
 2. todo `tests/input/*` termina com a linha da **sentinela** `424242` (abaixo);
 3. restrinja **`languages`** do problema às linguagens COM driver;
-4. `moj push` + `moj validate`/`calibrate` como sempre (mexer em `scripts/` muda o
+4. declare as linguagens de função no `conf`: **`FUNCTION_LANGS=c,py`** (ids da linguagem de
+   submissão: `py`, não `py3`). O `moj fn` e o template do editor web já gravam a linha; no editor,
+   ela é o campo **Submissão de função** da aba Limites. É ela que diz ao editor do aluno (treino e
+   o módulo `esqueletos` do contest) que ali ele escreve SÓ a função: o editor abre vazio, sem o
+   esqueleto com `main` (que daria CE por main duplicado). A linha não muda o julgamento nem pede
+   recalibração. O `validate-problem` reprova linguagem listada sem `scripts/<lang>/compile.sh` e
+   avisa driver fora da lista (`fn/driver-langs.sh`);
+5. `moj push` + `moj validate`/`calibrate` como sempre (mexer em `scripts/` muda o
    tl-checksum ⇒ o Painel pede recalibração — correto, aceite);
-5. **exemplo**: a entrada do teste é o formato INTERNO do driver, que o aluno não lê. Escolha um:
+6. **exemplo**: a entrada do teste é o formato INTERNO do driver, que o aluno não lê. Escolha um:
    - **sem exemplo**: `SAMPLE=no` no `conf` (no editor web, **Sem exemplos** na aba Limites) e o
      exemplo no TEXTO do enunciado — uma figura, uma chamada da função e o que ela devolve ou
      imprime. Não crie `tests/input/sample*`;

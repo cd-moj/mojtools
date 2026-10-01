@@ -37,8 +37,11 @@ SOLDIRS=(sols/good)
   # pacotes carimbados), e com `sed`, não `grep -v`: o grep repõe o \n final que falte e mudaria o
   # hash de conf sem \n no fim. Por isso quem ACRESCENTA a linha num conf assim a põe no COMEÇO
   # (server/bin/sample-flag-migrate.sh); o editor/API já normalizam o \n final ao gravar.
+  # FUNCTION_LANGS (as linguagens de SUBMISSÃO DE FUNÇÃO, cdmoj/docs/PACOTE.md) também fica de fora
+  # pelo mesmo motivo: ela só diz ao EDITOR que ali o aluno escreve só a função — quem julga é o
+  # scripts/<lang>/compile.sh, e ele já entra no hash (server/bin/function-langs-migrate.sh).
   if [[ -f "$pkg/conf" ]]; then printf '=conf\n'
-    if grep -qE '^[[:space:]]*SAMPLE[[:space:]]*=' "$pkg/conf"; then sed -E '/^[[:space:]]*SAMPLE[[:space:]]*=/d' "$pkg/conf"
+    if grep -qE '^[[:space:]]*(SAMPLE|FUNCTION_LANGS)[[:space:]]*=' "$pkg/conf"; then sed -E '/^[[:space:]]*(SAMPLE|FUNCTION_LANGS)[[:space:]]*=/d' "$pkg/conf"
     else cat "$pkg/conf"; fi
     printf '\n'; fi
   # testes (entrada + saída esperada + grupos do score) + soluções "good".
