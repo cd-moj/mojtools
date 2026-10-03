@@ -124,6 +124,13 @@ fi
 cpun="$(sed -nE 's/^[[:space:]]*CPUNEEDED=["'"'"']?([0-9]+).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
 [[ "$cpun" =~ ^[0-9]+$ && "$cpun" -ge 1 && "$cpun" -le 64 ]] || cpun=1
 snuma=false; grep -qE '^[[:space:]]*SAMENUMA=["'"'"']?y' "$PKG/conf" 2>/dev/null && snuma=true
+# STOPWHEN_* (parar no 1º erro) e o nº de testes: vão ao json servível p/ o checklist da prova (cdmoj preflight,
+# item `stop_first`) — rota de contest não abre pacote. TCP 2026 (03/10/2026): o G tinha 214 testes e
+# STOPWHEN_TLE=n, e cada TLE levava 2,5–4 min (o juiz roda TODOS depois do 1º). Vale a ÚLTIMA linha (como o
+# `source` do build-and-test); ausente = não para (o juiz só para com "y").
+_sw(){ local v; v="$(sed -nE "s/^[[:space:]]*$1=[\"']?([A-Za-z]*).*/\\1/p" "$PKG/conf" 2>/dev/null | tail -1)"; [[ "$v" == y ]] && echo true || echo false; }
+sw_wa="$(_sw STOPWHEN_WA)"; sw_tle="$(_sw STOPWHEN_TLE)"; sw_re="$(_sw STOPWHEN_RE)"
+ntests="$(find "$PKG/tests/input" -maxdepth 1 -type f 2>/dev/null | wc -l)"; ntests="${ntests//[^0-9]/}"; ntests="${ntests:-0}"
 # FUNCTION_LANGS (submissão de FUNÇÃO, cdmoj/docs/PACOTE.md): as linguagens em que o aluno envia SÓ a
 # função — o driver com o `main` é o scripts/<lang>/compile.sh do autor. O editor (treino e o módulo
 # `esqueletos` do contest) abre VAZIO nelas: o esqueleto com `main` daria CE por main duplicado. É
@@ -212,9 +219,10 @@ out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
   --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   --argjson cpun "$cpun" --argjson snuma "$snuma" --argjson fnl "$fnl_json" \
+  --argjson swwa "$sw_wa" --argjson swtle "$sw_tle" --argjson swre "$sw_re" --argjson ntests "$ntests" \
   '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
     statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma,
-    function_langs:$fnl}
+    function_langs:$fnl, stop_when:{wa:$swwa, tle:$swtle, re:$swre}, tests:$ntests}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"
 rm -f "$b64f" "$stmts_f" "$samples_f"
 priv="$(dirname "$TREINO_JSONS")/jsons-private/$ID.json"

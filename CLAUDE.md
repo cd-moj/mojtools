@@ -129,6 +129,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   (30/09/2026) DECLARA as linguagens de função: o `install-fn.sh` a grava (união, ids canônicos, no
   COMEÇO do conf, sem `sed -i` — roda no Mac do autor), o `gen-problem-json.sh` a serve como
   `function_langs` e o editor do aluno (treino e o módulo `esqueletos` do contest) abre VAZIO nelas.
+  O json servível leva também `stop_when:{wa,tle,re}` (os STOPWHEN_* do conf, última linha vale) e `tests` (nº de
+  arquivos em tests/input) — o checklist da prova (cdmoj preflight `stop_first`) avisa o problema ICPC que segue
+  julgando depois do 1º erro sem abrir o pacote (TCP 2026: G com 214 testes, 4 min por TLE).
   Ter `scripts/<lang>/compile.sh` NÃO é o sinal (o slot COMPILE também é ban e OpenMP/MPI): a
   heurística `fn/driver-langs.sh` (main num heredoc; 156/45 no acervo, sem ambíguo) só serve ao aviso
   do `validate-problem.sh` (`conf_function_sane` reprova linguagem sem driver) e à migração do cdmoj.
