@@ -14,7 +14,7 @@ if [[ ! -s "$_rars_jar" ]]; then
     flock 9
     if [[ ! -s "$_rars_jar" ]]; then
       _rars_tmp="$(mktemp "$_rars_dir/.rars.XXXXXX")" \
-        && wget -q https://github.com/TheThirdOne/rars/releases/download/v1.5/rars1_5.jar -O "$_rars_tmp" \
+        && wget -q https://github.com/TheThirdOne/rars/releases/download/v1.6/rars1_6.jar -O "$_rars_tmp" \
         && mv -f "$_rars_tmp" "$_rars_jar" || rm -f "$_rars_tmp"
     fi
   ) 9>"$_rars_jar.lock"
