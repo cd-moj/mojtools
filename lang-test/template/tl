@@ -1,1 +1,3 @@
 TL[default]=1
+# RISC-V roda no RARS (uma JVM): só a subida leva mais de 1 s (~2,6 s medido no juiz em 16/10/2026)
+TL[riscv]=5
