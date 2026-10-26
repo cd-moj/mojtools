@@ -41,7 +41,14 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   byte a byte e as linhas se embaralham), `.stop` conferido por todo worker (STOPWHEN/RUNALL),
   `/proc/$BAT_PID` sumiu ⇒ worker sai. O `binfile.sh` EXPORTA `MOJ_TEST_CPUS` e
   `OMP_NUM_THREADS` (= k) p/ a jaula; o `run.sh` de MPI faz `mpirun -np "$MOJ_TEST_CPUS"`.
-  `report.env`: `NPROCINFO=P`, `CPUNEEDEDINFO=k`, `CPUGROUPSINFO`. O `calibreitor.sh` exporta
+  `report.env`: `NPROCINFO=P`, `CPUNEEDEDINFO=k`, `CPUGROUPSINFO`. **Laço final (26/10/2026)**: a
+  regra de parada é UMA função (`_stops <rc>`, com `_verdict_rc`), usada pelo pool e reaplicada EM ORDEM
+  no laço final sobre os veredictos finais (depois do rerun de TLE): parada espúria (o TLE que a disparou
+  passa no rerun) ⇒ os testes que o pool não rodou rodam ali, em série no grupo 0, sem rerun; com falha
+  confirmada eles não rodam (e o `score-summary.sh` conta `SOMA[g,NT]`: grupo com teste que não rodou
+  NÃO pontua). Antes: "Unknown ERROR" e, com grupos, "Accepted" FALSO; e o `((RESPERRO++)) && continue`
+  não pulava com RESPERRO 0 (linha EXECTIME vazia). ⚠ o `score-summary.sh` roda sob `set -f`: glob só
+  com `set +f` local. Teste: `test-final-loop.sh`. O `calibreitor.sh` exporta
   `MOJ_PARALLEL=1` (um teste por vez em k CPUs = a forma do julgamento; o `ALLOWPARALLELTEST=n`
   de antes era vencido pelo conf sourced depois — bug (f)) e tira o `MOJ_RELEASE_FILE` (a calibração
   nunca libera grupo: a disparada por um job de P grupos devolvia os slots dele no meio do julgamento,

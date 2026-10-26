@@ -89,6 +89,9 @@ collect_toolchain()
 {
   TOOLCHAIN_VER=""
   [[ -n "${MOJ_PROBLEM_ID:-}" ]] || return 0
+  # na calibração, NÃO: o agente também passa MOJ_PROBLEM_ID ao calibreitor (o nome do report usa), e cada
+  # solução calibrada pagava uma jaula a mais só p/ ler a versão do compilador (26/10/2026)
+  [[ -n "${MOJ_CALIBRATING:-}" ]] && return 0
   local vc="${_VERCMD[$LANGUAGE]:-}"; [[ -n "$vc" ]] || return 0
   local vs="$workdirbase/.ver.sh"
   printf '#!/bin/bash\n%s 2>&1 | head -2\n' "$vc" > "$vs"; chmod +x "$vs"
@@ -533,10 +536,8 @@ function run-testinput()
   local EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
   local _CMP="" _V=""
   _verdict_for "${TL[$LANGUAGE]}"
-  local VERDICT="$_V" ERR
-  case "$VERDICT" in
-    AC|AC,PE) ERR=0 ;; TLE) ERR=3 ;; WA) ERR=6 ;; RE) ERR=127 ;; RE_NZEC) ERR=126 ;; MLE) ERR=9 ;; *) ERR=7 ;;
-  esac
+  local VERDICT="$_V" ERR _RC
+  _verdict_rc "$VERDICT"; ERR=$_RC
   echo "VERDICT[$FILE]=$VERDICT" >> $workdirbase/log.verdictall
   echo "$VERDICT" > $workdirbase/$FILE-log.verdict
   # calibração: o veredicto do MESMO teste pelo outro método. Arquivo PRÓPRIO: o log.verdictall é sourced com
@@ -546,6 +547,22 @@ function run-testinput()
     echo "VERDICTALT[$FILE]=$_V" >> $workdirbase/log.verdictalt
   fi
   return $ERR
+}
+
+# _verdict_rc <veredicto> — o código de saída do run-testinput para esse veredicto, em _RC (sem subshell).
+_verdict_rc() {
+  case "$1" in
+    AC|AC,PE) _RC=0 ;; TLE) _RC=3 ;; WA) _RC=6 ;; RE) _RC=127 ;; RE_NZEC) _RC=126 ;; MLE) _RC=9 ;; *) _RC=7 ;;
+  esac
+}
+# _stops <rc> — a REGRA DE PARADA (STOPWHEN_* do conf e RUNALL), a MESMA no pool paralelo e no laço final:
+# verdadeiro = depois deste teste não se roda mais nenhum.
+_stops() {
+  { (( $1 == 6 ))   && [[ "${STOPWHEN_WA:-}" == "y" ]];  } && return 0
+  { (( $1 == 3 ))   && [[ "${STOPWHEN_TLE:-}" == "y" ]]; } && return 0
+  { (( $1 >= 126 )) && [[ "${STOPWHEN_RE:-}" == "y" ]];  } && return 0
+  { (( $1 != 0 ))   && [[ "$RUNALL" != "y" ]];           } && return 0
+  return 1
 }
 
 # _verdict_for <TL> [alt] — a cadeia de decisão de UM teste pelo TL dado: TLE → RE → RE_NZEC → compare → MLE.
@@ -611,10 +628,7 @@ _test_worker() {  # $1 = índice do grupo (0..P-1)
     [[ -d "/proc/$BAT_PID" ]] || exit 0     # o harness morreu: worker órfão não roda mais nada
     if mkdir "$workdirbase/.claim/$i" 2>/dev/null; then
       run-testinput "${TESTS[$i]}"; RET=$?
-      { (( RET == 6 ))   && [[ "${STOPWHEN_WA:-}" == "y" ]];  } && : > "$workdirbase/.stop"
-      { (( RET == 3 ))   && [[ "${STOPWHEN_TLE:-}" == "y" ]]; } && : > "$workdirbase/.stop"
-      { (( RET >= 126 )) && [[ "${STOPWHEN_RE:-}" == "y" ]];  } && : > "$workdirbase/.stop"
-      { (( RET != 0 ))   && [[ "$RUNALL" != "y" ]];           } && : > "$workdirbase/.stop"
+      _stops "$RET" && : > "$workdirbase/.stop"
     fi
     ((i++))
   done
@@ -650,6 +664,14 @@ VERDICTORDER[AC]=1
 VERDICTORDER[AC,PE]=1
 SMALLRESP=AC
 
+# O LAÇO FINAL NÃO CONFIA NO `.stop` DO POOL (26/10/2026). A parada do pool pode ser ESPÚRIA: o teste que a
+# disparou (TLE por disputa de CPU entre os testes paralelos) passa no rerun serial logo abaixo. Antes, os
+# testes que a parada deixou de fora viravam "INPUT NOT TESTED" e o veredicto saía "Unknown ERROR" — ou, com
+# grupos (tests/score), um "Accepted" FALSO, com grupo pontuando sem ter rodado inteiro. Agora a regra de parada
+# (_stops) é reaplicada em ordem, sobre os veredictos FINAIS (depois do rerun): enquanto nada a disparou, o teste
+# que o pool não rodou roda AQUI, em série no grupo 0, sem rerun de TLE (a execução serial é a referência).
+STOPPED=0
+NOTTESTED=()
 for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "--------------------------------------------------------------------"
   if [[ ! -e "$INPUT" ]]; then
@@ -662,12 +684,23 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG "## Testfile: $FILE"
   LOG ""
   THISRERUN=0
-  THISVERDICT=${VERDICT[$FILE]}
-  [[ -z "$THISVERDICT" ]] &&
-    LOG " - Can't find VERDICT for this FILE($INPUT)" &&
-    RESP="INPUT NOT TESTED" && ((RESPERRO++)) && continue
+  THISVERDICT=${VERDICT[$FILE]:-}
+  if [[ -z "$THISVERDICT" && $STOPPED -eq 0 ]]; then
+    LOG " - Not run by the parallel pass (its stop was not confirmed): running it now, serially"
+    run-testinput "$INPUT"
+    THISRERUN=1
+    source $workdirbase/log.verdictall
+    THISVERDICT="${VERDICT[$FILE]:-}"
+  fi
+  # ((RESPERRO++)) && continue NÃO pulava quando RESPERRO era 0: o post-increment vale 0 (falso) — o teste
+  # seguia com veredicto vazio, contava duas vezes e logava uma linha EXECTIME vazia
+  if [[ -z "$THISVERDICT" ]]; then
+    LOG " - Can't find VERDICT for this FILE($INPUT)$( (( STOPPED )) && echo ' (not run: a previous test stopped the run)')"
+    RESP="INPUT NOT TESTED"; RESPERRO=$((RESPERRO+1)); NOTTESTED+=("$FILE")
+    continue
+  fi
 
-  if [[ "$THISVERDICT" == "TLE" ]]; then
+  if [[ "$THISVERDICT" == "TLE" && $THISRERUN -eq 0 ]]; then
     if [[ "$TLERERUN" == "y" ]]; then
 	    LOG " - Rerun: because got TLE while running parallel tests"
 	    run-testinput $INPUT
@@ -679,6 +712,7 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
 	    LOG " - Rerun: It will not be RERUNNED because previous RERUN were TLE"
     fi
   fi
+  _verdict_rc "$THISVERDICT"; _stops "$_RC" && STOPPED=1
 
   LOG ""
   LOG "### CAGE CONTROL DATA this is for Bruno to check"

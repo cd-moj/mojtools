@@ -82,13 +82,14 @@ source "$workdirbase/log.verdictall"
 
 declare -A RESPOSTASCOUNT
 shopt -s extglob &>/dev/null
-NOGROUP=""
-for INPUT in "${!VERDICT[@]}"; do
-  groupname="${INPUT%%+([0-9])}"                            # tira os dígitos finais
-  [[ -n "${GROUPFFS[$INPUT]}" ]] && groupname="$INPUT"      # nome exato também vale como grupo
+# _ss_group_of <teste> — o índice do grupo do teste em _SSG (vazio = sem grupo). Primeiro o nome sem os dígitos
+# finais (ou o nome exato); senão o GLOB REAL contra os padrões, na ordem do arquivo (o atalho só cobre
+# prefixo-sem-dígitos-finais — "aula_*" não vira o nome derivado de "aula_2_1").
+_ss_group_of() {
+  local INPUT="$1" groupname _g _pat
+  groupname="${INPUT%%+([0-9])}"
+  [[ -n "${GROUPFFS[$INPUT]}" ]] && groupname="$INPUT"
   if [[ -z "${GROUPFFS[$groupname]}" ]]; then
-    # fallback: GLOB REAL contra os padrões, na ordem do arquivo (o atalho acima só cobre
-    # prefixo-sem-dígitos-finais — "aula_*" não vira o nome derivado de "aula_2_1")
     for (( _g=0; _g<${#GROUP[@]}; _g++ )); do
       for _pat in ${GROUPPATS[$_g]:-}; do
         if [[ "$INPUT" == $_pat ]]; then GROUPFFS[$INPUT]=$_g; groupname="$INPUT"; break 2; fi
@@ -96,27 +97,44 @@ for INPUT in "${!VERDICT[@]}"; do
     done
   fi
   [[ -z "${GROUPFFS[$groupname]}" && -n "$EXTRAGROUP" ]] && GROUPFFS[$groupname]=$EXTRAGROUP
-  if [[ -z "${GROUPFFS[$groupname]}" ]]; then
+  _SSG="${GROUPFFS[$groupname]:-}"
+}
+NOGROUP=""
+for INPUT in "${!VERDICT[@]}"; do
+  _ss_group_of "$INPUT"
+  if [[ -z "$_SSG" ]]; then
     LOG "- score-summary: sem grupo para o teste '$INPUT'"; NOGROUP="$INPUT"; break
   fi
-  gi=${GROUPFFS[$groupname]}
+  gi=$_SSG
   if [[ ${VERDICT[$INPUT]} =~ AC ]]; then (( SOMA[$gi,AC]++ )); else (( SOMA[$gi,WRONG]++ )); fi
   (( RESPOSTASCOUNT[${VERDICT[$INPUT]}]++ ))
 done
+# os testes que NÃO rodaram (uma falha confirmada parou a execução — STOPWHEN/RUNALL — ou o worker morreu): o
+# grupo deles não pode valer os pontos. Antes, grupo com 1 AC executado e o resto sem rodar pontuava — com todos
+# os grupos assim, saía "Accepted" com teste que nunca rodou (26/10/2026).
+if [[ -z "$NOGROUP" ]]; then
+  # ⚠ este arquivo roda sob `set -f` (acima): a lista dos testes precisa do glob ligado SÓ aqui
+  set +f; _ss_inputs=( "$PROBLEMTEMPLATEDIR"/tests/input/* ); set -f
+  for _t in "${_ss_inputs[@]}"; do
+    [[ -e "$_t" ]] || continue
+    _t="${_t##*/}"; [[ -n "${VERDICT[$_t]:-}" ]] && continue
+    _ss_group_of "$_t"; [[ -n "$_SSG" ]] && (( SOMA[$_SSG,NT]++ ))
+  done
+fi
 
-# soma os pontos: grupo vale o peso só se 0 WRONG e >=1 AC. Além do BREAK (string de
+# soma os pontos: grupo vale o peso só se 0 WRONG, >=1 AC e NENHUM teste sem rodar (NT). Além do BREAK (string de
 # display legada), acumula o dado ESTRUTURADO por grupo (GJSON -> SCORE_GROUPS): só
 # grupos de peso>0 (peso 0 = exemplos), earned = peso | 0 (falhou) | null (não executado).
 EARNED=0; FAILED=0; BREAK="Pontos |"; GJSON=""
 for (( g=0; g<${#GROUP[@]}; g++ )); do
-  if (( ${SOMA[$g,WRONG]:-0} == 0 && ${SOMA[$g,AC]:-0} > 0 )); then
+  if (( ${SOMA[$g,WRONG]:-0} == 0 && ${SOMA[$g,AC]:-0} > 0 && ${SOMA[$g,NT]:-0} == 0 )); then
     (( EARNED += ${GROUP[$g]} ))
     GEARNED=${GROUP[$g]}
     (( ${GROUP[$g]} > 0 )) && BREAK+=" ${GROUP[$g]} |"     # grupo de 0 ponto (público) não entra no detalhe
   elif (( ${SOMA[$g,WRONG]:-0} > 0 )); then
     (( FAILED++ )); BREAK+=" 0 |"; GEARNED=0
   else
-    # grupo sem NENHUM teste executado. De peso 0 é VÁCUO (ex.: "sample* - 0 pontos" num problema
+    # grupo sem NENHUM teste executado, ou com teste que não rodou (NT). De peso 0 é VÁCUO (ex.: "sample* - 0 pontos" num problema
     # SAMPLE=no — o validate-problem.sh o aceita, e contá-lo como falha derrubava TODA submissão
     # perfeita). Não esconde falha: teste que falha sempre derruba o PRÓPRIO grupo, seja qual for o peso.
     (( ${GROUP[$g]} == 0 )) && continue

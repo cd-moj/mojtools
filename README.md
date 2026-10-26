@@ -527,6 +527,13 @@ testes com uma reivindicação atômica por teste (`mkdir`), todo worker confere
 antes de pegar o próximo, e o `report.env` leva `NPROCINFO=P` e `CPUNEEDEDINFO=k` (o report mostra
 "P teste(s) ao mesmo tempo × k CPU(s) por teste"). Teste: `make test-parallel`.
 
+O laço final, depois do pool, reaplica a MESMA regra de parada (`_stops`) em ordem, sobre os veredictos
+finais (depois do rerun serial de TLE). Se o teste que parou o pool passa no rerun, a parada era espúria
+(disputa de CPU entre testes paralelos): os testes que ela deixou de fora rodam ali, em série, no grupo 0.
+Com uma falha confirmada, eles não rodam, e um grupo de `tests/score` com teste que não rodou não pontua.
+Antes, a parada espúria dava "Unknown ERROR" e, com grupos, um "Accepted" falso. Teste: `make
+test-final-loop`.
+
 Lê do `conf` do problema: todas as chaves de limite (ver `cdmoj/docs/PACOTE.md`).
 
 ### `cage-run.sh`: a jaula
