@@ -694,10 +694,11 @@ mas só valem se o checksum do pacote ainda bate. Se o pacote mudou e ninguém r
 arquivo `tl` do próprio pacote (o formato local, útil fora do servidor); se nem isso existe, o campo
 sai vazio. As chaves legadas `py2`/`py3` fundem em `py` pelo maior valor.
 
-Se o `conf` do pacote tem **`TLOVERRIDE`**, ele é aplicado por cima do calibrado
-(`override[lang] // override[default] // calibrado[lang]`), porque o número que o aluno lê tem de
-ser o que o juiz vai cobrar. Este script roda no **servidor** e o `conf` é código do autor: o
-override é lido por `sed`, **nunca** por `source`.
+Se o `conf` do pacote tem **`TLOVERRIDE`** ou **`TLMOD[<lang>.sum|.mult]`**, eles são aplicados por cima do
+calibrado — a conta do juiz: `override[lang] // override[default] // ((calibrado[lang] // calibrado[default]) +
+sum) × mult` —, porque o número que o aluno lê tem de ser o que o juiz vai cobrar. A regra é a `tl_eff`, cópia
+literal da do servidor (`cdmoj lib/tl-store.sh`). Este script roda no **servidor** e o `conf` é código do autor:
+o override e os ajustes são lidos por `sed`, **nunca** por `source`.
 
 **O portão do índice público mora aqui** (`var/jsons/` é servido sem login: lista *e* enunciado).
 É fail-closed: o default é privado, e só vira público se o `.moj-meta.json` disser `public: true` —

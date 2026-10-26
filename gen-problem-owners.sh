@@ -6,7 +6,7 @@
 #     { generated_at, count, problems: [ {id, repo, prob, title, author, author_norm,
 #                                          owner, collaborators[], collections[], public, html,
 #                                          tl_checksum, public_at, good_langs,
-#                                          tl_override} ] }
+#                                          tl_override, tl_mods} ] }
 # html = ENUNCIADO COMPILADO E SERVÍVEL (json em var/jsons OU var/jsons-private) — vale também
 # p/ problema PRIVADO validado (a pill "sem HTML" do painel deixa de ser sinônimo de privado).
 # good_langs = extensões das soluções sols/good/* (= linguagens); a gestão marca "revisar" se alguma
@@ -152,8 +152,17 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
       ovr="$(sed -nE 's/^[[:space:]]*TLOVERRIDE\[([A-Za-z0-9]{1,16})\]=([0-9]+\.?[0-9]*|\.[0-9]+)[[:space:]]*(#.*)?$/\1=\2/p' \
              "$pdir/conf" 2>/dev/null | sed -E 's/^py[23]=/py=/' | paste -sd';' -)"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" \
+    # TLMOD[<lang>.sum|.mult] do conf: o juiz soma/multiplica por cima da tabela antes do override (26/10/2026;
+    # 404 pacotes têm TLMOD[spim.sum]=1 e o Painel mostrava 1 s a menos). Espelho de `tl_conf_mods` (cdmoj
+    # lib/tl-store.sh): mesma regex, só linguagem canônica (o juiz procura TLMOD[$LANGUAGE.sum] já normalizado),
+    # sem `default`. Vai como lang.tipo=valor separado por ';'.
+    mods=""; _cf=""; [[ -f "$pdir/conf" ]] && _cf="$(<"$pdir/conf")" 2>/dev/null   # $(<…) não forka
+    if [[ "$_cf" == *'.sum]'* || "$_cf" == *'.mult]'* ]]; then
+      mods="$(sed -nE 's/^[[:space:]]*TLMOD\[([A-Za-z0-9]{1,16})\.(sum|mult)\]=(-?([0-9]+\.?[0-9]*|\.[0-9]+))[[:space:]]*(#.*)?$/\1.\2=\3/p' \
+              "$pdir/conf" 2>/dev/null | grep -vE '^(default|py2|py3|cc|cxx|hpp|h)\.' | paste -sd';' -)"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" "$mods" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -180,7 +189,11 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         good_langs:((.[12] // "")|split(",")|map(select(length>0))),
         languages:((.[14] // "")|split(",")|map(select(length>0))),
         tl_override:(((.[15] // "")|split(";")|map(select(length>0)|split("=")|select(length==2)
-                      |{(.[0]):.[1]})|add) // {}) }
+                      |{(.[0]):.[1]})|add) // {}),
+        tl_mods:((.[16] // "")|split(";")|map(select(length>0)|split("=")|select(length==2)
+                   |(.[0]|split(".")) as $lk | select(($lk|length)==2 and ((.[1]|tonumber?) != null))
+                   |{l:$lk[0], k:$lk[1], v:(.[1]|tonumber)})
+                 | if length == 0 then {} else reduce .[] as $e ({sum:{}, mult:{}}; .[$e.k][$e.l] = $e.v) end) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 
