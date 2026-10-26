@@ -10,7 +10,9 @@ bash kattis/export.sh <pkgdir> <id> <out-dir | out.tar.gz>
 # ex.: kattis/export.sh moj-problems/eda2-problems/somaab "eda2-problems#somaab" /tmp/somaab.tar.gz
 ```
 Gera um pacote Kattis válido:
-- `problem.yaml` — de `conf`+`.moj-meta.json`+`author`+`tags`+`tl` (uuid v5 estável; `time_limit`
+- `problem.yaml` — de `conf`+`.moj-meta.json`+`author`+`tags`+`tl`. O `conf` e o `tl` são lidos por
+  REGEX (`kt_conf_json`), nunca por `source`: isto roda na API e o conf é texto do autor. Ver
+  `test-no-source.sh`. Também: uuid v5 estável; `time_limit`
   = máx dos TL por-linguagem, arredondado p/ múltiplo de `time_resolution`; `credits.authors`,
   `keywords`, `limits`).
 - `statement/problem.<lang>.md` — `docs/enunciado.md` (ou org/tex → md via pandoc).

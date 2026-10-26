@@ -110,13 +110,14 @@ fi
 if [[ "$tl_json" == '{}' ]]; then
   TLFILE="$PKG/tl"; [[ -f "$PKG/tl.$HOSTNAME" ]] && TLFILE="$PKG/tl.$HOSTNAME"
   if [[ -f "$TLFILE" ]]; then
-    declare -A TL; declare -A TLMOD
-    source "$TLFILE" 2>/dev/null
-    { for k in "${!TL[@]}"; do printf '%s\t%s\n' "$k" "${TL[$k]}"; done; } \
-      | jq -R -s -c 'split("\n")|map(select(length>0)|split("\t")
-          |{((.[0]) | if .=="py3" or .=="py2" then "py" else . end):.[1]})|add // {}' \
-      > /tmp/.tljson.$$ 2>/dev/null && tl_json="$(cat /tmp/.tljson.$$)"; rm -f /tmp/.tljson.$$
-    unset TL TLMOD
+    # lido por REGEX, NUNCA `source`: este script roda NA API e o `tl` do pacote pode chegar no tar do autor
+    # (upload) — até 26/10/2026 um `TL[c]=$(…)` aqui executava código no servidor. Vale a ÚLTIMA linha de
+    # cada linguagem, como no bash; o que não é número não é TL.
+    tl_json="$(sed -nE 's/^[[:space:]]*TL\[([A-Za-z0-9+]{1,16})\]=["'"'"']?([0-9]+\.?[0-9]*|\.[0-9]+)["'"'"']?[[:space:]]*(#.*)?$/\1\t\2/p' \
+        "$TLFILE" 2>/dev/null \
+      | jq -Rnc '[inputs | split("\t") | select(length==2)
+                  | {((.[0]) | if .=="py3" or .=="py2" then "py" else . end): .[1]}] | add // {}' 2>/dev/null)"
+    [[ -n "$tl_json" ]] || tl_json='{}'
   fi
 fi
 # CPUNEEDED/SAMENUMA (problema paralelo): vão ao json servível p/ quem NÃO abre pacote (o preflight

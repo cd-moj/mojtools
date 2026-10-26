@@ -21,30 +21,60 @@ print("") if not e or not re.fullmatch(r"[0-9.+\-*/() ]+", e) else print(eval(e,
 PY
 }
 
-# kt_collect <pkgdir> <id> -> JSON com os campos-fonte do MOJ (source do conf+tl, meta, author, tags)
+# kt_conf_json <arquivo> -> {"scalars":{NOME:valor},"arrays":{NOME:{chave:valor}}}: as atribuições bash do
+# arquivo (o `conf` ou o `tl` do pacote), lidas por REGEX. NUNCA `source`: o conf é texto do AUTOR e isto roda
+# NA API (sidecar.sh a cada create/edit/upload de problema, e o export). Até 26/10/2026 o kt_collect fazia
+# `source` do conf e do tl, e uma linha `X=$(…)` executava código no servidor com o usuário da API; aqui ela é
+# texto. A última atribuição vence, como no bash; aspas simples ou duplas em volta do valor saem; depois de um
+# espaço, o resto da linha (comentário) é ignorado.
+kt_conf_json(){ python3 -I - "$1" <<'PY'
+import sys, re, json
+arrays, scalars = {}, {}
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+except OSError:
+    lines = []
+ASSIGN = re.compile(r'^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)(?:\[([^\]]*)\])?=(.*)$')
+def value(s):
+    s = s.strip()
+    if s[:1] in ('"', "'"):
+        end = s.find(s[0], 1)
+        return s[1:end] if end > 0 else s[1:]
+    return s.split(None, 1)[0] if s else ""
+for ln in lines:
+    m = ASSIGN.match(ln)
+    if not m:
+        continue
+    name, key, v = m.group(1), m.group(2), value(m.group(3))
+    if key is None:
+        scalars[name] = v
+    else:
+        arrays.setdefault(name, {})[key.strip().strip("\"'")] = v
+print(json.dumps({"scalars": scalars, "arrays": arrays}, ensure_ascii=False))
+PY
+}
+
+# kt_collect <pkgdir> <id> -> JSON com os campos-fonte do MOJ (conf+tl por kt_conf_json, meta, author, tags)
 kt_collect(){
-  local pkg="$1" id="$2"
-  ( set +e +u; set +o noglob
-    declare -A TLMOD ULIMITS TL
-    PUBLIC=""; ALLOWPARALLELTEST=""; CALIBRATIONTL=""; MAXPARALLELTESTS=""
-    [[ -f "$pkg/conf" ]] && source "$pkg/conf" 2>/dev/null
-    [[ -f "$pkg/tl" ]] && source "$pkg/tl" 2>/dev/null
-    local tlj='{}' k
-    for k in "${!TL[@]}"; do tlj="$(jq -c --arg k "$k" --argjson v "${TL[$k]:-0}" '.+{($k):$v}' <<<"$tlj" 2>/dev/null || echo "$tlj")"; done
-    local ulj='{}'
-    for k in "${!ULIMITS[@]}"; do ulj="$(jq -c --arg k "$k" --arg v "${ULIMITS[$k]}" '.+{($k):$v}' <<<"$ulj")"; done
-    local tmj='{}'
-    for k in "${!TLMOD[@]}"; do tmj="$(jq -c --arg k "$k" --arg v "${TLMOD[$k]}" '.+{($k):$v}' <<<"$tmj")"; done
-    local tags='[]'; [[ -f "$pkg/tags" ]] && tags="$(sed 's/^#//' "$pkg/tags" | jq -R . | jq -sc 'map(select(length>0))')"
-    local meta='{}'; [[ -f "$pkg/.moj-meta.json" ]] && meta="$(cat "$pkg/.moj-meta.json" 2>/dev/null)"; [[ -n "$meta" ]] || meta='{}'
-    local prev='{}'; [[ -f "$pkg/.kattis.json" ]] && prev="$(cat "$pkg/.kattis.json" 2>/dev/null)"; [[ -n "$prev" ]] || prev='{}'
-    jq -n --arg id "$id" --arg cf "${TLMOD[calibrafactor]:-}" --argjson tl "$tlj" --argjson ul "$ulj" \
-      --argjson tlmod "$tmj" --arg public "${PUBLIC:-}" --arg parallel "${ALLOWPARALLELTEST:-}" \
-      --arg author "$(head -1 "$pkg/author" 2>/dev/null)" --argjson tags "$tags" \
-      --argjson meta "$meta" --argjson prev "$prev" \
-      '{id:$id, calibrafactor:$cf, tl:$tl, ulimits:$ul, tlmod:$tlmod, public:$public,
-        allowparallel:$parallel, author:$author, tags:$tags, meta:$meta, prev:$prev}'
-  )
+  local pkg="$1" id="$2" tags='[]' meta='{}' prev='{}'
+  [[ -f "$pkg/tags" ]] && tags="$(sed 's/^#//' "$pkg/tags" | jq -R . | jq -sc 'map(select(length>0))')"
+  [[ -f "$pkg/.moj-meta.json" ]] && meta="$(cat "$pkg/.moj-meta.json" 2>/dev/null)"; [[ -n "$meta" ]] || meta='{}'
+  [[ -f "$pkg/.kattis.json" ]] && prev="$(cat "$pkg/.kattis.json" 2>/dev/null)"; [[ -n "$prev" ]] || prev='{}'
+  { kt_conf_json "$pkg/conf"; kt_conf_json "$pkg/tl"; } \
+  | jq -s --arg id "$id" --arg author "$(head -1 "$pkg/author" 2>/dev/null)" --argjson tags "$tags" \
+      --argjson meta "$meta" --argjson prev "$prev" '
+      (.[0] // {}) as $c | (.[1] // {}) as $t
+      # TL: só número, no formato do calibreitor (".310", "1"); o resto da linha não é TL
+      | (($t.arrays.TL // {}) | to_entries
+          | map(select(.value | test("^([0-9]+\\.?[0-9]*|\\.[0-9]+)$"))
+                | .value |= ((if startswith(".") then "0" + . else . end)
+                             | (if endswith(".") then . + "0" else . end) | tonumber))
+          | from_entries) as $tl
+      | {id:$id, calibrafactor:(($c.arrays.TLMOD // {}).calibrafactor // ""), tl:$tl,
+         ulimits:($c.arrays.ULIMITS // {}), tlmod:($c.arrays.TLMOD // {}),
+         public:($c.scalars.PUBLIC // ""), allowparallel:($c.scalars.ALLOWPARALLELTEST // ""),
+         author:$author, tags:$tags, meta:$meta, prev:$prev}'
 }
 
 # kt_problem_yaml <collect-json> <uuid> <repo> -> escreve problem.yaml no stdout

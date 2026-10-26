@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score test-fn deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel test-score test-fn test-no-source deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -67,6 +67,11 @@ test-score:
 ##           validate-problem a confere, install-fn a grava, driver-langs.sh (a heurística)
 test-fn:
 	@bash fn/test-function-langs.sh
+
+## test-no-source — o conf e o tl do PACOTE nunca são `source`ados no servidor (kattis/sidecar.sh, export.sh,
+##                  gen-problem-json.sh): conf/tl envenenados não executam nada e os valores certos saem
+test-no-source:
+	@bash test-no-source.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:

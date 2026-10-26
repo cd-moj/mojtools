@@ -205,6 +205,14 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
 
 ## Regras
 
+- **O `conf` e o `tl` do PACOTE nunca são `source`ados em script que roda NO SERVIDOR** (incidente de
+  26/10/2026): `kattis/` (o `sidecar.sh` roda a cada create/edit/upload de problema), `gen-problem-json.sh`,
+  `gen-problem-owners.sh`, `validate-problem.sh` e o resto do que a API chama. O conf é texto do AUTOR, e um
+  `source` executa `X=$(…)` com o usuário da API — o `kt_collect` fazia isso e o fallback do
+  `gen-problem-json.sh` fazia com o `tl`. Leia por regex (`kt_conf_json` em `kattis/lib.sh`, ou o `sed` no
+  molde do `TLOVERRIDE`). No JUIZ o `source` segue (calibreitor/build-and-test: lá o autor já roda código no
+  host por desenho — `compare.sh`, `prep.sh`). Teste: `test-no-source.sh` (`make test-no-source`), com conf e
+  tl envenenados e um inventário por grep.
 - **Um renderizador só.** Mexeu no enunciado? é em `render-statement.sh` — o preview, o servido
   e a validação acompanham juntos. Não criar um pandoc paralelo.
 - Exemplos do enunciado vêm **sempre** de `tests/input|output/sample*` (na ordem), nunca do texto.
