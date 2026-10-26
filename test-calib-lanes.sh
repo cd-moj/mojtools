@@ -66,7 +66,7 @@ calib(){
   local tag="$1"; shift
   rm -f "$P"/tl "$P"/tl.* "$P/.calib-sols.json"; : > "$FAKE_LOG"
   local t0=$EPOCHREALTIME
-  env "$@" bash "$H/calibreitor.sh" "$P" > "$W/$tag.log" 2>&1
+  env "$@" bash "$H/calibreitor.sh" "$P" > "$W/$tag.log" 2>&1; echo "$?" > "$W/$tag.rc"
   echo "$t0 $EPOCHREALTIME" | awk '{printf "%.2f", $2 - $1}' > "$W/$tag.wall"
   cp "$P/tl.juizteste" "$W/$tag.tl" 2>/dev/null; cp "$P/.calib-sols.json" "$W/$tag.sols" 2>/dev/null; cp "$FAKE_LOG" "$W/$tag.cage"
 }
@@ -82,6 +82,7 @@ ck "tabela (TL e TLKATTIS) idêntica"                       '[[ -s "$W/serial.tl
 DBG="$(diff <(jq -S . "$W/serial.sols") <(jq -S . "$W/raias.sols"))"
 ck ".calib-sols.json idêntico (7 soluções, na ordem das categorias)" '[[ -z "$DBG" && "$(jq length "$W/raias.sols")" == 7 && "$(jq -r "map(.category) | join(\",\")" "$W/raias.sols")" == "good,good,good,pass,slow,slow,wrong" ]]'
 DBG="$(diff <(norm_log "$W/serial.log") <(norm_log "$W/raias.log"))"
+ck "calibração completa sai com 0 (serial e raias; a última linha do script era um \`&&\` falso)" '[[ "$(cat "$W/serial.rc")" == 0 && "$(cat "$W/raias.rc")" == 0 ]]'
 ck "log idêntico (fora o caminho do workdir)"              '[[ -s "$W/serial.log" && -z "$DBG" ]]'
 DBG="$(cat "$W/raias.log")"
 ck "a good que falha, na ordem, com a frase-contrato"      'grep -q "c.cpp got .*was waiting Accepted" "$W/raias.log" && [[ "$(grep -n "^c.cpp:" "$W/raias.log" | cut -d: -f1)" -gt "$(grep -n "^b.py:" "$W/raias.log" | cut -d: -f1)" ]]'

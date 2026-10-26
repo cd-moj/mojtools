@@ -394,5 +394,6 @@ for OTHERSOL in pass slow wrong; do
     TOREMOVE+=" ${T}"
     i=$((i+1)); nsol=$((nsol+1))
   done
-  (( nsol == 0 )) && echo none
+  if (( nsol == 0 )); then echo none; fi   # `if`, não `&&`: como última linha do script, o `&&` falso virava rc 1
 done
+exit 0
