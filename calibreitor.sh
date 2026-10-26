@@ -208,6 +208,9 @@ _run_phase(){
       for (( i=0; i<n; i++ )); do
         mkdir "$TEMP.claim/$i" 2>/dev/null || continue
         f="${items[i]}"; lg="$(lang_canon "${f##*.}")"
+        # a solução COMEÇOU: o resultado de cada uma só sai no fim da fase, e uma calibração morta no teto de
+        # wall-clock (o agente mata a árvore) deixaria o log sem dizer qual solução estava rodando
+        echo "  [raia $li] ${f##*/}"
         if (( L > 1 )); then
           MOJ_CPU_GROUPS="$g" MOJ_PARALLEL=1 bash build-and-test.sh "$lg" "$f" "$PROBLEMDIR" "$runall" \
             > "$TEMP.item.$i.out" 2> "$TEMP.item.$i.err"
@@ -226,6 +229,12 @@ _item_tv(){
   T="$(head -n1 "$TEMP.item.$1.out" 2>/dev/null)"; A="$(tail -n1 "$TEMP.item.$1.out" 2>/dev/null)"
   [[ "$A" == "$T" || -d "$A" ]] && A=""
   return 0
+}
+# _item_err <i> : build-and-test sem veredicto — o fim do stderr dele vai ao log (o agente sobe o log; sem isto a
+# falha virava só "<sem veredito>")
+_item_err(){
+  [[ -z "$A" && -s "$TEMP.item.$1.err" ]] || return 0
+  echo "  stderr do build-and-test:"; tail -c 600 "$TEMP.item.$1.err" | sed 's/^/    /'
 }
 # _exectimes <workdir> : as linhas EXECTIME do trace (ancorado: o trace copia o stderr da solução, e uma linha
 # "… EXECTIME x 0.01 AC" no meio dela não é tempo), "<tempo> <código>" por linha
@@ -273,6 +282,7 @@ for i in "${!GOODS[@]}"; do
     # calibrada" mesmo assim). Quem diz quais linguagens ficaram sem TL é o resumo no fim.
     # ⚠ "was waiting Accepted" é contrato: o agente do juiz conta as falhas por essa frase.
     echo "$AC got '${A:-<sem veredito>}', was waiting Accepted. Check ${T}"
+    _item_err "$i"
   fi
   echo "Verdict: $A"
   echo
@@ -377,6 +387,7 @@ for OTHERSOL in pass slow wrong; do
     echo
     BIGRESP="$A"
     echo "Verdict: $BIGRESP"
+    _item_err "$i"
     alt_line "$T"
     save_report "$T" "$OTHERSOL-${TLs##*/}"
     sols_add "$T" "${TLs##*/}" "$LANG" "$OTHERSOL" "$BIGRESP"

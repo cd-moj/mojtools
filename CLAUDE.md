@@ -73,8 +73,11 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   grupo; reivindicam por `mkdir $TEMP.claim/<i>`) rodando `MOJ_CPU_GROUPS=<g> MOJ_PARALLEL=1 build-and-test`, com
   barreira entre as good e pass+slow+wrong. SÓ o pai lê `$TEMP.item.<i>.out` EM ORDEM (`_item_tv`: 1ª/última linha
   como o agente; `_exectimes` do run-trace) e calcula W/LANGOK/tabela/`sols`: log e arquivos idênticos ao serial.
-  Saíram o coproc, o FIFO, o fd 7 e o `tail -f`. `MOJ_CALIB_LANES=0` = uma raia; o agente grepa o nome p/ saber se
-  pode pedir raias. Teste: `test-calib-lanes.sh` (serial × 3 raias, pin, sobreposição, bordas).
+  Saíram o coproc, o FIFO, o fd 7 e o `tail -f`; no lugar do log "ao vivo", cada raia imprime `  [raia N] <solução>`
+  quando a pega (uma calibração morta no teto de wall-clock ainda diz qual rodava) e o pai põe o fim do stderr do
+  build-and-test no log quando não há veredicto (`_item_err`). `MOJ_CALIB_LANES=0` = uma raia; o agente grepa o nome
+  p/ saber se pode pedir raias. Teste: `test-calib-lanes.sh` (serial × 3 raias, pin, sobreposição, grupos vazios,
+  sem veredicto, bordas).
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** pelos DOIS métodos
   (tabela `TL[]` MOJ + `TLKATTIS[]` Kattis — ver "MÉTODOS DE TL" nas Regras), grava o
   vetor ESTRUTURADO **`.calib-sols.json`** (por solução, `{file,lang,category,verdict,method,etl,tests:
