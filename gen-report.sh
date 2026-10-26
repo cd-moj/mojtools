@@ -29,7 +29,7 @@ wb="${1:?uso: gen-report.sh <workdirbase>}"
 PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" CPUNEEDEDINFO="" CPUGROUPSINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
-VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT=""
+VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT="" TL_METHOD=""
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 # tolerância (drift) acima do TL antes de TLE (build-and-test.sh: TLMOD[<lang>.drift] › TLMOD[default.drift]).
 # Vazio = report.env de um build-and-test antigo: sem o valor, mas o amarelo segue valendo pelo veredicto.
@@ -269,6 +269,8 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
 
   # ---- gráfico de tempo de execução (top tempos quando há muitos) ----
   tlhead="limite $(secs "$TL_LANG")s"
+  # método do TL (build-and-test.sh/tl-methods.sh): só o Kattis se anuncia; o MOJ é o de sempre
+  [[ "$TL_METHOD" == kattis ]] && tlhead="$tlhead · método Kattis"
   [[ -n "$TL_DRIFT" ]] && awk -v d="$TL_DRIFT" 'BEGIN{ exit !(d+0 > 0) }' && tlhead="$tlhead · tolerância +$(secs "$TL_DRIFT")s"
   raw '<h3 style="margin:1rem 0 .2rem">Tempo de execução <span class="muted">('"$tlhead"')</span></h3>'$'\n'
   TIMED=(); for f in "${FILES[@]}"; do [[ -n "${T[$f]}" ]] && TIMED+=("$f"); done

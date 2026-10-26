@@ -13,8 +13,7 @@ collect="$(kt_collect "$PKG" "$ID")"
 uuid="$(jq -r '.prev.uuid // empty' <<<"$collect")"; [[ -n "$uuid" ]] || uuid="$(kt_uuid "$ID")"
 kt_problem_yaml "$collect" "$uuid" "$REPO" > "$PKG/problem.yaml" 2>/dev/null || { rm -f "$PKG/problem.yaml"; exit 0; }
 
-jq -n --arg uuid "$uuid" --arg id "$ID" --argjson tl "$(jq '.tl' <<<"$collect")" \
-   --arg cf "$(jq -r '.calibrafactor' <<<"$collect")" --argjson tlmod "$(jq '.tlmod' <<<"$collect")" \
-   --arg lang "$MOJ_STATEMENT_LANG" --argjson prev "$(jq '.prev' <<<"$collect")" '
-   ($prev) + {uuid:$uuid, moj_id:$id, per_language_tl:$tl, calibrafactor:$cf, tlmod:$tlmod,
-              statement_lang:$lang, format:"2025-09"}' > "$PKG/.kattis.json"
+jq --arg uuid "$uuid" --arg id "$ID" --arg lang "$MOJ_STATEMENT_LANG" '
+   (.prev) + {uuid:$uuid, moj_id:$id, per_language_tl:.tl, calibrafactor:.calibrafactor, tlmod:.tlmod,
+              tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride,
+              statement_lang:$lang, format:"2025-09"}' <<<"$collect" > "$PKG/.kattis.json"

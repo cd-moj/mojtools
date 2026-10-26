@@ -20,24 +20,26 @@ py="$(find "$root" -maxdepth 3 -name problem.yaml 2>/dev/null | head -1)"
 [[ -n "$py" ]] || { echo "sem problem.yaml no pacote" >&2; exit 1; }
 root="$(dirname "$py")"
 y="$(kt_parse_yaml "$root/problem.yaml")" || { echo "problem.yaml ilegível" >&2; exit 1; }
-side='{}'; [[ -f "$root/.kattis.json" ]] && side="$(cat "$root/.kattis.json" 2>/dev/null)"; [[ -n "$side" ]] || side='{}'
+side='{}'; [[ -f "$root/.kattis.json" ]] && side="$(cat "$root/.kattis.json" 2>/dev/null)"
+jq -e 'type == "object"' >/dev/null 2>&1 <<<"$side" || side='{}'
 
 mkdir -p "$OUT/docs" "$OUT/tests/input" "$OUT/tests/output" "$OUT/sols/good"
 
-# 2) conf (ac_to_time_limit->calibrafactor ; memory/output->ULIMITS)
-cf="$(jq -r '.limits.time_multipliers.ac_to_time_limit // empty' <<<"$y")"; [[ -n "$cf" ]] || cf=1.35
+# 2) conf: o TEMPO pelo kt_tl_conf (TLMETHOD + KATTIS_* + TLOVERRIDE do time_limit explícito — lib.sh);
+#    memory/output -> ULIMITS
 mem="$(jq -r '.limits.memory // empty' <<<"$y")"; outm="$(jq -r '.limits.output // empty' <<<"$y")"
-{ printf 'TLMOD[calibrafactor]=%s\n' "$cf"
+{ kt_tl_conf "$y" "$side"
   [[ "$mem"  =~ ^[0-9]+$ ]] && printf 'ULIMITS[-v]=%s\n' "$((mem*1024))"
   [[ "$outm" =~ ^[0-9]+$ ]] && printf 'ULIMITS[-f]=%s\n' "$((outm*1024))"
   printf 'ALLOWPARALLELTEST=y\n'; } > "$OUT/conf"
 
-# 3) tl (single time_limit->default; restaura por-linguagem do sidecar se houver)
-tl="$(jq -r '.limits.time_limit // empty' <<<"$y")"
-{ echo '#importado do Kattis'
-  if [[ "$(jq -r '(.per_language_tl // {}) | length' <<<"$side")" -gt 0 ]]; then
-    jq -r '.per_language_tl | to_entries[] | "TL[\(.key)]=\(.value)"' <<<"$side"
-  elif [[ -n "$tl" ]]; then printf 'TL[default]=%s\n' "$tl"; fi; } > "$OUT/tl"
+# 3) tl: só a ida e volta (os TLs calibrados por linguagem que o sidecar guardou — exibição até o juiz calibrar;
+#    o juiz nunca recebe este arquivo). O time_limit explícito virou TLOVERRIDE[default] acima.
+if [[ "$(jq -r '(.per_language_tl // {}) | length' <<<"$side")" -gt 0 ]]; then
+  { echo '#importado do Kattis'
+    jq -r '.per_language_tl | to_entries[] | select((.key | test("^[A-Za-z0-9+]{1,16}$")) and (.value | type == "number"))
+           | "TL[\(.key)]=\(.value)"' <<<"$side"; } > "$OUT/tl"
+fi
 
 # 4) author / tags
 jq -r '(.credits.authors // .credits // []) | if type=="array" then map(if type=="object" then (.name//"") else . end)|join(" e ") elif type=="string" then . else "" end' <<<"$y" > "$OUT/author"
@@ -65,9 +67,11 @@ ngroups=0; [[ -d "$root/data/secret" ]] && while IFS= read -r f; do
 done < <(find "$root/data/secret" -name '*.in' 2>/dev/null | sort)
 [[ "$ngroups" == 1 ]] && NOTES+=("grupos/scoring achatados — pontuação por grupo em .kattis.json (curar se for scoring)")
 
-# 7) submissions -> sols
-declare -A SMAP=( [accepted]=good [wrong_answer]=wrong [time_limit_exceeded]=slow [run_time_error]=wrong [rejected]=wrong [brute_force]=pass )
-for v in accepted wrong_answer time_limit_exceeded run_time_error rejected brute_force; do
+# 7) submissions -> sols. brute_force ("RTE ou TLE, nunca WA" na spec) não tem categoria no MOJ: vai p/ upcoming
+#    (guardada, não rodada) — antes ia p/ pass, que exige o CONTRÁRIO (aceita). `pass` é o diretório que o export
+#    do MOJ escreve (tem de passar, não define o TL), na ida e volta.
+declare -A SMAP=( [accepted]=good [wrong_answer]=wrong [time_limit_exceeded]=slow [run_time_error]=wrong [rejected]=wrong [brute_force]=upcoming [pass]=pass )
+for v in accepted wrong_answer time_limit_exceeded run_time_error rejected brute_force pass; do
   d="$root/submissions/$v"; [[ -d "$d" ]] || continue; mkdir -p "$OUT/sols/${SMAP[$v]}"
   find "$d" -type f ! -name '*.yaml' -exec cp {} "$OUT/sols/${SMAP[$v]}/" \; 2>/dev/null
 done

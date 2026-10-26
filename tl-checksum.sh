@@ -40,8 +40,13 @@ SOLDIRS=(sols/good)
   # FUNCTION_LANGS (as linguagens de SUBMISSÃO DE FUNÇÃO, cdmoj/docs/PACOTE.md) também fica de fora
   # pelo mesmo motivo: ela só diz ao EDITOR que ali o aluno escreve só a função — quem julga é o
   # scripts/<lang>/compile.sh, e ele já entra no hash (server/bin/function-langs-migrate.sh).
+  # TLMETHOD (o método do TL, moj|kattis — tl-methods.sh, 26/10/2026) também, nos DOIS carimbos: a tabela de
+  # TL leva as duas metades sempre, então trocar o método não muda TL medido nenhum — e o juiz não precisa do
+  # conf novo, porque o método vai NO JOB (o servidor lê o conf atual ao entregar). Com a linha no estreito o
+  # TL sumiria da prova até recalibrar; no --all-sols o juiz rebaixaria e recalibraria à toa. Os parâmetros
+  # KATTIS_* ficam (mudam o TL Kattis: recalibra, como o calibrafactor).
   if [[ -f "$pkg/conf" ]]; then printf '=conf\n'
-    if grep -qE '^[[:space:]]*(SAMPLE|FUNCTION_LANGS)[[:space:]]*=' "$pkg/conf"; then sed -E '/^[[:space:]]*(SAMPLE|FUNCTION_LANGS)[[:space:]]*=/d' "$pkg/conf"
+    if grep -qE '^[[:space:]]*(SAMPLE|FUNCTION_LANGS|TLMETHOD)[[:space:]]*=' "$pkg/conf"; then sed -E '/^[[:space:]]*(SAMPLE|FUNCTION_LANGS|TLMETHOD)[[:space:]]*=/d' "$pkg/conf"
     else cat "$pkg/conf"; fi
     printf '\n'; fi
   # testes (entrada + saída esperada + grupos do score) + soluções "good".

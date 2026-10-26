@@ -291,6 +291,19 @@ while IFS= read -r _d; do [[ -n "$_d" && "$_fdecl" != *" $_d "* ]] && _fmiss+="$
 done < <(bash "$SELF/fn/driver-langs.sh" "$PKG" 2>/dev/null)
 [[ -n "$_fmiss" ]] && render_leak="${render_leak}driver-de-funcao-fora-do-FUNCTION_LANGS($_fmiss) "
 
+# --- conf_tlmethod_sane: o MÉTODO do TL (TLMETHOD=moj|kattis) e os parâmetros do Kattis (cdmoj/docs/PACOTE.md
+#     "Métodos de TL"), lidos por GREP (cpv) — a mesma faixa do tl-methods.sh `kattis_params`. HARD: com valor
+#     inválido o juiz cairia no padrão calado e mediria/julgaria por outra regra que a do autor.
+source "$SELF/tl-methods.sh"
+_tlm="$(cpv TLMETHOD)"; _ka="$(cpv KATTIS_AC_TO_TIME_LIMIT)"; _kb="$(cpv KATTIS_TIME_LIMIT_TO_TLE)"; _kr="$(cpv KATTIS_TIME_RESOLUTION)"
+tbad=""
+[[ -z "$_tlm" || "$_tlm" == moj || "$_tlm" == kattis ]] || tbad+="TLMETHOD=$_tlm (moj|kattis) "
+[[ -z "$_ka" ]] || _tlm_in "$_ka" 1 100 || tbad+="KATTIS_AC_TO_TIME_LIMIT=$_ka (número de 1 a 100) "
+[[ -z "$_kb" ]] || _tlm_in "$_kb" 1 100 || tbad+="KATTIS_TIME_LIMIT_TO_TLE=$_kb (número de 1 a 100) "
+[[ -z "$_kr" ]] || _tlm_in "$_kr" 0 10 x || tbad+="KATTIS_TIME_RESOLUTION=$_kr (número > 0 e ≤ 10) "
+if [[ -n "$tbad" ]]; then add conf_tlmethod_sane 0 "valor inválido no conf: $tbad"
+else add conf_tlmethod_sane 1 "TLMETHOD=${_tlm:-moj}${_ka:+ KATTIS_AC_TO_TIME_LIMIT=$_ka}${_kb:+ KATTIS_TIME_LIMIT_TO_TLE=$_kb}${_kr:+ KATTIS_TIME_RESOLUTION=$_kr}"; fi
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 

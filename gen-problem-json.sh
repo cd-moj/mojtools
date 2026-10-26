@@ -93,14 +93,20 @@ author=""
 # servível = MÁX entre hosts p/ o checksum ATUAL do pacote. Se o pacote mudou e ninguém
 # recalibrou ainda, fica {} (o tl antigo é descartado). Fallback legado: tl.<host>/tl no
 # pacote (fallback p/ pacotes antigos sem o campo).
+# MÉTODO do TL (26/10/2026, tl-methods.sh): TLMETHOD=kattis no conf serve a metade Kattis (`hosts[].tl_kattis` do
+# store; `TLKATTIS[...]` no fallback) — sem ela, {} (TL ainda não calibrado por esse método), nunca o MOJ no
+# lugar: o juiz julga pelo método do conf. Lido por sed (o conf é texto do autor; isto roda no servidor).
+tl_method="$(sed -nE 's/^[[:space:]]*TLMETHOD=["'"'"']?([a-z]*).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
+[[ "$tl_method" == kattis ]] || tl_method=moj
+tl_field=tl; tl_arr=TL; [[ "$tl_method" == kattis ]] && { tl_field=tl_kattis; tl_arr=TLKATTIS; }
 tl_json='{}'
 storef="$MOJ_TL_STORE/$ID.json"
 cur_cks="$(bash "$MOJTOOLS_DIR/tl-checksum.sh" "$PKG" 2>/dev/null)"
 # chaves py3/py2 são LEGADAS (calibração pré-unificação do python): fundem em 'py' por MAX.
 if [[ -f "$storef" && -n "$cur_cks" ]]; then
-  tl_json="$(jq -c --arg cks "$cur_cks" '
+  tl_json="$(jq -c --arg cks "$cur_cks" --arg f "$tl_field" '
     if (.checksum // "")!=$cks or ((.hosts // {})|length)==0 then {}
-    else [ .hosts[].tl // {} ]
+    else [ .hosts[][$f] // {} ]
          | reduce (.[]|to_entries[]) as $e ({};
              ($e.key | if .=="py3" or .=="py2" then "py" else . end) as $k
              | .[$k]=([(.[$k]//0),($e.value|tonumber? // 0)]|max))
@@ -113,7 +119,7 @@ if [[ "$tl_json" == '{}' ]]; then
     # lido por REGEX, NUNCA `source`: este script roda NA API e o `tl` do pacote pode chegar no tar do autor
     # (upload) — até 26/10/2026 um `TL[c]=$(…)` aqui executava código no servidor. Vale a ÚLTIMA linha de
     # cada linguagem, como no bash; o que não é número não é TL.
-    tl_json="$(sed -nE 's/^[[:space:]]*TL\[([A-Za-z0-9+]{1,16})\]=["'"'"']?([0-9]+\.?[0-9]*|\.[0-9]+)["'"'"']?[[:space:]]*(#.*)?$/\1\t\2/p' \
+    tl_json="$(sed -nE 's/^[[:space:]]*'"$tl_arr"'\[([A-Za-z0-9+]{1,16})\]=["'"'"']?([0-9]+\.?[0-9]*|\.[0-9]+)["'"'"']?[[:space:]]*(#.*)?$/\1\t\2/p' \
         "$TLFILE" 2>/dev/null \
       | jq -Rnc '[inputs | split("\t") | select(length==2)
                   | {((.[0]) | if .=="py3" or .=="py2" then "py" else . end): .[1]}] | add // {}' 2>/dev/null)"
@@ -221,7 +227,8 @@ out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --
   --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   --argjson cpun "$cpun" --argjson snuma "$snuma" --argjson fnl "$fnl_json" \
   --argjson swwa "$sw_wa" --argjson swtle "$sw_tle" --argjson swre "$sw_re" --argjson ntests "$ntests" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
+  --arg tlm "$tl_method" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tags:$tags, collections:$colls, languages:$langs, public:$pub,
     statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma,
     function_langs:$fnl, stop_when:{wa:$swwa, tle:$swtle, re:$swre}, tests:$ntests}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"

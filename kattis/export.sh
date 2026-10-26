@@ -54,21 +54,20 @@ if [[ ${#samples[@]} -eq 0 ]]; then
 fi
 shopt -u nullglob; set -o noglob
 
-# 4) submissions/<veredicto>/  (good/pass->accepted ; wrong->wrong_answer ; slow->time_limit_exceeded)
-declare -A VMAP=( [good]=accepted [pass]=accepted [wrong]=wrong_answer [slow]=time_limit_exceeded )
-passglobs=()
+# 4) submissions/<veredicto>/  (good->accepted ; wrong->wrong_answer ; slow->time_limit_exceeded ; pass->pass)
+# `pass` (tem de passar, mas NÃO define o TL) vai p/ um diretório PRÓPRIO com a regra `permitted: [AC]` e sem
+# `use_for_time_limit`: no accepted/ a regra pré-definida da spec (use_for_time_limit: lower) valeria sempre —
+# "a rule cannot remove a use_for_time_limit set by another rule". As chaves do submissions.yaml são relativas a
+# submissions/ (spec 2025-09).
+declare -A VMAP=( [good]=accepted [pass]=pass [wrong]=wrong_answer [slow]=time_limit_exceeded )
 set +o noglob; shopt -s nullglob
 for cat in good pass wrong slow; do
   dstv="${VMAP[$cat]}"; for s in "$PKG/sols/$cat"/*; do [[ -f "$s" ]] || continue
-    mkdir -p "$STG/submissions/$dstv"; bn="$(basename "$s")"
-    [[ "$cat" == pass ]] && bn="pass_$bn" && passglobs+=("submissions/accepted/$bn")
-    cp "$s" "$STG/submissions/$dstv/$bn"; done
+    mkdir -p "$STG/submissions/$dstv"; cp "$s" "$STG/submissions/$dstv/$(basename "$s")"; done
 done
 shopt -u nullglob; set -o noglob
 [[ -d "$STG/submissions/accepted" ]] || NOTES+=("sem solução accepted")
-if [[ ${#passglobs[@]} -gt 0 ]]; then
-  { for g in "${passglobs[@]}"; do printf '%s:\n  use_for_time_limit: false\n' "$g"; done; } > "$STG/submissions/submissions.yaml"
-fi
+[[ -d "$STG/submissions/pass" ]] && printf 'pass:\n  permitted: [AC]\n' > "$STG/submissions/submissions.yaml"
 
 # 5) output_validator/  (se houver compare custom no MOJ) — bridge p/ a interface Kattis (42/43)
 CMP=""; for c in "$PKG/scripts/compare.sh"; do [[ -f "$c" ]] && CMP="$c"; done
@@ -91,10 +90,11 @@ printf '#!/bin/sh\ncat >/dev/null 2>&1\nexit 42\n' > "$STG/input_validators/acce
 NOTES+=("input_validator trivial (accept-all) — escreva um real p/ rigor ICPC")
 
 # 7) sidecar .kattis.json (round-trip sem perda) — guarda no pacote MOJ E no export
-side="$(jq -n --arg uuid "$uuid" --arg id "$ID" --argjson tl "$(jq '.tl' <<<"$collect")" \
-  --arg cf "$(jq -r '.calibrafactor' <<<"$collect")" --argjson tlmod "$(jq '.tlmod' <<<"$collect")" \
-  --arg lang "$SLANG" --argjson custom_checker "$([[ -n "$CMP" ]] && echo true || echo false)" \
-  '{uuid:$uuid, moj_id:$id, per_language_tl:$tl, calibrafactor:$cf, tlmod:$tlmod, statement_lang:$lang, custom_checker:$custom_checker, format:"2025-09"}')"
+side="$(jq --arg uuid "$uuid" --arg id "$ID" --arg lang "$SLANG" \
+  --argjson custom_checker "$([[ -n "$CMP" ]] && echo true || echo false)" \
+  '{uuid:$uuid, moj_id:$id, per_language_tl:.tl, calibrafactor:.calibrafactor, tlmod:.tlmod,
+    tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride,
+    statement_lang:$lang, custom_checker:$custom_checker, format:"2025-09"}' <<<"$collect")"
 printf '%s\n' "$side" > "$STG/.kattis.json"   # viaja no pacote exportado (round-trip); não mexe na fonte MOJ
 
 # 8) saída: diretório ou arquivo

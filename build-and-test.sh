@@ -36,6 +36,13 @@ function write_report_env()
     printf 'SRCBASENAME=%q\n'        "$(basename "$SRCCODE")"
     printf 'TL_LANG=%q\n'            "${TL[$LANGUAGE]:-}"
     printf 'TL_DRIFT=%q\n'           "${TLDRIFT:-0}"   # tolerância acima do TL antes de TLE
+    # método do TL (tl-methods.sh): o usado; o pedido, se a tabela não tinha a metade Kattis; o teto de tempo
+    # de cada teste; e, na calibração, o TL do OUTRO método (os veredictos dele estão em log.verdictalt)
+    printf 'TL_METHOD=%q\n'          "${TL_METHOD:-moj}"
+    printf 'TL_METHOD_WANTED=%q\n'   "${TL_METHOD_WANTED:-${TL_METHOD:-moj}}"
+    printf 'ETL=%q\n'                "${ETL:-}"
+    printf 'TL_METHOD_ALT=%q\n'      "${TL_METHOD_ALT:-}"
+    printf 'TL_LANG_ALT=%q\n'        "${TL_ALT:-}"
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
     printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
     # veredicto CANÔNICO limpo (sem score) + score estruturado, p/ o backend casar/montar strings
@@ -399,7 +406,7 @@ if [[ ! -e "$LANGCOMPARE" ]]; then
   exit 3
 fi
 
-declare -A TL
+declare -A TL TLKATTIS
 # TL por host: usa tl.<hostname> se existir (calibração específica da máquina,
 # calibrada neste host), senão o tl padrão do pacote. MOJ_TLFILE (env) VENCE os dois:
 # é como o calibreitor aponta os filhos p/ uma tabela PRIVADA (fora do pacote
@@ -414,6 +421,27 @@ if [[ ! -e "$TLFILE" ]]; then
 fi
 source $TLFILE
 LOG "TL file: $(basename "$TLFILE")"
+
+# MÉTODO DO TL (26/10/2026, tl-methods.sh): a tabela traz as DUAS metades — TL[] (MOJ) e TLKATTIS[] (Kattis,
+# por linguagem) — e o método escolhe qual vira a tabela de trabalho. Quem manda é o JOB (MOJ_TL_METHOD: o
+# servidor lê o conf ATUAL ao entregar o job; o TLMETHOD fica fora dos dois carimbos do tl-checksum, então o
+# conf do cache pode estar velho), depois o conf (local, calibração), depois `moj`. Daqui p/ baixo nada muda:
+# TLMOD sum/mult, TLOVERRIDE (final, vence qualquer método), drift e ETL valem p/ os dois.
+source "$SELFDIR/tl-methods.sh"
+declare -A TLMOJTAB
+for _k in "${!TL[@]}"; do TLMOJTAB[$_k]="${TL[$_k]}"; done
+TL_METHOD="$(tl_method_of)"; TL_METHOD_WANTED="$TL_METHOD"
+if [[ "$TL_METHOD" == kattis ]]; then
+  if (( ${#TLKATTIS[@]} > 0 )); then
+    TL=(); for _k in "${!TLKATTIS[@]}"; do TL[$_k]="${TLKATTIS[$_k]}"; done
+  else
+    # tabela local ou de calibração antiga, sem a metade Kattis: julga pelo MOJ e DIZ (log + report.env).
+    # Num job isto não acontece: o agente recalibra antes de julgar quando o job pede kattis e falta a tabela.
+    LOG "AVISO: o método do TL é kattis, mas a tabela não tem TLKATTIS (calibração antiga ou tabela local) — julgando pelo MOJ"
+    TL_METHOD=moj
+  fi
+fi
+LOG "TL method: $TL_METHOD"
 
 # shim de compat: tl calibrado antes da unificação do python tem chave py3 (às vezes py2);
 # sem isto TL[py] cairia no TL[default] (o MENOR) => falso TLE até recalibrar.
@@ -458,6 +486,32 @@ TLMOD[$LANGUAGE.drift]="$TLDRIFT"
 LOG " - Drift (tolerância): ${TLDRIFT}s"
 
 ETL=$(echo 2+${TL[$LANGUAGE]}+0.2+${TLMOD[$LANGUAGE.drift]}*2|bc -l)
+
+# ---- CALIBRAÇÃO: julgar TAMBÉM pelo OUTRO método (26/10/2026; decisão do Ribas: medição completa) --------
+# Só na fase pass/slow/wrong do calibreitor (MOJ_CALIBRATING + MOJ_CALIB_ALT, com a tabela das duas metades).
+# O julgamento de job NÃO passa por aqui. TL_ALT = o TL do outro método p/ esta linguagem, com os mesmos
+# sum/mult (sem TLOVERRIDE, como o ativo em calibração). O teste roda até um PISO de tempo maior que o ETL de
+# sempre, p/ que o tempo e a saída sejam conhecidos até o TL do outro método e até b × o TL Kattis (a folga que
+# o Kattis exige da solução lenta) — teto de 30 s por teste. O veredicto ATIVO não muda: só a duração.
+TL_ALT=""; TL_METHOD_ALT=""
+if [[ -n "${MOJ_CALIBRATING:-}" && -n "${MOJ_CALIB_ALT:-}" && ${#TLKATTIS[@]} -gt 0 && "$TL_METHOD" == "$TL_METHOD_WANTED" ]]; then
+  declare -A _ALTTAB=()
+  if [[ "$TL_METHOD" == kattis ]]; then TL_METHOD_ALT=moj; for _k in "${!TLMOJTAB[@]}"; do _ALTTAB[$_k]="${TLMOJTAB[$_k]}"; done
+  else TL_METHOD_ALT=kattis; for _k in "${!TLKATTIS[@]}"; do _ALTTAB[$_k]="${TLKATTIS[$_k]}"; done; fi
+  [[ -z "${_ALTTAB[py]:-}" && -n "${_ALTTAB[py3]:-}" ]] && _ALTTAB[py]="${_ALTTAB[py3]}"
+  TL_ALT="${_ALTTAB[$LANGUAGE]:-${_ALTTAB[default]:-}}"
+  if tl_num "$TL_ALT"; then
+    [[ -n "${TLMOD[$LANGUAGE.sum]}" ]]  && TL_ALT=$(echo "${TL_ALT}+${TLMOD[$LANGUAGE.sum]}"|bc -l)
+    [[ -n "${TLMOD[$LANGUAGE.mult]}" ]] && TL_ALT=$(echo "${TL_ALT}*${TLMOD[$LANGUAGE.mult]}"|bc -l)
+    read -r _KA _KB _KR < <(kattis_params 2>/dev/null)
+    _TLK="$TL_ALT"; [[ "$TL_METHOD" == kattis ]] && _TLK="${TL[$LANGUAGE]}"
+    _FLOOR="$(echo "f = $TL_ALT + ${TLMOD[$LANGUAGE.drift]}; g = $_KB * $_TLK; if (g > f) f = g; f = f + 0.5; if (f > 30) f = 30; f" | bc -l)"
+    [[ "$(echo "$_FLOOR > $ETL" | bc -l)" == 1 ]] && ETL="$_FLOOR"
+    LOG " - Calibração, os dois métodos: TL $TL_METHOD=${TL[$LANGUAGE]} · $TL_METHOD_ALT=$TL_ALT · tempo máximo por teste ${ETL}s"
+  else
+    TL_ALT=""; TL_METHOD_ALT=""
+  fi
+fi
 RESP=""
 RESPERRO=0
 CORRECT=0
@@ -477,42 +531,53 @@ function run-testinput()
   local BWRAPEXITCODE=$?
   echo $BWRAPEXITCODE > $workdirbase/$FILE-log.bwrapexitcode
   local EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
-  local ERR=0
-  local VERDICT=""
-  if echo "($EXECTIME - ${TL[$LANGUAGE]}) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
-    VERDICT=TLE
-    ERR=3
-  elif (( BWRAPEXITCODE >= 127 )) ; then
-    VERDICT=RE
-    ERR=127
-  elif (( BWRAPEXITCODE != 0 )) ; then
-    VERDICT=RE_NZEC
-    ERR=126
-  else
-    $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> $workdirbase/$FILE-log.compare
-    COMPAREEXIT=$?
-    if (( COMPAREEXIT == 4 )); then
-      VERDICT=AC
-      ERR=0
-    elif (( COMPAREEXIT == 5 )); then
-      VERDICT=AC,PE
-      ERR=0
-    elif (( COMPAREEXIT == 6 )); then
-      VERDICT=WA
-      ERR=6
-    else
-      VERDICT=UE
-      ERR=7
-    fi
-  fi
-  # limite de memória por RSS medido (res %M) — só se MEMLIMITMB no conf e o teste rodou.
-  if [[ -n "${MEMLIMITMB:-}" && "$VERDICT" != TLE && "$VERDICT" != RE && "$VERDICT" != RE_NZEC ]]; then
-    local RSSKB=$(grep '^res' $workdirbase/$FILE-log.timelog 2>/dev/null|awk '{print $NF}')
-    if [[ "$RSSKB" =~ ^[0-9]+$ ]] && (( RSSKB > MEMLIMITMB*1024 )); then VERDICT=MLE; ERR=9; fi
-  fi
+  local _CMP="" _V=""
+  _verdict_for "${TL[$LANGUAGE]}"
+  local VERDICT="$_V" ERR
+  case "$VERDICT" in
+    AC|AC,PE) ERR=0 ;; TLE) ERR=3 ;; WA) ERR=6 ;; RE) ERR=127 ;; RE_NZEC) ERR=126 ;; MLE) ERR=9 ;; *) ERR=7 ;;
+  esac
   echo "VERDICT[$FILE]=$VERDICT" >> $workdirbase/log.verdictall
   echo "$VERDICT" > $workdirbase/$FILE-log.verdict
+  # calibração: o veredicto do MESMO teste pelo outro método. Arquivo PRÓPRIO: o log.verdictall é sourced com
+  # só `declare -A VERDICT`, e uma linha `VERDICTALT[t-1]` lá viraria subscrito aritmético.
+  if [[ -n "$TL_ALT" ]]; then
+    _verdict_for "$TL_ALT" alt
+    echo "VERDICTALT[$FILE]=$_V" >> $workdirbase/log.verdictalt
+  fi
   return $ERR
+}
+
+# _verdict_for <TL> [alt] — a cadeia de decisão de UM teste pelo TL dado: TLE → RE → RE_NZEC → compare → MLE.
+# Lê EXECTIME/BWRAPEXITCODE/FILE/INPUT do run-testinput (escopo dinâmico) e devolve em _V — sem subshell,
+# porque o compare roda NO MÁXIMO uma vez por execução (memo em _CMP, local do run-testinput): o veredicto
+# ativo e o do outro método (calibração) compartilham. Quando o ativo deu TLE e o processo terminou antes do
+# teto, o compare roda só p/ o outro método — e grava em -log.compare-alt, p/ o report.html (que mostra o
+# -log.compare) não exibir um diff num teste que, pelo método ativo, estourou o tempo.
+_verdict_for() {
+  local tl="$1" cmpf="$workdirbase/$FILE-log.compare"
+  [[ "${2:-}" == alt ]] && cmpf="$workdirbase/$FILE-log.compare-alt"
+  if echo "($EXECTIME - $tl) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
+    _V=TLE
+  elif (( BWRAPEXITCODE >= 127 )) ; then
+    _V=RE
+  elif (( BWRAPEXITCODE != 0 )) ; then
+    _V=RE_NZEC
+  else
+    if [[ -z "$_CMP" ]]; then
+      $LANGCOMPARE $workdirbase/$FILE-team_output $PROBLEMTEMPLATEDIR/tests/output/$FILE $INPUT &> "$cmpf"
+      _CMP=$?
+    fi
+    if (( _CMP == 4 )); then _V=AC
+    elif (( _CMP == 5 )); then _V=AC,PE
+    elif (( _CMP == 6 )); then _V=WA
+    else _V=UE; fi
+  fi
+  # limite de memória por RSS medido (res %M) — só se MEMLIMITMB no conf e o teste rodou.
+  if [[ -n "${MEMLIMITMB:-}" && "$_V" != TLE && "$_V" != RE && "$_V" != RE_NZEC ]]; then
+    local RSSKB=$(grep '^res' $workdirbase/$FILE-log.timelog 2>/dev/null|awk '{print $NF}')
+    if [[ "$RSSKB" =~ ^[0-9]+$ ]] && (( RSSKB > MEMLIMITMB*1024 )); then _V=MLE; fi
+  fi
 }
 
 # POOL DE P WORKERS sobre a fila de testes (24/09/2026; antes: `run-testinput &` + `wait -n`).

@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score test-fn test-no-source deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel test-score test-fn test-no-source test-calib test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -72,6 +72,17 @@ test-fn:
 ##                  gen-problem-json.sh): conf/tl envenenados não executam nada e os valores certos saem
 test-no-source:
 	@bash test-no-source.sh
+
+## test-calib — os DOIS métodos de TL (tl-methods.sh): a tabela com as metades MOJ e Kattis, pass/slow/wrong
+##              julgadas pelos dois (code_alt), o piso de tempo da calibração, o método do job, o tl-checksum
+##              e o validate (calibreitor + build-and-test reais, cage-run FALSO)
+test-calib:
+	@bash test-calib-methods.sh
+
+## test-kattis — o tempo na ida e volta MOJ ⇄ Kattis (kattis/import.sh, export.sh): método, multiplicadores,
+##               time_limit = TLOVERRIDE[default], pass/brute_force (precisa de python3+pyyaml)
+test-kattis:
+	@bash kattis/test-kattis.sh
 
 ## deps — doctor de dependências (host e, com --rootfs, dentro da jaula)
 deps:

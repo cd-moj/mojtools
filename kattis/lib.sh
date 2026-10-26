@@ -74,7 +74,51 @@ kt_collect(){
       | {id:$id, calibrafactor:(($c.arrays.TLMOD // {}).calibrafactor // ""), tl:$tl,
          ulimits:($c.arrays.ULIMITS // {}), tlmod:($c.arrays.TLMOD // {}),
          public:($c.scalars.PUBLIC // ""), allowparallel:($c.scalars.ALLOWPARALLELTEST // ""),
+         # método do TL (tl-methods.sh) + parâmetros do Kattis + o TL fixado pelo autor (TLOVERRIDE)
+         tl_method:(if $c.scalars.TLMETHOD == "kattis" then "kattis" else "moj" end),
+         kattis:{ac_to_time_limit:($c.scalars.KATTIS_AC_TO_TIME_LIMIT // ""),
+                 time_limit_to_tle:($c.scalars.KATTIS_TIME_LIMIT_TO_TLE // ""),
+                 time_resolution:($c.scalars.KATTIS_TIME_RESOLUTION // "")},
+         tloverride:($c.arrays.TLOVERRIDE // {}),
          author:$author, tags:$tags, meta:$meta, prev:$prev}'
+}
+
+# kt_tl_conf <problem.yaml em JSON> <.kattis.json ou {}> -> as linhas de TEMPO do `conf` do MOJ (stdout), p/ o
+# import e o normalize. Só NÚMERO validado vira linha (o conf é sourced no juiz). Mapeamento (cdmoj/docs/PACOTE.md
+# "Métodos de TL"):
+#   • TLMETHOD: o do sidecar (ida e volta MOJ → Kattis → MOJ); sem sidecar (pacote Kattis nativo) = kattis;
+#   • time_multipliers.ac_to_time_limit / time_limit_to_tle (ou o legado time_multiplier / time_safety_margin)
+#     e time_resolution -> KATTIS_*; o calibrafactor volta do sidecar (o multiplicador do Kattis NÃO é ele);
+#   • time_limit explícito = o TL fixado pelo autor -> TLOVERRIDE[default]. Exceção: sidecar ANTIGO (sem a
+#     chave `tloverride`), em que o time_limit era o máx do calibrado — aí o por-linguagem volta pelo `tl`.
+#     Sidecar novo devolve o TLOVERRIDE do autor por linguagem, como era.
+kt_tl_conf(){
+  jq -rn --argjson y "$1" --argjson side "$2" '
+    def num($lo; $hi; $excl):
+      if . == null then null else (tostring) as $s
+        | if ($s | test("^([0-9]+\\.?[0-9]*|\\.[0-9]+)$")) then
+            ($s | (if startswith(".") then "0" + . else . end) | (if endswith(".") then . + "0" else . end) | tonumber)
+            | (if ((if $excl then . > $lo else . >= $lo end) and . <= $hi) then . else null end)
+          else null end end;
+    ($y.limits // {}) as $l | ($l.time_multipliers // {}) as $tm
+    | ($side | type == "object" and has("moj_id")) as $rt
+    # ida e volta: o método e os KATTIS_* do sidecar (no método MOJ o ac_to_time_limit do yaml é o calibrafactor);
+    # sidecar de antes de 26/10/2026 (sem tl_method) é de um problema MOJ
+    | (if $rt then (if $side.tl_method == "kattis" then "kattis" else "moj" end) else "kattis" end) as $m
+    | ((if $rt then $side.kattis.ac_to_time_limit else ($tm.ac_to_time_limit // $l.time_multiplier) end) | num(1; 100; false)) as $a
+    | ((if $rt then $side.kattis.time_limit_to_tle else ($tm.time_limit_to_tle // $l.time_safety_margin) end) | num(1; 100; false)) as $b
+    | ((if $rt then $side.kattis.time_resolution else $l.time_resolution end) | num(0; 10; true)) as $r
+    | (($side.calibrafactor // "") | tostring) as $cf
+    | (if $rt and ($side | has("tloverride")) then ($side.tloverride // {})
+       elif $rt then {}
+       else {default: $l.time_limit} end) as $ov
+    | (if $m == "kattis" then "TLMETHOD=kattis" else empty end),
+      (if ($cf | test("^[0-9][0-9.+*/ ()-]*$")) then "TLMOD[calibrafactor]=\"\($cf)\"" else "TLMOD[calibrafactor]=1.35" end),
+      (if $a != null then "KATTIS_AC_TO_TIME_LIMIT=\($a)" else empty end),
+      (if $b != null then "KATTIS_TIME_LIMIT_TO_TLE=\($b)" else empty end),
+      (if $r != null then "KATTIS_TIME_RESOLUTION=\($r)" else empty end),
+      ($ov | to_entries[] | select(.key | test("^[A-Za-z0-9]{1,16}$"))
+        | (.value | num(0; 100000; true)) as $v | select($v != null) | "TLOVERRIDE[\(.key)]=\($v)")'
 }
 
 # kt_problem_yaml <collect-json> <uuid> <repo> -> escreve problem.yaml no stdout

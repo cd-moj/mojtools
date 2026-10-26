@@ -12,18 +12,17 @@ y="$(kt_parse_yaml "$SRC/problem.yaml")"
 A="$(cd "$SRC" && pwd)"   # caminho absoluto p/ os symlinks
 mkdir -p "$V/docs" "$V/tests/input" "$V/tests/output" "$V/sols/good"
 
-# conf + tl (derivados; pequenos -> escritos)
-cf="$(jq -r '.limits.time_multipliers.ac_to_time_limit // empty' <<<"$y")"; [[ -n "$cf" ]] || cf=1.35
+# conf + tl (derivados; pequenos -> escritos). O tempo pelo kt_tl_conf, o MESMO mapeamento do import.sh.
 mem="$(jq -r '.limits.memory // empty' <<<"$y")"; outm="$(jq -r '.limits.output // empty' <<<"$y")"
-{ printf 'TLMOD[calibrafactor]=%s\n' "$cf"
+side='{}'; [[ -f "$A/.kattis.json" ]] && side="$(cat "$A/.kattis.json")"; jq -e 'type == "object"' >/dev/null 2>&1 <<<"$side" || side='{}'
+{ kt_tl_conf "$y" "$side"
   [[ "$mem" =~ ^[0-9]+$ ]] && printf 'ULIMITS[-v]=%s\n' "$((mem*1024))"
   [[ "$outm" =~ ^[0-9]+$ ]] && printf 'ULIMITS[-f]=%s\n' "$((outm*1024))"
   printf 'ALLOWPARALLELTEST=y\n'; } > "$V/conf"
-tl="$(jq -r '.limits.time_limit // empty' <<<"$y")"
-side='{}'; [[ -f "$A/.kattis.json" ]] && side="$(cat "$A/.kattis.json")"
-{ echo '#kattis view'
-  if [[ "$(jq -r '(.per_language_tl // {})|length' <<<"$side")" -gt 0 ]]; then jq -r '.per_language_tl|to_entries[]|"TL[\(.key)]=\(.value)"' <<<"$side"
-  elif [[ -n "$tl" ]]; then printf 'TL[default]=%s\n' "$tl"; fi; } > "$V/tl"
+if [[ "$(jq -r '(.per_language_tl // {})|length' <<<"$side")" -gt 0 ]]; then
+  { echo '#kattis view'
+    jq -r '.per_language_tl|to_entries[]|select((.key|test("^[A-Za-z0-9+]{1,16}$")) and (.value|type=="number"))|"TL[\(.key)]=\(.value)"' <<<"$side"; } > "$V/tl"
+fi
 
 # enunciado (symlink, opcional) + testes (symlink, sample->sampleN, secret achatado)
 st="$(find "$A/statement" -maxdepth 1 \( -name 'problem.*.md' -o -name 'problem.*.tex' \) 2>/dev/null | head -1)"
@@ -35,8 +34,8 @@ for f in "$A/data/sample"/*.in; do i=$((i+1)); b="$(basename "$f" .in)"; ln -sf 
   ln -sf "$f" "$V/tests/input/$n"; [[ -f "${f%.in}.ans" ]] && ln -sf "${f%.in}.ans" "$V/tests/output/$n"; done < <(find "$A/data/secret" -name '*.in' 2>/dev/null | sort)
 
 # soluções (symlink) + checker bridge
-declare -A SMAP=( [accepted]=good [wrong_answer]=wrong [time_limit_exceeded]=slow [run_time_error]=wrong [brute_force]=pass )
-for v in accepted wrong_answer time_limit_exceeded run_time_error brute_force; do d="$A/submissions/$v"; [[ -d "$d" ]] || continue
+declare -A SMAP=( [accepted]=good [wrong_answer]=wrong [time_limit_exceeded]=slow [run_time_error]=wrong [brute_force]=upcoming [pass]=pass )
+for v in accepted wrong_answer time_limit_exceeded run_time_error brute_force pass; do d="$A/submissions/$v"; [[ -d "$d" ]] || continue
   mkdir -p "$V/sols/${SMAP[$v]}"; for s in "$d"/*; do [[ -f "$s" && "$s" != *.yaml ]] && ln -sf "$s" "$V/sols/${SMAP[$v]}/$(basename "$s")"; done; done
 if [[ -d "$A/output_validator" ]]; then mkdir -p "$V/scripts"; ln -sf "$A/output_validator" "$V/output_validator"; cp "$KT_DIR/validator-bridge.sh" "$V/scripts/compare.sh"; chmod +x "$V/scripts/compare.sh"; fi
 [[ -f "$A/author" ]] && ln -sf "$A/author" "$V/author" || echo "Kattis" > "$V/author"

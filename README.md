@@ -215,6 +215,12 @@ O `calibrafactor` é a **folga**: o tempo-limite vai ser o tempo da sua soluçã
 1.35. O `ULIMITS[-u]` é o número de processos (Java e outras runtimes precisam de bem mais do que o
 default de 1024). A lista completa das chaves está em `cdmoj/docs/PACOTE.md`.
 
+Se você prefere o **método do Kattis** (spec 2025-09: o tempo-limite é o menor múltiplo de 1 s que é pelo
+menos 2 × o tempo da `good`), acrescente `TLMETHOD=kattis` ao `conf`. A calibração mede os dois métodos
+sempre, então trocar de método não pede recalibração. Os parâmetros (`KATTIS_AC_TO_TIME_LIMIT`,
+`KATTIS_TIME_LIMIT_TO_TLE`, `KATTIS_TIME_RESOLUTION`) e as regras estão em `cdmoj/docs/PACOTE.md`, seção
+"Métodos de TL".
+
 Falta ainda o arquivo `author`, que é obrigatório:
 
 ```sh
@@ -495,8 +501,13 @@ Error**, `3` a linguagem não está disponível, ou falta o arquivo `tl`, ou o p
 
 Lê do ambiente: `CAGE_ROOT` (a raiz do sandbox), `CAGE_ROOT_<LANG>` (raiz diferente para uma
 linguagem específica), `MOJ_PROBLEM_ID`, **`MOJ_TLFILE`** (aponta uma tabela de TL FORA do pacote e
-vence `tl.<máquina>`/`tl` — é como o calibreitor isola os filhos dele) e **`MOJ_CALIBRATING`**
-(setado, desliga o `TLOVERRIDE` do conf: durante a calibração se mede de verdade).
+vence `tl.<máquina>`/`tl` — é como o calibreitor isola os filhos dele), **`MOJ_CALIBRATING`**
+(setado, desliga o `TLOVERRIDE` do conf: durante a calibração se mede de verdade), **`MOJ_TL_METHOD`**
+(`moj`|`kattis`: o método do TL que o job manda; vence o `TLMETHOD` do conf, que pode estar velho no cache
+do juiz) e **`MOJ_CALIB_ALT`** (com `MOJ_CALIBRATING`: julga também pelo outro método — o piso de tempo e o
+`log.verdictalt`; é o calibreitor quem liga, na fase pass/slow/wrong). O `report.env` traz `TL_METHOD` (o
+usado), `TL_METHOD_WANTED` (o pedido, quando a tabela não tinha a metade Kattis e o julgamento caiu no MOJ),
+`ETL` (o teto de cada teste) e, na calibração, `TL_METHOD_ALT`/`TL_LANG_ALT`.
 
 **Paralelismo dos testes** (24/09/2026): cada teste roda em **k CPUs** (`CPUNEEDED` do conf, default 1)
 e até **P testes rodam ao mesmo tempo**. Quem decide P e quais CPUs é o **agente do juiz**, pelo
@@ -555,8 +566,21 @@ são zerados, e `passwd`/`group` viram arquivos sintéticos de uma linha. Detalh
 calibreitor.sh <pacote>
 ```
 
-Roda cada solução de `sols/good/`, pega o pior tempo por linguagem, multiplica pelo
-`TLMOD[calibrafactor]` (1.35 por padrão) e grava `tl.<máquina>` e `tl` dentro do pacote. Roda
+Roda cada solução de `sols/good/`, pega o pior tempo por linguagem e grava `tl.<máquina>` e `tl` dentro
+do pacote com as DUAS metades da tabela (os dois métodos de TL — `tl-methods.sh`; formato e regras em
+`cdmoj/docs/PACOTE.md`, "Métodos de TL"):
+
+```
+TL[cpp]=.3035                 # MOJ: calibrafactor (1,35) × pior tempo AC + 0,02
+TL[default]=.3035             #      o menor entre as linguagens
+declare -A TLKATTIS           # (dentro do arquivo: o agente do juiz faz source dele sob set -u)
+TLKATTIS[cpp]=1               # Kattis: o menor múltiplo de KATTIS_TIME_RESOLUTION (1 s) que é
+TLKATTIS[default]=1           #         ≥ KATTIS_AC_TO_TIME_LIMIT (2,0) × pior tempo AC; default = o menor
+```
+
+Quem escolhe a metade é o `TLMETHOD` do conf (`moj`, o padrão, ou `kattis`), no julgamento: o
+`build-and-test.sh` usa o `MOJ_TL_METHOD` do job (o servidor lê o conf ATUAL ao entregar o job) ›
+`TLMETHOD` do conf › `moj`. O `TLMOD` sum/mult, o drift e o `TLOVERRIDE` valem por cima dos dois. Roda
 **um teste por vez** (exporta `MOJ_PARALLEL=1`; o `ALLOWPARALLELTEST=n` de antes era vencido pelo
 conf do pacote), cada um com as **k CPUs** do problema (`CPUNEEDED`; o agente dá o grupo de CPUs
 via `MOJ_CPU_GROUPS`) — o tempo-limite é medido na MESMA forma em que o julgamento roda cada
@@ -570,14 +594,25 @@ pula essa parte, e é o que o agente do juiz usa quando está com pressa). O cal
 registra; quem decide se cada solução fez o que a categoria pede é o **servidor**
 (`cdmoj/server/api/v1/lib/calib-expect.sh`, tabela em `cdmoj/docs/PACOTE.md` §10).
 
+Essas soluções são julgadas pelos **dois métodos** de uma vez (o calibreitor exporta `MOJ_CALIB_ALT=1`):
+o `build-and-test.sh` julga pelo método do conf e grava, por teste, também o veredicto pelo OUTRO método
+(`log.verdictalt`). Para isso o teste roda além do teto de sempre (TL + 2,2 s), até
+`max(TL do outro método + drift, KATTIS_TIME_LIMIT_TO_TLE × TL Kattis) + 0,5 s` (teto de 30 s), e o
+compare roda mesmo depois de um TLE pelo método ativo quando o processo terminou (o "compare tardio",
+gravado em `<teste>-log.compare-alt`, fora do report). O veredicto ativo não muda; só a duração. Assim a
+margem do Kattis (a solução lenta tem de passar de 1,5 × TL) fica medível, e trocar de método não perde o
+juízo das soluções.
+
 Antes das soluções, a calibração completa roda o **validador de entrada** do pacote
 (`scripts/validator.cpp`, via `testlib/validator-run.sh`) e anexa o resultado ao `.calib-sols.json`
 como uma entrada `category:"validator"` (o modo `CALIBRATE_ONLY_GOOD` não roda o validador).
 
 Grava também um `report.html` por solução em `.calib-reports/`, que o agente sobe para o servidor,
 e o vetor **ESTRUTURADO** da calibração em **`.calib-sols.json`**: por solução executada,
-`{file, lang, category:good|pass|slow|wrong, verdict, tests:[{name,code,time,tl}]}` — o mesmo
-formato do vetor `tests` de uma submissão normal. O agente o envia no `/judge/calib-report`
+`{file, lang, category:good|pass|slow|wrong, verdict, method, etl, tests:[{name,code,time,tl,code_alt,tl_alt}]}`
+— o vetor `tests` tem o mesmo formato do de uma submissão normal, UM item por teste (o rerun de TLE vale
+pela última linha); `method` é o método dos `code`, `etl` o teto de tempo de cada teste, e
+`code_alt`/`tl_alt` o veredicto e o TL pelo outro método (só pass/slow/wrong). O agente o envia no `/judge/calib-report`
 (campo `sols`) e o autor o consome estruturado no `/problems/calib` (`moj calib`, `moj --json
 calib`) para integrar com ferramentas externas. Durante a calibração o `tl` de cada teste é o
 `CALIBRATIONTL` (dummy de medição), não o TL final.
@@ -725,6 +760,10 @@ Não cobre o enunciado, as tags nem o autor.
 
 É por isso que **corrigir um typo no enunciado não força recalibração**, mas trocar um teste (entrada
 ou saída esperada), o `tests/score`, uma solução `good`, o `conf` ou um script força.
+
+Do `conf` ficam de fora, nos DOIS carimbos, as linhas que não mudam TL medido nenhum: `SAMPLE` (exemplos no
+enunciado), `FUNCTION_LANGS` (o editor do aluno) e `TLMETHOD` (o método do TL: a tabela traz as duas
+metades, e o juiz recebe o método no job). Os `KATTIS_*` entram: mudam o TL Kattis.
 
 Com **`--all-sols`** entram também as `sols/{pass,slow,wrong,upcoming}`, e o resultado é a **versão
 do pacote**: é ela que o servidor devolve ao juiz em `/judge/package-meta`, e é comparando-a que o
