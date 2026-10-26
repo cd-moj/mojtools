@@ -137,6 +137,10 @@ export MOJ_CALIBRATING=1         # a CALIBRAÇÃO mede de verdade: TLOVERRIDE n�
 # depois) — a calibração rodava testes em paralelo sem querer (bug (f), 24/09/2026). A env do
 # agente (MOJ_TEST_CPUS/MOJ_CPU_GROUPS, largura k) atravessa; MOJ_PARALLEL é sempre 1 aqui.
 export MOJ_PARALLEL=1
+# A calibração NUNCA libera grupo de CPU ao agente (26/10/2026). A calibração disparada por um JOB herdava o
+# MOJ_RELEASE_FILE dele, e cada build-and-test filho anotava os grupos ≥ 1 como livres ao fim do seu pool
+# (_release_group): o agente devolvia ao escalonador os slots que o job ainda ia usar para julgar.
+unset MOJ_RELEASE_FILE
 # temps de um run morto (kill -9) + o vetor estruturado ANTERIOR: sols é sempre da calibração
 # corrente — run abortado deixa sols AUSENTE (o agente não o manda e o servidor preserva/zera
 # pelo checksum), nunca dado velho com cara de novo

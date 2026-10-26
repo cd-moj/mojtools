@@ -43,7 +43,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `OMP_NUM_THREADS` (= k) p/ a jaula; o `run.sh` de MPI faz `mpirun -np "$MOJ_TEST_CPUS"`.
   `report.env`: `NPROCINFO=P`, `CPUNEEDEDINFO=k`, `CPUGROUPSINFO`. O `calibreitor.sh` exporta
   `MOJ_PARALLEL=1` (um teste por vez em k CPUs = a forma do julgamento; o `ALLOWPARALLELTEST=n`
-  de antes era vencido pelo conf sourced depois — bug (f)). `validate-problem.sh` reprova valor
+  de antes era vencido pelo conf sourced depois — bug (f)) e tira o `MOJ_RELEASE_FILE` (a calibração
+  nunca libera grupo: a disparada por um job de P grupos devolvia os slots dele no meio do julgamento,
+  26/10/2026; teste em `test-calib-methods.sh`). `validate-problem.sh` reprova valor
   inválido das 4 chaves (`conf_parallel_sane`, por grep) e avisa soft quando nenhum juiz do
   registry tem k CPUs (num nó, com `SAMENUMA=y`). Templates `script-templates/paralelo-openmp`
   (compile `-fopenmp`) e `paralelo-mpi` (`mpirun --bind-to none --oversubscribe -np

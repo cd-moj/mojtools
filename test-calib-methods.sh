@@ -177,4 +177,13 @@ for bad in 'TLMETHOD=Kattis' 'TLMETHOD=boca' 'KATTIS_AC_TO_TIME_LIMIT=0.5' 'KATT
   val "$bad"; ck "reprova $bad" '[[ "$(jq -r .ok <<<"$DBG")" == false ]]'
 done
 
+echo "== a calibração nunca libera grupo de CPU (26/10/2026) =="
+# a calibração disparada por um JOB de 2 grupos herdava o arquivo de liberação dele: cada build-and-test filho
+# anotava o grupo 1 como livre e o agente o devolvia ao escalonador com o job ainda julgando nele
+mkconf ''
+REL="$W/released"; : > "$REL"
+( export MOJ_RELEASE_FILE="$REL" MOJ_CPU_GROUPS="0|0"; calib )
+DBG="$(cat "$REL") | $(tail -3 "$W/calib.out")"
+ck "com o MOJ_RELEASE_FILE do job no ambiente, nenhum grupo anotado" '[[ -s "$P/tl.juizteste" && ! -s "$REL" ]]'
+
 echo "calib-methods: $pass ok, $fail falhas"; [[ $fail -eq 0 ]]
