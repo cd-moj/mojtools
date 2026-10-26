@@ -68,6 +68,13 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   linguagem sem a sua — pedido do Ribas) › 0, resolvida UMA vez em `TLDRIFT` (valor não-numérico = 0) e
   gravada de volta em `TLMOD[<lang>.drift]`; TLE só quando `tempo − TL > TLDRIFT`. O servidor espelha a regra
   por grep no juízo das soluções (`cdmoj lib/calib-expect.sh` `calx_drift`): mexeu numa, mexa na outra.
+- **Raias na calibração (26/10/2026)**: com `MOJ_CPU_GROUPS` de G grupos, o `calibreitor.sh` roda as soluções do
+  mesmo tipo em paralelo — `_run_phase`: L = min(G, soluções) subshells (`trap - EXIT`; pinadas com `taskset -pc` no
+  grupo; reivindicam por `mkdir $TEMP.claim/<i>`) rodando `MOJ_CPU_GROUPS=<g> MOJ_PARALLEL=1 build-and-test`, com
+  barreira entre as good e pass+slow+wrong. SÓ o pai lê `$TEMP.item.<i>.out` EM ORDEM (`_item_tv`: 1ª/última linha
+  como o agente; `_exectimes` do run-trace) e calcula W/LANGOK/tabela/`sols`: log e arquivos idênticos ao serial.
+  Saíram o coproc, o FIFO, o fd 7 e o `tail -f`. `MOJ_CALIB_LANES=0` = uma raia; o agente grepa o nome p/ saber se
+  pode pedir raias. Teste: `test-calib-lanes.sh` (serial × 3 raias, pin, sobreposição, bordas).
 - `calibreitor.sh` — calibra um problema num juiz: roda as soluções, define o **TL** pelos DOIS métodos
   (tabela `TL[]` MOJ + `TLKATTIS[]` Kattis — ver "MÉTODOS DE TL" nas Regras), grava o
   vetor ESTRUTURADO **`.calib-sols.json`** (por solução, `{file,lang,category,verdict,method,etl,tests:

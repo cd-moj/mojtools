@@ -36,6 +36,7 @@ function sai()
       && mv -f "$t" "$PROBLEMDIR/.calib-sols.json" 2>/dev/null || rm -f "$t"
   fi
   rm $TEMP
+  rm -rf "$TEMP.claim"
   rm -f $TEMP.*
   rm -rf $TOREMOVE
 }
@@ -173,33 +174,93 @@ if [[ -z "$CALIBRATE_ONLY_GOOD" ]]; then
   fi
 fi
 
+# ===== RAIAS (26/10/2026; pedido do Ribas: a calibração roda as soluções do mesmo tipo em paralelo) ============
+# MOJ_CALIB_LANES — o agente procura este nome aqui p/ saber que o calibreitor tem raias; MOJ_CALIB_LANES=0 no
+# ambiente desliga (uma raia só, qualquer que seja o nº de grupos).
+# As raias são os grupos de CPU do agente (MOJ_CPU_GROUPS="g0|g1|…"; vazio/ausente = 1 raia, o caminho de sempre).
+# Cada raia é uma subshell pinada no seu grupo que reivindica soluções por `mkdir $TEMP.claim/<i>` (o padrão do
+# pool do build-and-test) e roda um build-and-test com MOJ_CPU_GROUPS=<o grupo> e MOJ_PARALLEL=1: cada SOLUÇÃO
+# segue rodando um teste por vez em k CPUs, a forma do julgamento. Duas fases com barreira: as good (a tabela de TL
+# sai delas) e depois pass+slow+wrong (julgadas pela tabela nova). Só o PAI, em ordem, lê os resultados, calcula W e
+# LANGOK e grava os arquivos comuns (report, vetor `sols`): o log sai igual ao serial, só que no fim da fase.
+CALIB_GROUPS=()
+if [[ -n "${MOJ_CPU_GROUPS+x}" ]]; then
+  _cg="${MOJ_CPU_GROUPS}"
+  while :; do CALIB_GROUPS+=("${_cg%%|*}"); [[ "$_cg" == *"|"* ]] || break; _cg="${_cg#*|}"; done
+else
+  CALIB_GROUPS=("")
+fi
+[[ "${MOJ_CALIB_LANES:-1}" == 0 ]] && CALIB_GROUPS=("${CALIB_GROUPS[0]}")
+
+# _run_phase <runall> <solução…> : roda as soluções em L = min(grupos, soluções) raias e espera todas (barreira).
+# Deixa $TEMP.item.<i>.out (o stdout do build-and-test: 1ª linha = workdir, última = veredicto) p/ o pai.
+_run_phase(){
+  local runall="$1"; shift
+  local -a items=("$@"); local n=${#items[@]} L=${#CALIB_GROUPS[@]} li
+  local -a pids=()
+  (( n == 0 )) && return 0
+  (( L > n )) && L=$n
+  rm -rf "$TEMP.claim"; mkdir -p "$TEMP.claim"
+  for (( li=0; li<L; li++ )); do
+    ( trap - EXIT          # a raia nunca publica nem apaga nada (o sai() é do pai)
+      g="${CALIB_GROUPS[li]}"
+      (( L > 1 )) && [[ -n "$g" ]] && taskset -pc "$g" $BASHPID >/dev/null 2>&1
+      for (( i=0; i<n; i++ )); do
+        mkdir "$TEMP.claim/$i" 2>/dev/null || continue
+        f="${items[i]}"; lg="$(lang_canon "${f##*.}")"
+        if (( L > 1 )); then
+          MOJ_CPU_GROUPS="$g" MOJ_PARALLEL=1 bash build-and-test.sh "$lg" "$f" "$PROBLEMDIR" "$runall" \
+            > "$TEMP.item.$i.out" 2> "$TEMP.item.$i.err"
+        else
+          bash build-and-test.sh "$lg" "$f" "$PROBLEMDIR" "$runall" > "$TEMP.item.$i.out" 2> "$TEMP.item.$i.err"
+        fi
+      done ) &
+    pids+=($!)
+  done
+  wait "${pids[@]}" 2>/dev/null
+  return 0
+}
+# _item_tv <i> : T (o workdir) e A (o veredicto) da solução i, como o agente lê o build-and-test (1ª e última
+# linha). Build-and-test morto antes do veredicto (a última linha é o próprio workdir) = A vazio.
+_item_tv(){
+  T="$(head -n1 "$TEMP.item.$1.out" 2>/dev/null)"; A="$(tail -n1 "$TEMP.item.$1.out" 2>/dev/null)"
+  [[ "$A" == "$T" || -d "$A" ]] && A=""
+  return 0
+}
+# _exectimes <workdir> : as linhas EXECTIME do trace (ancorado: o trace copia o stderr da solução, e uma linha
+# "… EXECTIME x 0.01 AC" no meio dela não é tempo), "<tempo> <código>" por linha
+_exectimes(){
+  local _ln _a _b et sr
+  [[ -n "$1" && -f "$1/run-trace.log" ]] || return 0
+  while IFS= read -r _ln; do
+    [[ "$_ln" =~ ^EXECTIME[[:space:]] ]] || continue
+    read -r _a _b et sr <<< "$_ln"
+    printf '%s %s\n' "$et" "$sr"
+  done < "$1/run-trace.log"
+}
+
 echo "AC solutions:"
-for AC in $PROBLEMDIR/sols/good/*; do
+export ALLOWPARALLELTEST=n
+GOODS=()
+for AC in $PROBLEMDIR/sols/good/*; do [[ -e "$AC" ]] && GOODS+=("$AC"); done
+_run_phase "$ALLOWTLEDURINGCALIBRATION" "${GOODS[@]}"
+for i in "${!GOODS[@]}"; do
+  AC="${GOODS[i]}"
   echo "${AC##*/}:"
   # extensão -> linguagem canônica (lang-canon.sh): py2/py3 legadas = py; cc/cxx/c++ = cpp.
   # Chave ÚNICA na tabela de TL — e é o canônico que vai ao build-and-test (era a extensão crua).
   LANG="$(lang_canon "${AC##*.}")"
   [[ ! -n "${WORSTTIMEPERLANG[$LANG]}" ]] && WORSTTIMEPERLANG[$LANG]=0.01
-
-  mkfifo $TEMP.coprocout
-  export ALLOWPARALLELTEST=n
-  coproc bash build-and-test.sh "$LANG" $AC $PROBLEMDIR $ALLOWTLEDURINGCALIBRATION &>$TEMP.coprocout
-  #read -u ${COPROC[0]} T
-  exec 7<$TEMP.coprocout
-  read -u 7 T
-  while read L; do
-    # ancorado: o trace copia o stderr da solução, e uma linha "… EXECTIME x 0.01 AC" no meio dela não é tempo
-    [[ "$L" =~ ^EXECTIME[[:space:]] ]] || continue;
-    read l l ET SMALLRESP <<< "$L"
-    printf " $ET"
-    [[ "$SMALLRESP" != "AC" ]] && printf "($SMALLRESP)"
+  _item_tv "$i"
+  while read -r ET SMALLRESP; do
+    printf ' %s' "$ET"
+    [[ "$SMALLRESP" != "AC" ]] && printf '(%s)' "$SMALLRESP"
     if [[ "$SMALLRESP" =~ "AC" ]] && echo "$ET > ${WORSTTIMEPERLANG[$LANG]}"|bc |grep -q 1; then
       WORSTTIMEPERLANG[$LANG]=$ET
     fi
-  done <<< $(tail -f --pid=$COPROC_PID $T/run-trace.log)
+  done < <(_exectimes "$T")
   echo
 
-  read -u 7 A
   if [[ "${A}" =~ "Accepted" ]]; then
     LANGOK[$LANG]=1
   elif [[ "${A}" =~ "Time Limit Exceeded" && "$ALLOWTLEDURINGCALIBRATION" == "y" ]]; then
@@ -218,8 +279,6 @@ for AC in $PROBLEMDIR/sols/good/*; do
   save_report "$T" "good-${AC##*/}"
   sols_add "$T" "${AC##*/}" "$LANG" good "$A"
   TOREMOVE+=" ${T}"
-  exec 7<&-
-  rm -f $TEMP.coprocout
 done
 
 TLMULT=1.35
@@ -297,32 +356,32 @@ fi
 # alternativo de cada teste vai p/ o log.verdictalt e o vetor estruturado (code_alt/tl_alt); trocar o método no
 # conf não perde o juízo das soluções.
 export MOJ_CALIB_ALT=1
+OTHERS=(); OCATS=()
+for OTHERSOL in pass slow wrong; do
+  [[ -d "$PROBLEMDIR/sols/$OTHERSOL" ]] || continue
+  for TLs in $PROBLEMDIR/sols/$OTHERSOL/*; do [[ -e "$TLs" ]] && { OTHERS+=("$TLs"); OCATS+=("$OTHERSOL"); }; done
+done
+_run_phase y "${OTHERS[@]}"
+i=0
 for OTHERSOL in pass slow wrong; do
   [[ ! -d "$PROBLEMDIR/sols/$OTHERSOL" ]] && continue
   echo
   echo "${OTHERSOL^^} solutions:"
-  for TLs in $PROBLEMDIR/sols/$OTHERSOL/*; do
-    if [[ ! -e $TLs ]]; then echo none; continue;fi
+  nsol=0
+  while (( i < ${#OTHERS[@]} )) && [[ "${OCATS[i]}" == "$OTHERSOL" ]]; do
+    TLs="${OTHERS[i]}"
     echo "${TLs##*/}:"
     LANG="$(lang_canon "${TLs##*.}")"
-    mkfifo $TEMP.coproc
-    coproc bash build-and-test.sh "$LANG" $TLs $PROBLEMDIR y >$TEMP.coproc
-    exec 7<$TEMP.coproc
-    read -u 7 T
-    tail -f --pid=$COPROC_PID $T/run-trace.log|
-      while read L; do
-        [[ "$L" =~ ^EXECTIME[[:space:]] ]] || continue;
-        read l l ET SMALLRESP <<< "$L"
-        printf "$ET($SMALLRESP) "
-      done
+    _item_tv "$i"
+    while read -r ET SMALLRESP; do printf '%s(%s) ' "$ET" "$SMALLRESP"; done < <(_exectimes "$T")
     echo
-    read -u 7 BIGRESP
+    BIGRESP="$A"
     echo "Verdict: $BIGRESP"
     alt_line "$T"
     save_report "$T" "$OTHERSOL-${TLs##*/}"
     sols_add "$T" "${TLs##*/}" "$LANG" "$OTHERSOL" "$BIGRESP"
-    exec 7<&-
-    rm -f $TEMP.coproc
     TOREMOVE+=" ${T}"
+    i=$((i+1)); nsol=$((nsol+1))
   done
+  (( nsol == 0 )) && echo none
 done

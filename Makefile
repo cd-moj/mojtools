@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score test-final-loop test-fn test-no-source test-calib test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -84,6 +84,11 @@ test-no-source:
 ##              e o validate (calibreitor + build-and-test reais, cage-run FALSO)
 test-calib:
 	@bash test-calib-methods.sh
+
+## test-calib-lanes — a calibração em RAIAS (as soluções do mesmo tipo em paralelo, uma por grupo de CPU): o mesmo
+##                    resultado e o mesmo log do serial, o pin por raia, a sobreposição no tempo e as bordas
+test-calib-lanes:
+	@bash test-calib-lanes.sh
 
 ## test-kattis — o tempo na ida e volta MOJ ⇄ Kattis (kattis/import.sh, export.sh): método, multiplicadores,
 ##               time_limit = TLOVERRIDE[default], pass/brute_force (precisa de python3+pyyaml)

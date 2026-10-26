@@ -597,7 +597,16 @@ tempo-limite para linguagem que teve pelo menos uma solução `good` **aceita** 
 vive no limite de propósito). A conta exata é `calibrafactor × pior_tempo_AC + 0,02`.
 
 Depois, roda as soluções de `pass/`, `slow/` e `wrong/` para conferência (o `CALIBRATE_ONLY_GOOD=1`
-pula essa parte, e é o que o agente do juiz usa quando está com pressa). O calibreitor só roda e
+pula essa parte, e é o que o agente do juiz usa quando está com pressa).
+
+**Raias (26/10/2026).** Com mais de um grupo de CPU no `MOJ_CPU_GROUPS` (`"g0|g1|…"`, do agente), o calibreitor
+roda as soluções do mesmo tipo em paralelo: uma raia por grupo, cada uma pinada no seu grupo e rodando
+`build-and-test.sh` com `MOJ_CPU_GROUPS=<o grupo>` e `MOJ_PARALLEL=1`. Cada solução segue com um teste por vez
+em k CPUs. São duas fases com barreira: as `good` (a tabela sai delas) e depois `pass`+`slow`+`wrong`. Só o
+processo principal lê os resultados, em ordem, e calcula a tabela, então o log e os arquivos saem iguais aos do
+serial, só que no fim de cada fase. Sem grupos, ou com `MOJ_CALIB_LANES=0`, há uma raia só: o caminho de sempre.
+O agente procura o nome `MOJ_CALIB_LANES` no `calibreitor.sh` para saber se pode pedir raias. Teste:
+`test-calib-lanes.sh` (`make test-calib-lanes`). O calibreitor só roda e
 registra; quem decide se cada solução fez o que a categoria pede é o **servidor**
 (`cdmoj/server/api/v1/lib/calib-expect.sh`, tabela em `cdmoj/docs/PACOTE.md` §10).
 
