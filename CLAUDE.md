@@ -255,7 +255,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   VERDICT`), e o teste roda até `max(TL do outro + drift, b × TL Kattis) + 0,5` (teto 30 s) — o veredicto
   ativo não muda. O servidor classifica por método (`code` × `code_alt`, `cdmoj lib/calib-expect.sh`). Testes:
   `test-calib-methods.sh` (`make test-calib`) e `kattis/test-kattis.sh` (`make test-kattis`). Formato:
-  `cdmoj/docs/PACOTE.md` "Métodos de TL".
+  `cdmoj/docs/PACOTE.md` "Métodos de TL". ⚠ A FAIXA dos parâmetros (`_tlm_in`) é awk, nunca `bc`: o `validate-problem.sh` a usa NO SERVIDOR, cuja
+  imagem não tem `bc` — com ele todo `KATTIS_*` explícito reprovava o pacote (27/10/2026, fotos-do-drone). É a regra
+  do `_num_in` da CLI; `test-tl-methods.sh` roda sem `bc` no PATH e compara as duas. As CONTAS seguem em `bc` (juiz).
 - **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
   o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
   `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o

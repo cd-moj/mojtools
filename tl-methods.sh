@@ -1,5 +1,6 @@
-# tl-methods.sh — os DOIS métodos de TL (sourceável; só bash + bc). Fonte única do calibreitor.sh, do
-# build-and-test.sh e do test-calib-methods.sh. Formato do pacote: cdmoj/docs/PACOTE.md.
+# tl-methods.sh — os DOIS métodos de TL (sourceável; bash + bc nas contas, que rodam só no JUIZ; a faixa dos
+# parâmetros, `_tlm_in`, é awk porque o validate-problem.sh a usa no SERVIDOR, que não tem bc). Fonte única do
+# calibreitor.sh, do build-and-test.sh e do test-calib-methods.sh. Formato do pacote: cdmoj/docs/PACOTE.md.
 #
 #   MOJ    (o de sempre): TL[lang] = calibrafactor × W[lang] + 0,02  — fica no calibreitor.sh, intocado.
 #   Kattis (spec 2025-09, "Problem timing"), POR LINGUAGEM (decisão do Ribas, 26/10/2026):
@@ -25,11 +26,13 @@ tl_method_of(){
   [[ "$m" == kattis ]] && echo kattis || echo moj
 }
 
-# _tlm_in <v> <min> <max> <min-exclusivo?> — v é número dentro da faixa
+# _tlm_in <v> <min> <max> <min-exclusivo?> — v é número dentro da faixa. Por AWK (LC_ALL=C), nunca bc: a
+# conferência do pacote (validate-problem.sh, conf_tlmethod_sane) roda no SERVIDOR, e a imagem dele não tem bc —
+# com bc a saída vinha vazia e TODO KATTIS_* explícito virava "valor inválido", até inteiro (27/10/2026,
+# fotos-do-drone). É a MESMA regra do `_num_in` da CLI (moj-cli/moj). Teste: test-tl-methods.sh.
 _tlm_in(){
   tl_num "$1" || return 1
-  local op='>='; [[ "${4:-}" == x ]] && op='>'
-  [[ "$(echo "$1 $op $2 && $1 <= $3" | LC_ALL=C bc -l 2>/dev/null)" == 1 ]]
+  LC_ALL=C awk -v v="$1" -v lo="$2" -v hi="$3" -v x="${4:-}" 'BEGIN{ v += 0; exit !((x == "x" ? v > lo : v >= lo) && v <= hi) }'
 }
 
 kattis_params(){

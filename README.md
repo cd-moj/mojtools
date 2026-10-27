@@ -587,7 +587,11 @@ TLKATTIS[default]=1           #         ≥ KATTIS_AC_TO_TIME_LIMIT (2,0) × pio
 
 Quem escolhe a metade é o `TLMETHOD` do conf (`moj`, o padrão, ou `kattis`), no julgamento: o
 `build-and-test.sh` usa o `MOJ_TL_METHOD` do job (o servidor lê o conf ATUAL ao entregar o job) ›
-`TLMETHOD` do conf › `moj`. O `TLMOD` sum/mult, o drift e o `TLOVERRIDE` valem por cima dos dois. Roda
+`TLMETHOD` do conf › `moj`. O `TLMOD` sum/mult, o drift e o `TLOVERRIDE` valem por cima dos dois. Os
+parâmetros do Kattis têm faixa (`KATTIS_AC_TO_TIME_LIMIT` e `KATTIS_TIME_LIMIT_TO_TLE` de 1 a 100,
+`KATTIS_TIME_RESOLUTION` > 0 e ≤ 10); o `validate-problem.sh` reprova o valor fora dela (`conf_tlmethod_sane`).
+Quem confere é o `_tlm_in`, em awk e sem `bc`, porque ele roda também no servidor (teste: `make test-tl-methods`).
+Roda
 **um teste por vez** (exporta `MOJ_PARALLEL=1`; o `ALLOWPARALLELTEST=n` de antes era vencido pelo
 conf do pacote), cada um com as **k CPUs** do problema (`CPUNEEDED`; o agente dá o grupo de CPUs
 via `MOJ_CPU_GROUPS`) — o tempo-limite é medido na MESMA forma em que o julgamento roda cada
