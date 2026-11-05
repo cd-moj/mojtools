@@ -36,6 +36,10 @@ Usage: $0 <options>
 -s, --stderr-log-file     stderr log of the cage
 -t, --time-log-file       File with execution times
 -T, --time-limit          Limit of execution time, this should be greater than the problem TLE
+              (wall clock). Env MOJ_CAGE_CPUSEC=<s>: also a CPU-time cap per process
+              (ulimit -t; used when the problem's TL is CPU time, TLCLOCK=cpu). Env
+              MOJ_CAGE_CPUSTAT=<file>: write the cpu.stat of the systemd scope there
+              (the exact CPU of the run, orphans included; only with a scope)
 -B, --bwrap-time-file     Time log of all bubblewrap execution
 -w, --rw-dir              Exposes a directory as a persistend dir at '/tmp/rwdir'
               this option allows '-d','-i' and '-o' to be ommited
@@ -334,8 +338,26 @@ done
 # O b-a-t exporta MOJ_CAGE_FSIZE e NÃO aplica -f em si mesmo: o -f no harness matava o
 # próprio julgamento com SIGXFSZ quando o trace ingeria stderr gigante do time (Maratona
 # 29/08). Sem a env (standalone/calibração) nada muda.
+# MOJ_CAGE_CPUSEC (relógio do TL = cpu, TLCLOCK=cpu no conf; 05/11/2026): o TETO DE CPU de cada processo
+# enjaulado (RLIMIT_CPU: SIGXCPU no N, SIGKILL no N+1), pelo mesmo caminho do -f — no harness ele somaria o
+# CPU do julgamento inteiro. É só freio (quem queima CPU morre perto do teto em vez de rodar até a parede, -T);
+# o veredicto é do build-and-test, pelo CPU medido. Sem a env (relógio de parede) nada muda.
+# MOJ_CAGE_CPUSTAT=<arq> (relógio de CPU): o CPU do teste é o do CGROUP do escopo do systemd (o `cpu.stat`, que conta
+# todo processo que passou pelo escopo — filho órfão inclusive). O `time` de fora da jaula NÃO serve: a bancada num juiz
+# real (05/11/2026) deu user 0.00 até p/ um laço infinito (o bwrap não repassa o rusage), e o `time` de dentro não vê o
+# filho que o aluno deixa órfão (quem o colhe é o init do bwrap). Um bash DENTRO do escopo e FORA do bwrap grava o
+# cpu.stat no fim; sem escopo (root, ou sem user manager) não há arquivo e o build-and-test cai no timelog de dentro.
+CPUWRAP=()
+if [[ -n "$SCOPE" && -n "${MOJ_CAGE_CPUSTAT:-}" ]]; then
+  rm -f "$MOJ_CAGE_CPUSTAT" 2>/dev/null
+  CPUWRAP=(bash -c '"$@"; rc=$?; cg="$(grep -m1 "^0::" /proc/self/cgroup 2>/dev/null | cut -d: -f3-)"
+    [[ -n "$cg" ]] && cat "/sys/fs/cgroup${cg}/cpu.stat" > "$MOJ_CAGE_CPUSTAT" 2>/dev/null; exit $rc' cage-cpu)
+fi
 ([[ "${MOJ_CAGE_FSIZE:-}" =~ ^[0-9]+$ ]] && ulimit -f "$MOJ_CAGE_FSIZE" 2>/dev/null
- exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $PIN $SCOPE bwrap $ROOTBINDS \
+ if [[ "${MOJ_CAGE_CPUSEC:-}" =~ ^[0-9]+$ ]] && (( MOJ_CAGE_CPUSEC >= 1 )); then
+   ulimit -H -t "$(( MOJ_CAGE_CPUSEC + 1 ))" 2>/dev/null; ulimit -S -t "$MOJ_CAGE_CPUSEC" 2>/dev/null
+ fi
+ exec /usr/bin/time -f "real %e\nuser %U\nsys %S\nres %M\ncpu %P" -o $BWRAPTIMEFILE timeout "$SAFETLE" $SHIELD $PIN $SCOPE "${CPUWRAP[@]}" bwrap $ROOTBINDS \
   --chdir / \
   --unshare-all \
   --die-with-parent \

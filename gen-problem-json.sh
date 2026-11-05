@@ -138,6 +138,12 @@ snuma=false; grep -qE '^[[:space:]]*SAMENUMA=["'"'"']?y' "$PKG/conf" 2>/dev/null
 _sw(){ local v; v="$(sed -nE "s/^[[:space:]]*$1=[\"']?([A-Za-z]*).*/\\1/p" "$PKG/conf" 2>/dev/null | tail -1)"; [[ "$v" == y ]] && echo true || echo false; }
 sw_wa="$(_sw STOPWHEN_WA)"; sw_tle="$(_sw STOPWHEN_TLE)"; sw_re="$(_sw STOPWHEN_RE)"
 ntests="$(find "$PKG/tests/input" -maxdepth 1 -type f 2>/dev/null | wc -l)"; ntests="${ntests//[^0-9]/}"; ntests="${ntests:-0}"
+# RELÓGIO do TL (TLCLOCK=wall|cpu, 05/11/2026) e o mínimo do teto de parede (WALLTL, s): a página do problema e a do
+# contest dizem "(CPU)" no TL. Por sed (texto do autor); valor desconhecido = wall, como no juiz.
+tl_clock="$(sed -nE 's/^[[:space:]]*TLCLOCK=["'"'"']?([a-z]*).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
+[[ "$tl_clock" == cpu ]] || tl_clock=wall
+wall_tl="$(sed -nE 's/^[[:space:]]*WALLTL=["'"'"']?([0-9.]*).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)"
+[[ "$wall_tl" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] || wall_tl=null   # forma de número JSON (sem zero à esquerda)
 # FUNCTION_LANGS (submissão de FUNÇÃO, cdmoj/docs/PACOTE.md): as linguagens em que o aluno envia SÓ a
 # função — o driver com o `main` é o scripts/<lang>/compile.sh do autor. O editor (treino e o módulo
 # `esqueletos` do contest) abre VAZIO nelas: o esqueleto com `main` daria CE por main duplicado. É
@@ -246,8 +252,8 @@ out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --
   --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   --argjson cpun "$cpun" --argjson snuma "$snuma" --argjson fnl "$fnl_json" \
   --argjson swwa "$sw_wa" --argjson swtle "$sw_tle" --argjson swre "$sw_re" --argjson ntests "$ntests" \
-  --arg tlm "$tl_method" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tags:$tags, collections:$colls, languages:$langs, public:$pub,
+  --arg tlm "$tl_method" --arg tlc "$tl_clock" --argjson wtl "$wall_tl" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tl_clock:$tlc, wall_tl:$wtl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
     statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma,
     function_langs:$fnl, stop_when:{wa:$swwa, tle:$swtle, re:$swre}, tests:$ntests}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"

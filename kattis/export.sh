@@ -93,7 +93,7 @@ NOTES+=("input_validator trivial (accept-all) — escreva um real p/ rigor ICPC"
 side="$(jq --arg uuid "$uuid" --arg id "$ID" --arg lang "$SLANG" \
   --argjson custom_checker "$([[ -n "$CMP" ]] && echo true || echo false)" \
   '{uuid:$uuid, moj_id:$id, per_language_tl:.tl, calibrafactor:.calibrafactor, tlmod:.tlmod,
-    tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride,
+    tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride, tl_clock:.tl_clock, wall_tl:.wall_tl,
     statement_lang:$lang, custom_checker:$custom_checker, format:"2025-09"}' <<<"$collect")"
 printf '%s\n' "$side" > "$STG/.kattis.json"   # viaja no pacote exportado (round-trip); não mexe na fonte MOJ
 

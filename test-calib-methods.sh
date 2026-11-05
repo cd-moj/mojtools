@@ -39,12 +39,22 @@ spec="$(grep -h -m1 -o 'TIMES .*' "$D"/* 2>/dev/null | head -1)"; wrong="$(grep 
 read -r _ real rest <<<"$spec"; real="${real:-0.05}"
 for kv in $rest; do [[ "${kv%%=*}" == "$name" ]] && real="${kv#*=}"; done
 src="$(grep -l -m1 'TIMES' "$D"/* 2>/dev/null | head -1)"
-echo "run $(basename "${src:-?}") $name T=$T" >> "$FAKE_LOG"
-rc=0
-if [[ "$(echo "$real > $T" | bc -l)" == 1 ]]; then real="$T"; rc=137; : > "$OUT"   # morto no teto
+echo "run $(basename "${src:-?}") $name T=$T CPU=${MOJ_CAGE_CPUSEC:-}" >> "$FAKE_LOG"
+rc=0; cpu=""
+# relógio de CPU (FAKE_CPUMULT): CPU = real × fator no cpu.stat do escopo (MOJ_CAGE_CPUSTAT, como o cage-run real); morto
+# no teto de CPU (SIGXCPU) antes da parede
+if [[ -n "${FAKE_CPUMULT:-}" ]]; then
+  cpu="$(echo "$real * $FAKE_CPUMULT" | bc -l)"
+  if [[ -n "${MOJ_CAGE_CPUSEC:-}" && "$(echo "$cpu > $MOJ_CAGE_CPUSEC" | bc -l)" == 1 ]]; then
+    cpu="$MOJ_CAGE_CPUSEC"; real="$(echo "$cpu / $FAKE_CPUMULT" | bc -l)"; rc=152; : > "$OUT"
+  fi
+fi
+if (( rc )); then :
+elif [[ "$(echo "$real > $T" | bc -l)" == 1 ]]; then real="$T"; rc=137; : > "$OUT"   # morto no teto
 elif [[ " ${wrong#WRONG } " == *" $name "* ]]; then echo errado > "$OUT"
 else cat "$IN" > "$OUT"; fi
 printf 'real %s\nuser 0\nsys 0\nres 100\ncpu 99%%\n' "$real" > "$TLOG"
+[[ -n "$cpu" && -n "${MOJ_CAGE_CPUSTAT:-}" ]] && printf 'usage_usec %s\n' "$(echo "$cpu * 1000000 / 1" | bc)" > "$MOJ_CAGE_CPUSTAT"
 exit $rc
 EOF
 chmod +x "$H/cage-run.sh"
@@ -130,6 +140,17 @@ mkconf $'KATTIS_AC_TO_TIME_LIMIT=abc\nKATTIS_TIME_RESOLUTION=0'
 calib
 ck "parâmetro inválido cai no padrão (com aviso)" '[[ "$(v TLKATTIS py)" == 3 ]] && grep -q "AVISO: KATTIS_AC_TO_TIME_LIMIT=abc" "$W/calib.out"'
 
+echo "== relógio de CPU (TLCLOCK=cpu): o W sai do cpu.stat do escopo, o etl é o teto de CPU =="
+mkconf 'TLCLOCK=cpu'; export FAKE_CPUMULT=2      # o CPU é o dobro da parede (threads)
+calib
+DBG="$(cat "$TLF" 2>&1) $(tail -5 "$W/calib.out")"
+ck "TL[c] = 1,35 × 0,42 (o CPU do big3) + 0,02; TL[py] = 1,35 × 2,6 + 0,02" 'num_eq "$(v TL c)" 0.587 && num_eq "$(v TL py)" 3.53'
+ck "tests[].time = o CPU (a parede do big3 é 0,21)" '[[ "$(tst a.c big3 | jq .time)" == 0.42 ]]'
+DBG="$(row s.c) | $(grep " s.c big3" "$FAKE_LOG" | sort -u)"
+ck "s.c: etl = o teto de CPU (3 = ⌈2 + 0,587 + 0,2⌉), parede 4 (o teto de CPU + 1)" '[[ "$(jq -r .etl <<<"$(row s.c)")" == 3 ]] && grep -q "run s.c big3 T=4.00 CPU=3" "$FAKE_LOG"'
+ck "s.c big3: morta no teto de CPU = TLE com time = etl" '[[ "$(jq -r .code <<<"$(tst s.c big3)")" == TLE ]] && num_eq "$(jq -r .time <<<"$(tst s.c big3)")" 3'
+unset FAKE_CPUMULT
+
 echo "== julgamento de job (fora da calibração) =="
 mkconf ''; calib                                     # a tabela das duas metades em tl.juizteste
 bat(){ rm -f "$FAKE_LOG"; ( cd "$H" && env "$@" bash build-and-test.sh c "$P/sols/slow/m.c" "$P" 2>/dev/null ) > "$W/bat.out"
@@ -161,6 +182,15 @@ cp "$P/conf" "$W/c1"; cp "$W/c0" "$P/conf"; n1="$(cks)"; cp "$W/c1" "$P/conf"
 ck "TLMETHOD no fim (conf com \\n): igual ao conf sem a linha" '[[ "$(cks)" == "$n1" ]]'
 printf 'CALIBRATIONTL=5\nKATTIS_TIME_RESOLUTION=0.5\n' > "$P/conf"
 ck "KATTIS_* mudam os dois carimbos" '[[ "$(cks)" != "$n1" && "$(cks --all-sols)" != "$a0" ]]'
+# o RELÓGIO do TL (05/11/2026) é o contrário do TLMETHOD: muda o que a calibração mede ⇒ trocar recalibra
+printf 'CALIBRATIONTL=5
+TLCLOCK=cpu
+' > "$P/conf"; c1="$(cks)"
+printf 'CALIBRATIONTL=5
+TLCLOCK=cpu
+WALLTL=8
+' > "$P/conf"
+ck "TLCLOCK e WALLTL mudam o carimbo estreito (trocar o relógio ou o teto recalibra)" '[[ "$c1" != "$n1" && "$(cks)" != "$c1" ]]'
 
 echo "== validate-problem: conf_tlmethod_sane =="
 export CONTESTSDIR="$W/c" RUNDIR="$W/run"; mkdir -p "$CONTESTSDIR/treino/var/jsons" "$RUNDIR"
@@ -176,6 +206,19 @@ ck "kattis com parâmetros válidos: ok" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]
 for bad in 'TLMETHOD=Kattis' 'TLMETHOD=boca' 'KATTIS_AC_TO_TIME_LIMIT=0.5' 'KATTIS_TIME_LIMIT_TO_TLE=abc' 'KATTIS_TIME_RESOLUTION=0' 'KATTIS_TIME_RESOLUTION=11'; do
   val "$bad"; ck "reprova $bad" '[[ "$(jq -r .ok <<<"$DBG")" == false ]]'
 done
+
+echo "== validate-problem: conf_tlclock_sane =="
+valc(){ val "$1"; DBG="$(jq -c '.checks[]|select(.name=="conf_tlclock_sane")' "$RUNDIR"/validation/*.json 2>&1)"; }
+valc ''; ck "sem as chaves: ok (parede)" '[[ "$(jq -r .ok <<<"$DBG")" == true && "$(jq -r .detail <<<"$DBG")" == *TLCLOCK=wall* ]]'
+valc $'TLCLOCK=cpu
+WALLTL=8'; ck "cpu com WALLTL válido: ok" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]'
+valc $'TLCLOCK="wall"'; ck "wall entre aspas: ok" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]'
+for bad in 'TLCLOCK=CPU' 'TLCLOCK=parede' 'WALLTL=0.5' 'WALLTL=61' 'WALLTL=abc' $'TLCLOCK=cpu
+CPUNEEDED=4'; do
+  valc "$bad"; ck "reprova ${bad//$'\n'/ }" '[[ "$(jq -r .ok <<<"$DBG")" == false ]]'
+done
+valc $'TLCLOCK=wall
+CPUNEEDED=4'; ck "parede com CPUNEEDED=4: ok (o problema paralelo)" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]'
 
 echo "== a calibração nunca libera grupo de CPU (26/10/2026) =="
 # a calibração disparada por um JOB de 2 grupos herdava o arquivo de liberação dele: cada build-and-test filho

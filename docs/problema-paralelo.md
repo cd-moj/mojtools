@@ -122,7 +122,8 @@ antigos mascarava um Runtime Error como Accepted/Wrong Answer).
   (`SANDBOX.md`).
 - **Tempo de parede vs. CPU**: o TL é de **parede** (`real`). Um programa que cria k threads mas
   serializa num lock não vai ficar k vezes mais rápido — a `good` mede o que o autor conseguiu, e é
-  isso que vira o limite.
+  isso que vira o limite. Problema paralelo **não** usa `TLCLOCK=cpu` (o relógio de CPU soma as threads
+  e transformaria o speedup em custo): o `validate-problem.sh` reprova `TLCLOCK=cpu` com `CPUNEEDED` > 1.
 
 ## 8. Testes em paralelo, para qualquer problema
 

@@ -124,7 +124,7 @@ FAKE_NPROC=8 run MOJ_PARALLEL=1
 ck "com MOJ_PARALLEL=1 o conf não abre paralelo"     'grep -q "NPROC: 1 " "$TRACE" && [[ "$(maxpar)" == 1 ]]'
 
 echo "== cage-run.sh -C e templates =="
-ck "cage-run aceita -C (usage + getopt + PIN antes do bwrap)" 'grep -q "^-C, --cpus" "$MT/cage-run.sh" && grep -q "cpus:" "$MT/cage-run.sh" && grep -q "\$SHIELD \$PIN \$SCOPE bwrap" "$MT/cage-run.sh"'
+ck "cage-run aceita -C (usage + getopt + PIN antes do bwrap)" 'grep -q "^-C, --cpus" "$MT/cage-run.sh" && grep -q "cpus:" "$MT/cage-run.sh" && grep -qE "\\\$SHIELD \\\$PIN \\\$SCOPE (\"\\\$\\{CPUWRAP\\[@\\]\\}\" )?bwrap" "$MT/cage-run.sh"'
 for t in paralelo-openmp paralelo-mpi; do
   ck "template $t: json válido com slots"            'jq -e ".slots|length>0" "$MT/script-templates/$t/template.json" >/dev/null'
   ck "template $t: scripts com +x e sintaxe"         'for f in $(find "$MT/script-templates/$t/files" -name "*.sh"); do [[ -x "$f" ]] && bash -n "$f" || exit 1; done'

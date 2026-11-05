@@ -221,6 +221,12 @@ sempre, então trocar de método não pede recalibração. Os parâmetros (`KATT
 `KATTIS_TIME_LIMIT_TO_TLE`, `KATTIS_TIME_RESOLUTION`) e as regras estão em `cdmoj/docs/PACOTE.md`, seção
 "Métodos de TL".
 
+O tempo-limite é medido no **relógio de parede** (wall clock), o padrão. Num problema estilo ICPC você pode
+cobrá-lo pelo **tempo de CPU** (user+sys): acrescente `TLCLOCK=cpu` ao `conf`. A parede vira só um teto maior
+(3 × o tempo-limite, no mínimo o teto de CPU + 1 s; `WALLTL=<s>` sobe esse mínimo), que pega o programa
+bloqueado esperando algo ou dormindo. Não use em problema paralelo (`CPUNEEDED` > 1): lá o CPU soma as threads.
+Trocar o relógio recalibra. Detalhes em `cdmoj/docs/PACOTE.md`, seção "Relógio do TL".
+
 Falta ainda o arquivo `author`, que é obrigatório:
 
 ```sh
@@ -509,6 +515,27 @@ do juiz) e **`MOJ_CALIB_ALT`** (com `MOJ_CALIBRATING`: julga também pelo outro 
 usado), `TL_METHOD_WANTED` (o pedido, quando a tabela não tinha a metade Kattis e o julgamento caiu no MOJ),
 `ETL` (o teto de cada teste) e, na calibração, `TL_METHOD_ALT`/`TL_LANG_ALT`.
 
+**Relógio do TL** (05/11/2026; `TLCLOCK=cpu` no conf, o padrão é `wall`). No `wall` tudo é como sempre: o tempo é
+o `real` do timelog de dentro da jaula e o teto é `ETL = TL + 2,2 + 2·drift`. No `cpu`:
+
+- o tempo cobrado é o `usage_usec` do `cpu.stat` do cgroup do escopo do systemd em que o teste roda (o cage-run o
+  grava em `<teste>-log.cpustat`, via `MOJ_CAGE_CPUSTAT`): é exato e conta todo processo, até o filho que o aluno
+  deixa órfão. Sem escopo (juiz root, ou sem user manager) vale o `user + sys` do timelog de **dentro**, que não vê
+  esse filho (quem o colhe é o init do bwrap). O timelog de **fora** (`-B`) não serve: numa jaula real ele marca
+  `user 0.00` até para um laço infinito (bancada num juiz, 05/11/2026). O `report.env` diz a fonte
+  (`TL_CPU_SOURCE=cgroup|timelog`);
+- o `ETL` vira o teto de CPU (`⌈ETL⌉`, imposto por `ulimit -t` na jaula via `MOJ_CAGE_CPUSEC`, nunca na
+  compilação) e o teto de parede é `WALLCAP = max(3 × TL, ⌈ETL⌉ + 1, WALLTL)`;
+- TLE = `CPU − TL > drift` **ou** morte pela parede (o `real` de dentro ≥ `WALLCAP − 0,05`, ou sem timelog de
+  dentro e o de fora ≥ `WALLCAP`); o rc 124 sozinho não decide (o aluno pode sair com 124);
+- o tempo cobrado vai para `<teste>-log.exectime` (o calibreitor, o `gen-report.sh` e o agente o preferem ao
+  `real`), a parede numa linha própria `WALLTIME <teste> <s>` do trace, e o `report.env` ganha `TL_CLOCK=cpu` e
+  `WALLCAP` (o `ETL` é o teto de CPU).
+
+A calibração herda o tempo cobrado: o W sai em segundos de CPU nos dois métodos. O `validate-problem.sh` reprova
+`TLCLOCK` fora de `wall|cpu`, `WALLTL` fora de 1..60 e `TLCLOCK=cpu` com `CPUNEEDED` > 1 (`conf_tlclock_sane`).
+Teste: `test-tl-clock.sh` (`make test-tl-clock`; o modo `wall` tem o run-trace idêntico ao de antes).
+
 **Paralelismo dos testes** (24/09/2026): cada teste roda em **k CPUs** (`CPUNEEDED` do conf, default 1)
 e até **P testes rodam ao mesmo tempo**. Quem decide P e quais CPUs é o **agente do juiz**, pelo
 ambiente — e o ambiente **vence** o conf e o `nproc`:
@@ -556,7 +583,7 @@ cage-run.sh -d <dir> -i <entrada> -o <saída> -s <log-stderr> -t <log-tempo> -r 
 | `-d` | diretório com os arquivos, entra na jaula como `/tmp/dir`, só-leitura |
 | `-i` / `-o` | a entrada (`/tmp/in`, só-leitura) e a saída (`/tmp/out`, escrita) |
 | `-w` | um diretório de escrita em `/tmp/rwdir`. É o modo usado na **compilação** |
-| `-T` | tempo-limite duro (maior que o do problema, é uma rede de segurança) |
+| `-T` | tempo-limite duro de parede (maior que o do problema, é uma rede de segurança). Com a variável `MOJ_CAGE_CPUSEC=<s>`, cada processo da jaula também tem um teto de CPU (`ulimit -t`; o relógio de CPU, `TLCLOCK=cpu`) |
 | `-M` | limite de memória, em MB |
 | `-R` | a raiz do sistema de arquivos da jaula (o rootfs). Também vem da variável `CAGE_ROOT` |
 | `-b` | um bind extra para dentro da jaula (usado pelos `prep.sh` das linguagens) |
@@ -784,7 +811,8 @@ ou saída esperada), o `tests/score`, uma solução `good`, o `conf` ou um scrip
 
 Do `conf` ficam de fora, nos DOIS carimbos, as linhas que não mudam TL medido nenhum: `SAMPLE` (exemplos no
 enunciado), `FUNCTION_LANGS` (o editor do aluno) e `TLMETHOD` (o método do TL: a tabela traz as duas
-metades, e o juiz recebe o método no job). Os `KATTIS_*` entram: mudam o TL Kattis.
+metades, e o juiz recebe o método no job). Os `KATTIS_*` entram: mudam o TL Kattis. O `TLCLOCK` e o `WALLTL`
+entram também: o relógio muda o que a calibração mede, então trocá-lo (ou só o teto de parede) recalibra.
 
 Com **`--all-sols`** entram também as `sols/{pass,slow,wrong,upcoming}`, e o resultado é a **versão
 do pacote**: é ela que o servidor devolve ao juiz em `/judge/package-meta`, e é comparando-a que o

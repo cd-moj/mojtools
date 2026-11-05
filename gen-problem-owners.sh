@@ -161,8 +161,14 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
       mods="$(sed -nE 's/^[[:space:]]*TLMOD\[([A-Za-z0-9]{1,16})\.(sum|mult)\]=(-?([0-9]+\.?[0-9]*|\.[0-9]+))[[:space:]]*(#.*)?$/\1.\2=\3/p' \
               "$pdir/conf" 2>/dev/null | grep -vE '^(default|py2|py3|cc|cxx|hpp|h)\.' | paste -sd';' -)"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" "$mods" \
+    # RELÓGIO do TL (TLCLOCK=cpu, 05/11/2026): o Painel marca "CPU" no TL sem abrir pacote. Espelho de
+    # `tl_conf_clock` (cdmoj lib/tl-store.sh): última linha vale, valor desconhecido = wall; sem fork se não há a chave.
+    tlc=wall
+    if [[ "$_cf" == *TLCLOCK* ]]; then
+      [[ "$(sed -nE 's/^[[:space:]]*TLCLOCK=["'"'"']?([a-z]*).*/\1/p' "$pdir/conf" 2>/dev/null | tail -1)" == cpu ]] && tlc=cpu
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" "$mods" "$tlc" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -193,7 +199,8 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         tl_mods:((.[16] // "")|split(";")|map(select(length>0)|split("=")|select(length==2)
                    |(.[0]|split(".")) as $lk | select(($lk|length)==2 and ((.[1]|tonumber?) != null))
                    |{l:$lk[0], k:$lk[1], v:(.[1]|tonumber)})
-                 | if length == 0 then {} else reduce .[] as $e ({sum:{}, mult:{}}; .[$e.k][$e.l] = $e.v) end) }
+                 | if length == 0 then {} else reduce .[] as $e ({sum:{}, mult:{}}; .[$e.k][$e.l] = $e.v) end),
+        tl_clock:(if (.[17] // "") == "cpu" then "cpu" else "wall" end) }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 

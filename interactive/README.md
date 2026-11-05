@@ -54,7 +54,9 @@ bind do `bwrap`: nasceu replicado em 198 pacotes).
   `System.out.flush()` a cada resposta, senão trava (TLE). Diga isso no enunciado — o
   guia de autoria tem os modelos.
 - **TL e memória INCLUEM o árbitro** (mesmo cgroup/tempo real): calibre com folga
-  (`TLMOD[calibrafactor]`, `CALIBRATIONTL`) e lembre disso ao definir `MEMLIMITMB`.
+  (`TLMOD[calibrafactor]`, `CALIBRATIONTL`) e lembre disso ao definir `MEMLIMITMB`. Com o relógio de
+  CPU (`TLCLOCK=cpu`) também: o tempo cobrado é o user+sys da jaula inteira, árbitro e jogador. O jogador
+  que trava esperando o árbitro (sem `flush`) não gasta CPU e leva TLE no teto de parede.
 - Score contínuo só via `summary.sh` (`--score`); por teste o veredicto é binário.
 - Linguagem SEM o driver julga NÃO-interativamente (errado em silêncio) — por isso o
   instalador cobre todas as linguagens de `mojtools/lang/` por default.

@@ -67,8 +67,11 @@ sol_tests_json(){  # $1=workdir
   {
     for file in "${ORDER[@]}"; do
       t=""
-      [[ -s "$wb/$file-log.timelog" ]] && \
+      # o tempo COBRADO: <file>-log.exectime (relógio cpu, TLCLOCK=cpu) › o `real` (parede)
+      if [[ -s "$wb/$file-log.exectime" ]]; then t="$(head -n1 "$wb/$file-log.exectime")"
+      elif [[ -s "$wb/$file-log.timelog" ]]; then
         t="$(grep -m1 '^real' "$wb/$file-log.timelog" 2>/dev/null | awk '{print $NF}')"
+      fi
       jq -cn --arg n "$file" --arg c "${CODE[$file]}" --arg t "$t" --arg tl "$tl" --arg ca "${ALT[$file]:-}" --arg tla "$tla" \
         '{name:$n, code:$c, time:($t|tonumber? // null), tl:($tl|tonumber? // null)}
          + (if $ca != "" then {code_alt:$ca, tl_alt:($tla|tonumber? // null)} else {} end)'

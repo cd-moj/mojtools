@@ -43,6 +43,13 @@ function write_report_env()
     printf 'ETL=%q\n'                "${ETL:-}"
     printf 'TL_METHOD_ALT=%q\n'      "${TL_METHOD_ALT:-}"
     printf 'TL_LANG_ALT=%q\n'        "${TL_ALT:-}"
+    # relógio do TL (TLCLOCK=cpu): os tempos são de CPU, o ETL acima é o teto de CPU e WALLCAP o de parede. Só no
+    # cpu — sem a linha, quem lê assume a parede (o report.env de sempre)
+    if [[ "${TL_CLOCK:-wall}" == cpu ]]; then
+      printf 'TL_CLOCK=%q\n'         cpu
+      printf 'WALLCAP=%q\n'          "${WALLCAP:-}"
+      printf 'TL_CPU_SOURCE=%q\n'    "${TL_CPU_SOURCE:-}"   # cgroup (exato) | timelog (sem os filhos órfãos)
+    fi
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
     printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
     # veredicto CANÔNICO limpo (sem score) + score estruturado, p/ o backend casar/montar strings
@@ -515,6 +522,25 @@ if [[ -n "${MOJ_CALIBRATING:-}" && -n "${MOJ_CALIB_ALT:-}" && ${#TLKATTIS[@]} -g
     TL_ALT=""; TL_METHOD_ALT=""
   fi
 fi
+
+# ---- RELÓGIO DO TL (05/11/2026; pedido do Roberto/Ribas): TLCLOCK=cpu no conf cobra o TL pelo TEMPO DE CPU ------
+# (user+sys) e a parede vira só um teto MAIOR, que pega quem fica bloqueado ou dorme (sleep) sem gastar CPU. O padrão
+# é a parede (`wall`, tudo como sempre: os problemas paralelos e de compilador precisam dela). No cpu:
+#   CPUCAP  = o ETL calculado acima (TL + 2,2 + 2·drift, ou o piso da calibração) — teto do tempo COBRADO, imposto
+#             por RLIMIT_CPU na jaula (MOJ_CAGE_CPUSEC = ⌈CPUCAP⌉, só no run-testinput: compilação não);
+#   WALLCAP = max(3 × TL, ⌈CPUCAP⌉ + 1, WALLTL do conf) — teto de parede, o -T do cage-run (1 s acima do teto de CPU:
+#             quem só queima CPU morre pelo SIGXCPU, nunca rotulado como morto pela parede);
+#   o report.env leva ETL = ⌈CPUCAP⌉ (o teto do tempo que a calibração e o servidor comparam com o TL).
+# O TLCLOCK/WALLTL entram no tl-checksum (o conf inteiro): trocar o relógio recalibra — o W medido muda de natureza.
+TL_CLOCK=wall; WALLCAP=""; CPUSEC=""; RUNCAP="$ETL"; TL_CPU_SOURCE=""
+if [[ "${TLCLOCK:-}" == cpu ]]; then
+  TL_CLOCK=cpu
+  CPUSEC="$(LC_ALL=C awk -v e="$ETL" 'BEGIN{ c = int(e); if (c < e) c++; if (c < 1) c = 1; print c }')"
+  _WT="${WALLTL:-}"; [[ "$_WT" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]] || _WT=0
+  WALLCAP="$(LC_ALL=C awk -v tl="${TL[$LANGUAGE]}" -v c="$CPUSEC" -v w="$_WT" 'BEGIN{ m = 3 * tl; if (c + 1 > m) m = c + 1; if (w + 0 > m) m = w + 0; printf "%.2f", m }')"
+  RUNCAP="$WALLCAP"; ETL="$CPUSEC"
+  LOG " - Relógio do TL: CPU (user+sys) · teto de CPU ${CPUSEC}s · teto de parede ${WALLCAP}s"
+fi
 RESP=""
 RESPERRO=0
 CORRECT=0
@@ -525,15 +551,17 @@ function run-testinput()
   local INPUT=$1
   local FILE=$(basename $INPUT)
   # CAGE_CPUS (do worker, ou o grupo 0 no rerun): a jaula deste teste fica PINADA nessas CPUs
-  bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+  # MOJ_CAGE_CPUSEC/MOJ_CAGE_CPUSTAT vazios (relógio de parede) = o cage-run de sempre
+  MOJ_CAGE_CPUSEC="$CPUSEC" MOJ_CAGE_CPUSTAT="${CPUSEC:+$workdirbase/$FILE-log.cpustat}" bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
        -r $LANGRUN \
        -t $workdirbase/$FILE-log.timelog\
-       -T $ETL\
+       -T $RUNCAP\
        -B $workdirbase/$FILE-log.bwraptime &> $workdirbase/$FILE-log.cage-run
   local BWRAPEXITCODE=$?
   echo $BWRAPEXITCODE > $workdirbase/$FILE-log.bwrapexitcode
-  local EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
+  local EXECTIME _JT _WALLKILL=0 _CPUSRC=""
+  _judged_time "$FILE"; EXECTIME="$_JT"
   local _CMP="" _V=""
   _verdict_for "${TL[$LANGUAGE]}"
   local VERDICT="$_V" ERR _RC
@@ -548,6 +576,46 @@ function run-testinput()
   fi
   return $ERR
 }
+
+# _judged_time <FILE> — o tempo COBRADO do teste em _JT e, no relógio cpu, _WALLKILL=1 quando ele morreu pelo teto de
+# parede e _CPUSRC = de onde veio o CPU (sem subshell; são locais de quem chama). Parede: o `real` do timelog de DENTRO,
+# exatamente como sempre. CPU, nesta ordem:
+#   cgroup  = o `usage_usec` do cpu.stat do escopo do systemd (<FILE>-log.cpustat, que o cage-run grava com
+#             MOJ_CAGE_CPUSTAT): exato, conta todo processo do teste, filho órfão inclusive;
+#   timelog = sem escopo (juiz root, ou sem user manager): user+sys do timelog de DENTRO — threads e filhos esperados
+#             entram; o filho que o aluno deixa órfão (o init do bwrap o colhe) NÃO.
+# O timelog de FORA (-B) não serve p/ CPU: numa jaula real ele marca user 0.00 até p/ um laço infinito (bancada no
+# juiz, 05/11/2026). Ele só entra na morte pela parede: o `real` de dentro ≥ WALLCAP − 0,05; sem timelog de dentro (o
+# timeout não tem -k: quem ignora SIGTERM só morre no teto de fora, que leva o `time` de dentro junto) vale o `real`
+# de fora ≥ WALLCAP. O rc 124 sozinho NÃO decide: o aluno pode sair com 124. No cpu o tempo cobrado vai também p/
+# <FILE>-log.exectime (fora da jaula): é o que o calibreitor, o gen-report e o agente do juiz leem antes do `^real`.
+_judged_time() {
+  local tf="$workdirbase/$1-log.timelog" cs="$workdirbase/$1-log.cpustat" bf="$workdirbase/$1-log.bwraptime"
+  if [[ "$TL_CLOCK" != cpu ]]; then
+    _JT=$(grep '^real' $tf|awk '{print $NF}')
+    return 0
+  fi
+  # arquivo que falta vira /dev/null (o awk não para num arquivo inexistente em toda implementação)
+  [[ -s "$cs" ]] || cs=/dev/null; [[ -e "$tf" ]] || tf=/dev/null; [[ -e "$bf" ]] || bf=/dev/null
+  read -r _JT _WALLKILL _CPUSRC < <(LC_ALL=C awk -v tf="$tf" -v bf="$bf" -v cap="$WALLCAP" '
+    FILENAME == tf && /^real / && ir == "" { ir = $2 }
+    FILENAME == tf && /^user / && iu == "" { iu = $2 }
+    FILENAME == tf && /^sys / && is == "" { is = $2 }
+    FILENAME == bf && /^real / && orl == "" { orl = $2 }
+    FILENAME != tf && FILENAME != bf && $1 == "usage_usec" && cg == "" { cg = $2 }
+    END { k = 0
+          if (ir != "") { if (ir + 0 >= cap - 0.05) k = 1 } else if (orl != "" && orl + 0 >= cap + 0) k = 1
+          if (cg != "") { t = sprintf("%.2f", cg / 1000000); src = "cgroup" }
+          else if (iu != "" || is != "") { t = sprintf("%.2f", iu + is); src = "timelog" }
+          else { t = "-"; src = "none" }
+          print t, k, src }' "$tf" "$bf" "$cs" 2>/dev/null)
+  [[ "$_JT" == "-" ]] && _JT=""
+  [[ "$_WALLKILL" == 1 ]] || _WALLKILL=0
+  printf '%s\n' "$_JT" > "$workdirbase/$1-log.exectime"
+  return 0
+}
+# _wall_of <FILE> — o `real` do timelog de dentro (o da parede, que no relógio cpu só aparece no log)
+_wall_of() { grep -m1 '^real' "$workdirbase/$1-log.timelog" 2>/dev/null | awk '{print $NF}'; }
 
 # _verdict_rc <veredicto> — o código de saída do run-testinput para esse veredicto, em _RC (sem subshell).
 _verdict_rc() {
@@ -574,7 +642,7 @@ _stops() {
 _verdict_for() {
   local tl="$1" cmpf="$workdirbase/$FILE-log.compare"
   [[ "${2:-}" == alt ]] && cmpf="$workdirbase/$FILE-log.compare-alt"
-  if echo "($EXECTIME - $tl) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
+  if [[ "${_WALLKILL:-0}" == 1 ]] || echo "($EXECTIME - $tl) > ${TLMOD[$LANGUAGE.drift]} "|bc -l |grep -q 1; then
     _V=TLE
   elif (( BWRAPEXITCODE >= 127 )) ; then
     _V=RE
@@ -730,9 +798,16 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   LOG ""
   LOG ""
 
-  EXECTIME=$(grep '^real' $workdirbase/$FILE-log.timelog|awk '{print $NF}')
+  _JT=""; _WALLKILL=0; _CPUSRC=""; _judged_time "$FILE"; EXECTIME="$_JT"
+  # a fonte do CPU do julgamento: basta um teste sem o cgroup p/ o report dizer "timelog" (o mais fraco)
+  [[ "$TL_CLOCK" == cpu && -n "$_CPUSRC" ]] && { [[ "$TL_CPU_SOURCE" == timelog || "$_CPUSRC" != cgroup ]] && TL_CPU_SOURCE=timelog || TL_CPU_SOURCE=cgroup; }
   LOG "EXECTIME $FILE $EXECTIME $THISVERDICT"
   LOG " - Execution Time: $EXECTIME"
+  if [[ "$TL_CLOCK" == cpu ]]; then
+    # linha PRÓPRIA (o calibreitor lê o resto da linha EXECTIME como veredicto): a parede, só p/ log/report
+    LOG "WALLTIME $FILE $(_wall_of "$FILE")"
+    LOG " - Execution Time is CPU time (source: ${_CPUSRC:-?}); wall clock: $(_wall_of "$FILE") (wall cap ${WALLCAP}s)$( (( _WALLKILL )) && echo ' — KILLED AT THE WALL CAP')"
+  fi
   LOG " - Time Limit for this problem is: ${TL[$LANGUAGE]}"
   LOG " - Verdict for this output: $THISVERDICT"
   LOG ""

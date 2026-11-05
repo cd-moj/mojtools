@@ -304,6 +304,17 @@ tbad=""
 if [[ -n "$tbad" ]]; then add conf_tlmethod_sane 0 "valor inválido no conf: $tbad"
 else add conf_tlmethod_sane 1 "TLMETHOD=${_tlm:-moj}${_ka:+ KATTIS_AC_TO_TIME_LIMIT=$_ka}${_kb:+ KATTIS_TIME_LIMIT_TO_TLE=$_kb}${_kr:+ KATTIS_TIME_RESOLUTION=$_kr}"; fi
 
+# --- conf_tlclock_sane: o RELÓGIO do TL (TLCLOCK=wall|cpu) e o teto de parede (WALLTL, segundos), por GREP (cpv) —
+#     cdmoj/docs/PACOTE.md "Relógio do TL". HARD: valor inválido faria o juiz cair na parede calado; e o relógio de
+#     CPU com CPUNEEDED>1 não mede o problema paralelo (user+sys SOMA as threads: o speedup viraria custo).
+_tlc="$(cpv TLCLOCK)"; _wtl="$(cpv WALLTL)"
+cbad=""
+[[ -z "$_tlc" || "$_tlc" == wall || "$_tlc" == cpu ]] || cbad+="TLCLOCK=$_tlc (wall|cpu) "
+[[ -z "$_wtl" ]] || _tlm_in "$_wtl" 1 60 || cbad+="WALLTL=$_wtl (número de 1 a 60) "
+[[ "$_tlc" == cpu && "${_cpun:-1}" =~ ^[0-9]+$ && "${_cpun:-1}" -gt 1 ]] && cbad+="TLCLOCK=cpu com CPUNEEDED=$_cpun (problema paralelo: o TL tem de ser de parede) "
+if [[ -n "$cbad" ]]; then add conf_tlclock_sane 0 "valor inválido no conf: $cbad"
+else add conf_tlclock_sane 1 "TLCLOCK=${_tlc:-wall}${_wtl:+ WALLTL=$_wtl}"; fi
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 

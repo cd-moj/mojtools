@@ -80,6 +80,8 @@ kt_collect(){
                  time_limit_to_tle:($c.scalars.KATTIS_TIME_LIMIT_TO_TLE // ""),
                  time_resolution:($c.scalars.KATTIS_TIME_RESOLUTION // "")},
          tloverride:($c.arrays.TLOVERRIDE // {}),
+         # relógio do TL (TLCLOCK=cpu) e o mínimo do teto de parede (WALLTL): voltam no import (ida e volta)
+         tl_clock:(if $c.scalars.TLCLOCK == "cpu" then "cpu" else "wall" end), wall_tl:($c.scalars.WALLTL // ""),
          author:$author, tags:$tags, meta:$meta, prev:$prev}'
 }
 
@@ -92,6 +94,7 @@ kt_collect(){
 #   • time_limit explícito = o TL fixado pelo autor -> TLOVERRIDE[default]. Exceção: sidecar ANTIGO (sem a
 #     chave `tloverride`), em que o time_limit era o máx do calibrado — aí o por-linguagem volta pelo `tl`.
 #     Sidecar novo devolve o TLOVERRIDE do autor por linguagem, como era.
+#   • TLCLOCK=cpu / WALLTL (relógio do TL): só voltam do sidecar; pacote nativo fica na parede (o padrão do MOJ).
 kt_tl_conf(){
   jq -rn --argjson y "$1" --argjson side "$2" '
     def num($lo; $hi; $excl):
@@ -113,6 +116,10 @@ kt_tl_conf(){
        elif $rt then {}
        else {default: $l.time_limit} end) as $ov
     | (if $m == "kattis" then "TLMETHOD=kattis" else empty end),
+      # relógio do TL: só a ida e volta o liga (o import de pacote Kattis nativo segue na parede, o padrão do MOJ)
+      (if $rt and $side.tl_clock == "cpu" then "TLCLOCK=cpu" else empty end),
+      (if $rt and $side.tl_clock == "cpu" then ($side.wall_tl | num(1; 60; false)) as $w
+         | (if $w != null then "WALLTL=\($w)" else empty end) else empty end),
       (if ($cf | test("^[0-9][0-9.+*/ ()-]*$")) then "TLMOD[calibrafactor]=\"\($cf)\"" else "TLMOD[calibrafactor]=1.35" end),
       (if $a != null then "KATTIS_AC_TO_TIME_LIMIT=\($a)" else empty end),
       (if $b != null then "KATTIS_TIME_LIMIT_TO_TLE=\($b)" else empty end),

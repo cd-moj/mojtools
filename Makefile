@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-tl-clock test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -94,6 +94,12 @@ test-calib-lanes:
 ##                   servidor, cuja imagem não tem bc; e a mesma resposta do _num_in da CLI
 test-tl-methods:
 	@bash test-tl-methods.sh
+
+## test-tl-clock — o RELÓGIO do TL (TLCLOCK=cpu, 05/11/2026): user+sys de fora decide, a parede é só o teto
+##                 (quem dorme/fica bloqueado morre nele = TLE, nunca RE); o padrão (parede) com o run-trace idêntico
+##                 ao de antes (build-and-test real, cage-run FALSO)
+test-tl-clock:
+	@bash test-tl-clock.sh
 
 ## test-kattis — o tempo na ida e volta MOJ ⇄ Kattis (kattis/import.sh, export.sh): método, multiplicadores,
 ##               time_limit = TLOVERRIDE[default], pass/brute_force (precisa de python3+pyyaml)

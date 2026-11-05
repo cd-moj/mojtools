@@ -187,7 +187,7 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   git): o handler de `script-templates` do cdmoj copia p/ o pacote o bit **do alvo** do symlink.
 - `tl-checksum.sh` — **DOIS carimbos, um programa**. Sem flag = o ESTREITO (`tl_checksum`, o que
   invalida o TL): `conf` (menos as linhas `SAMPLE`, `FUNCTION_LANGS` e `TLMETHOD` — fora dos DOIS carimbos,
-  porque não mudam TL medido nenhum; filtradas por `sed`, só quando existem, p/ conf sem elas e sem `\n` final
+  porque não mudam TL medido nenhum; o `TLCLOCK`/`WALLTL` ficam DENTRO: mudam o que se mede; filtradas por `sed`, só quando existem, p/ conf sem elas e sem `\n` final
   dar o hash de sempre) + `tests/{input,output,score}` + `sols/good` + `scripts` (tudo que muda TL
   OU veredicto — `tests/score`/`output` entraram em 2026-07-19: fora do hash, um score corrigido
   nunca chegava ao juiz; mudou a cobertura? RE-STAMPE os checksums de `run/tl/*.json` em vez de
@@ -258,6 +258,27 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `cdmoj/docs/PACOTE.md` "Métodos de TL". ⚠ A FAIXA dos parâmetros (`_tlm_in`) é awk, nunca `bc`: o `validate-problem.sh` a usa NO SERVIDOR, cuja
   imagem não tem `bc` — com ele todo `KATTIS_*` explícito reprovava o pacote (27/10/2026, fotos-do-drone). É a regra
   do `_num_in` da CLI; `test-tl-methods.sh` roda sem `bc` no PATH e compara as duas. As CONTAS seguem em `bc` (juiz).
+- **RELÓGIO DO TL (05/11/2026; pedido do Roberto/Ribas: TL de CPU p/ problema ICPC, parede maior como teto).**
+  `TLCLOCK=wall|cpu` no conf (padrão `wall`: NADA muda — enquanto o git HEAD não tem o TLCLOCK, o `test-tl-clock.sh` compara o
+  run-trace com o do build-and-test de lá; depois do commit, a comparação é pulada) e `WALLTL=<s>` (mínimo do teto de parede). No `cpu` o `build-and-test.sh`:
+  tempo cobrado (`_judged_time`) = o `usage_usec` do `cpu.stat` do CGROUP do escopo do systemd (`MOJ_CAGE_CPUSTAT` →
+  um `bash -c` DENTRO do escopo e FORA do bwrap grava `<teste>-log.cpustat` no fim: exato, órfão incluso); sem escopo
+  (root, sem user manager) = `user+sys` do timelog de DENTRO (sem o filho órfão, que o init do bwrap colhe), e o
+  `report.env` diz `TL_CPU_SOURCE=cgroup|timelog`. ⚠ O timelog de FORA (`-B`) é CEGO: numa jaula real marca user
+  0.00 até p/ um laço infinito (bancada na .9, 05/11/2026) — nunca use p/ CPU. CPUCAP = o ETL de sempre, imposto por
+  `ulimit -t` (`MOJ_CAGE_CPUSEC` → subshell do exec do `cage-run.sh`, no molde do `-f`; NUNCA no harness — RLIMIT_CPU
+  somaria o CPU do julgamento inteiro — nem na compilação); `WALLCAP = max(3×TL efetivo, ⌈CPUCAP⌉+1, WALLTL)` é o
+  `-T` (1 s acima do teto de CPU: quem só queima CPU morre pelo SIGXCPU, nunca rotulado como morto pela parede); TLE = CPU − TL > drift OU morte pela parede
+  (`_WALLKILL`: `real` de dentro ≥ WALLCAP−0,05, ou timelog de dentro vazio e o de fora ≥ WALLCAP — o timeout não
+  tem `-k`); rc 124 sozinho NÃO decide. O tempo cobrado vai p/ `<teste>-log.exectime` — o calibreitor
+  (`.calib-sols.json`), o `gen-report.sh` e o agente do juiz (`agent_tests_json`) o preferem ao `^real` — e a parede
+  numa linha `WALLTIME` própria (a EXECTIME NÃO ganha campo: o `read … sr` do calibreitor pega o resto da linha).
+  `report.env`: `TL_CLOCK=cpu`, `WALLCAP` e `ETL=⌈CPUCAP⌉` (o `etl` que o servidor compara com b×TL). As DUAS chaves
+  ficam DENTRO do tl-checksum (o contrário do TLMETHOD: o W medido muda de natureza ⇒ trocar recalibra; o juiz lê o
+  conf do próprio cache). `conf_tlclock_sane` reprova valor inválido e `cpu` com `CPUNEEDED>1`. Servido como
+  `tl_clock`/`wall_tl` (gen-problem-json) e `tl_clock` no índice de donos; o sidecar `kattis/` o leva na ida e volta
+  (o import de pacote Kattis nativo NÃO liga o cpu). Testes: `test-tl-clock.sh`, `test-calib-methods.sh`
+  (calibração no cpu, checksum, validate) e `kattis/test-kattis.sh`. Formato: `cdmoj/docs/PACOTE.md` "Relógio do TL".
 - **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
   o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
   `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o

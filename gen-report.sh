@@ -30,6 +30,7 @@ PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" CPUNEEDEDINFO="" CPUGROUPSINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT="" TL_METHOD=""
+TL_CLOCK="" WALLCAP=""   # relógio do TL (TLCLOCK=cpu no conf): vazio = parede, o report.env de sempre
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 # tolerância (drift) acima do TL antes de TLE (build-and-test.sh: TLMOD[<lang>.drift] › TLMOD[default.drift]).
 # Vazio = report.env de um build-and-test antigo: sem o valor, mas o amarelo segue valendo pelo veredicto.
@@ -79,7 +80,12 @@ vkey(){ case "$1" in
   AC|AC,PE) echo ac;; WA) echo wa;; TLE|MLE) echo tle;;
   RE|RE_NZEC|TMT) echo re;; CE) echo ce;; *) echo gray;; esac; }
 
+# o tempo COBRADO do teste: <t>-log.exectime (relógio cpu, TLCLOCK=cpu: user+sys) › o `real` (parede)
 exectime_of(){ local f="$wb/$1-log.timelog"
+  [[ -s "$wb/$1-log.exectime" ]] && { head -n1 "$wb/$1-log.exectime"; return; }
+  [[ -s "$f" ]] && grep -m1 '^real' "$f" 2>/dev/null | awk '{print $NF}'; }
+# a parede do teste (o `real` de dentro) — no relógio cpu só aparece ao lado do tempo cobrado
+wall_of(){ local f="$wb/$1-log.timelog"
   [[ -s "$f" ]] && grep -m1 '^real' "$f" 2>/dev/null | awk '{print $NF}'; }
 # pico de RSS (memória residente real) em KB — res %M do /usr/bin/time. É o uso REAL de
 # memória (não o virtual reservado), melhor p/ linguagens que reservam heaps grandes.
@@ -271,6 +277,8 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
   tlhead="limite $(secs "$TL_LANG")s"
   # método do TL (build-and-test.sh/tl-methods.sh): só o Kattis se anuncia; o MOJ é o de sempre
   [[ "$TL_METHOD" == kattis ]] && tlhead="$tlhead · método Kattis"
+  # relógio do TL: no cpu os tempos são user+sys, e a parede é só o teto (quem dorme ou fica bloqueado morre nele)
+  [[ "$TL_CLOCK" == cpu ]] && tlhead="$tlhead · tempo de CPU${WALLCAP:+ · teto de parede $(secs "$WALLCAP")s}"
   [[ -n "$TL_DRIFT" ]] && awk -v d="$TL_DRIFT" 'BEGIN{ exit !(d+0 > 0) }' && tlhead="$tlhead · tolerância +$(secs "$TL_DRIFT")s"
   raw '<h3 style="margin:1rem 0 .2rem">Tempo de execução <span class="muted">('"$tlhead"')</span></h3>'$'\n'
   TIMED=(); for f in "${FILES[@]}"; do [[ -n "${T[$f]}" ]] && TIMED+=("$f"); done
@@ -358,6 +366,11 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
     raw "<summary><span class=\"badge\" style=\"background:$(vcolor "$v")\">$(escs "$v")</span> "
     raw "$(escs "$f") <span class=\"tmeta\">"
     [[ -n "$t" ]] && raw "· ${t}s / TL $(secs "$TL_LANG")s"
+    if [[ "$TL_CLOCK" == cpu ]]; then
+      _w="$(wall_of "$f")"
+      [[ -n "$_w" ]] && raw " (CPU) · parede ${_w}s"
+      [[ -n "$_w" && -n "$WALLCAP" ]] && LC_ALL=C awk -v w="$_w" -v c="$WALLCAP" 'BEGIN{ exit !(w + 0 >= c - 0.05) }' && raw " · morto no teto de parede"
+    fi
     [[ -n "$t" && "$(tclass "$t" "$v")" == drift ]] && raw " · acima do limite, aceito pela tolerância${TL_DRIFT:+ de $(secs "$TL_DRIFT")s}"
     [[ -n "${M[$f]}" ]] && raw " · $(mem_fmt "${M[$f]}")"
     raw "</span></summary>"$'\n'
@@ -414,7 +427,7 @@ raw '<table class="kv">'$'\n'
 for kv in \
   "Problema:${PROBLEM}" "Linguagem:${LANGUAGE}" "Arquivo:${SRCBASENAME}" \
   "Toolchain:${TOOLCHAIN_VER}" "Ambiente (raiz da jaula):${TOOLCHAIN_ROOT}" \
-  "Limite de tempo:$(secs "$TL_LANG")s" "Tolerância acima do limite (drift):${TL_DRIFT:+$(secs "$TL_DRIFT")s}" \
+  "Limite de tempo:$(secs "$TL_LANG")s" "Relógio do TL:$([[ "$TL_CLOCK" == cpu ]] && echo "tempo de CPU (user+sys)${WALLCAP:+, teto de parede $(secs "$WALLCAP")s}")" "Tolerância acima do limite (drift):${TL_DRIFT:+$(secs "$TL_DRIFT")s}" \
   "Veredicto final:${FINALRESP}" \
   "Rodar tudo (RUNALL):${RUNALL}" "Paralelismo:${NPROCINFO:+$NPROCINFO teste(s) ao mesmo tempo}${NPROCINFO:+${CPUNEEDEDINFO:+ × $CPUNEEDEDINFO CPU(s) por teste}}${CPUGROUPSINFO:+ (CPUs: $CPUGROUPSINFO)}" \
   "Host:${HOSTBT}" "Início:${STARTDATE}" "Tempo total:${TOTALTIME}s"; do

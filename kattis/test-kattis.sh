@@ -59,6 +59,16 @@ ck "calibrafactor como ac_to_time_limit; sem time_limit" '[[ "$(jq -r .time_mult
 bash "$MT/kattis/import.sh" "$W/out2" "$W/back2" >/dev/null 2>&1
 DBG="$(cat "$W/back2/conf")"
 ck "ida e volta MOJ: sem TLMETHOD, calibrafactor do sidecar, sem KATTIS_*" '! grep -q "^TLMETHOD" "$W/back2/conf" && grep -qx "TLMOD\[calibrafactor\]=\"1.5\"" "$W/back2/conf" && ! grep -q "^KATTIS_" "$W/back2/conf"'
+ck "ida e volta MOJ na parede: sem TLCLOCK nem WALLTL" '! grep -q "^TLCLOCK" "$W/back2/conf" && ! grep -q "^WALLTL" "$W/back2/conf"'
+
+echo "== ida e volta com o relógio de CPU (TLCLOCK=cpu, WALLTL) =="
+printf 'TLMOD[calibrafactor]=1.5\nTLCLOCK=cpu\nWALLTL=8\n' > "$P/conf"
+bash "$MT/kattis/export.sh" "$P" "repo#pp" "$W/out3" >/dev/null 2>&1
+DBG="$(cat "$W/out3/.kattis.json" 2>&1)"
+ck "o sidecar leva o relógio e o WALLTL" '[[ "$(jq -c "[.tl_clock, .wall_tl]" "$W/out3/.kattis.json")" == "[\"cpu\",\"8\"]" ]]'
+bash "$MT/kattis/import.sh" "$W/out3" "$W/back3" >/dev/null 2>&1
+DBG="$(cat "$W/back3/conf" 2>&1)"
+ck "TLCLOCK=cpu e WALLTL=8 restaurados" 'grep -qx "TLCLOCK=cpu" "$W/back3/conf" && grep -qx "WALLTL=8" "$W/back3/conf"'
 
 echo "== import de pacote nativo =="
 N="$W/nat"; mkdir -p "$N/data/sample" "$N/submissions"/{accepted,brute_force,time_limit_exceeded} "$N/statement"
@@ -76,6 +86,7 @@ bash "$MT/kattis/import.sh" "$N" "$W/nb" >/dev/null 2>&1
 DBG="$(cat "$W/nb/conf")"
 ck "nativo: TLMETHOD=kattis + os três KATTIS_*" 'grep -qx TLMETHOD=kattis "$W/nb/conf" && grep -qx KATTIS_AC_TO_TIME_LIMIT=2.5 "$W/nb/conf" && grep -qx KATTIS_TIME_LIMIT_TO_TLE=1.25 "$W/nb/conf" && grep -qx KATTIS_TIME_RESOLUTION=0.25 "$W/nb/conf"'
 ck "time_limit explícito -> TLOVERRIDE[default]; calibrafactor 1,35 (não o multiplicador)" 'grep -qx "TLOVERRIDE\[default\]=1.5" "$W/nb/conf" && grep -qx "TLMOD\[calibrafactor\]=1.35" "$W/nb/conf"'
+ck "nativo fica na parede (sem TLCLOCK)" '! grep -q "^TLCLOCK" "$W/nb/conf"'
 ck "brute_force -> upcoming (nunca pass); TLE -> slow" '[[ -f "$W/nb/sols/upcoming/bf.c" && ! -d "$W/nb/sols/pass" && -f "$W/nb/sols/slow/t.c" ]]'
 sed -i 's/^  time_multipliers.*/  time_multiplier: 5\n  time_safety_margin: 2/; /time_resolution/d; /time_limit:/d' "$N/problem.yaml"
 bash "$MT/kattis/import.sh" "$N" "$W/nb2" >/dev/null 2>&1
