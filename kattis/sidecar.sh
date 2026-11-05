@@ -15,5 +15,5 @@ kt_problem_yaml "$collect" "$uuid" "$REPO" > "$PKG/problem.yaml" 2>/dev/null || 
 
 jq --arg uuid "$uuid" --arg id "$ID" --arg lang "$MOJ_STATEMENT_LANG" '
    (.prev) + {uuid:$uuid, moj_id:$id, per_language_tl:.tl, calibrafactor:.calibrafactor, tlmod:.tlmod,
-              tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride, tl_clock:.tl_clock, wall_tl:.wall_tl,
+              tl_method:.tl_method, kattis:.kattis, tloverride:.tloverride, tl_clock:.tl_clock, wall_tl:.wall_tl, tl_unified:.tl_unified,
               statement_lang:$lang, format:"2025-09"}' <<<"$collect" > "$PKG/.kattis.json"

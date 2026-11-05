@@ -38,5 +38,11 @@ if [[ -f "$CLI" ]]; then
     [[ -z "$diffs" ]] || echo "    $diffs"
   else ck "achei o _num_in da CLI" 'false'; fi
 else echo "  (sem o checkout irmão do moj-cli: a paridade com o _num_in fica de fora)"; fi
+# tl_unify_table (TL ÚNICO, TLUNIFIED=y): o máx das chaves ≠ default em toda chave e no default; SEM bc (o PATH do teste)
+uni(){ PATH="$W/bin" "$BASH" -c 'source "$1"; declare -A T; eval "$2"; tl_unify_table T; for k in a b c default py x; do [[ -n "${T[$k]:-}" ]] && printf "%s=%s " "$k" "${T[$k]}"; done' _ "$MT/tl-methods.sh" "$1"; }
+ck "unifica no máx, grafia preservada (.3035 × 1.775 → 1.775)" '[[ "$(uni "T=([c]=.3035 [py]=1.775 [default]=.3035)")" == "c=1.775 default=1.775 py=1.775 " ]]'
+ck "só o default (a tabela fictícia da fase das good): intacta" '[[ "$(uni "T=([default]=5)")" == "default=5 " ]]'
+ck "valor que não é número é ignorado no máx"  '[[ "$(uni "T=([c]=0.5 [x]=abc [default]=0.5)")" == "c=0.5 default=0.5 x=0.5 " ]]'
+ck "o máx compara número, não texto (10 > 9.5)" '[[ "$(uni "T=([a]=9.5 [b]=10 [default]=9.5)")" == "a=10 b=10 default=10 " ]]'
 echo "RESULT: $pass passed, $fail failed"
 (( fail == 0 ))

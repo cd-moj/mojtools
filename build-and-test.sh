@@ -42,6 +42,7 @@ function write_report_env()
     printf 'TL_METHOD_WANTED=%q\n'   "${TL_METHOD_WANTED:-${TL_METHOD:-moj}}"
     printf 'ETL=%q\n'                "${ETL:-}"
     printf 'TL_METHOD_ALT=%q\n'      "${TL_METHOD_ALT:-}"
+    [[ -n "${TL_UNIFIED:-}" ]] && printf 'TL_UNIFIED=%q\n' y   # TL único (TLUNIFIED=y): o mesmo em toda linguagem
     printf 'TL_LANG_ALT=%q\n'        "${TL_ALT:-}"
     # relógio do TL (TLCLOCK=cpu): os tempos são de CPU, o ETL acima é o teto de CPU e WALLCAP o de parede. Só no
     # cpu — sem a linha, quem lê assume a parede (o report.env de sempre)
@@ -458,6 +459,15 @@ LOG "TL method: $TL_METHOD"
 [[ -z "${TL[py]:-}" && -n "${TL[py3]:-}" ]] && TL[py]="${TL[py3]}"
 [[ -z "${TL[py]:-}" && -n "${TL[py2]:-}" ]] && TL[py]="${TL[py2]}"
 
+# TL ÚNICO (TLUNIFIED=y no conf; 05/11/2026, pedido do Roberto p/ a LATAM): o mesmo TL em toda linguagem = o máx da tabela
+# do método (o TL do pior W entre todas as good). ANTES do default, do TLMOD e do TLOVERRIDE, que seguem valendo por cima
+# (escolha explícita do autor). A linha entra no tl-checksum: ligar recalibra, e a fase pass/slow/wrong já julga por ele.
+TL_UNIFIED=""
+if tl_unified_on; then
+  tl_unify_table TL; TL_UNIFIED=y
+  LOG " - TL único (TLUNIFIED=y): ${TL[default]}s em toda linguagem (o máx da tabela do método)"
+fi
+
 [[ ! -n "${TL[$LANGUAGE]}" ]] && TL[$LANGUAGE]=${TL[default]}
 
 if [[ -n "${TLMOD[$LANGUAGE.sum]}" ]]; then
@@ -509,6 +519,7 @@ if [[ -n "${MOJ_CALIBRATING:-}" && -n "${MOJ_CALIB_ALT:-}" && ${#TLKATTIS[@]} -g
   if [[ "$TL_METHOD" == kattis ]]; then TL_METHOD_ALT=moj; for _k in "${!TLMOJTAB[@]}"; do _ALTTAB[$_k]="${TLMOJTAB[$_k]}"; done
   else TL_METHOD_ALT=kattis; for _k in "${!TLKATTIS[@]}"; do _ALTTAB[$_k]="${TLKATTIS[$_k]}"; done; fi
   [[ -z "${_ALTTAB[py]:-}" && -n "${_ALTTAB[py3]:-}" ]] && _ALTTAB[py]="${_ALTTAB[py3]}"
+  [[ -n "$TL_UNIFIED" ]] && tl_unify_table _ALTTAB      # o outro método também pelo TL único
   TL_ALT="${_ALTTAB[$LANGUAGE]:-${_ALTTAB[default]:-}}"
   if tl_num "$TL_ALT"; then
     [[ -n "${TLMOD[$LANGUAGE.sum]}" ]]  && TL_ALT=$(echo "${TL_ALT}+${TLMOD[$LANGUAGE.sum]}"|bc -l)

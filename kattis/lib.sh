@@ -82,6 +82,8 @@ kt_collect(){
          tloverride:($c.arrays.TLOVERRIDE // {}),
          # relógio do TL (TLCLOCK=cpu) e o mínimo do teto de parede (WALLTL): voltam no import (ida e volta)
          tl_clock:(if $c.scalars.TLCLOCK == "cpu" then "cpu" else "wall" end), wall_tl:($c.scalars.WALLTL // ""),
+         # TL único (TLUNIFIED=y): o mesmo TL em toda linguagem — o modelo da spec do Kattis
+         tl_unified:($c.scalars.TLUNIFIED == "y"),
          author:$author, tags:$tags, meta:$meta, prev:$prev}'
 }
 
@@ -95,6 +97,8 @@ kt_collect(){
 #     chave `tloverride`), em que o time_limit era o máx do calibrado — aí o por-linguagem volta pelo `tl`.
 #     Sidecar novo devolve o TLOVERRIDE do autor por linguagem, como era.
 #   • TLCLOCK=cpu / WALLTL (relógio do TL): só voltam do sidecar; pacote nativo fica na parede (o padrão do MOJ).
+#   • TLUNIFIED=y (TL único): o pacote NATIVO entra com ele (na spec o problema tem UM tempo-limite — decisão do Ribas,
+#     05/11/2026); na ida e volta, o do sidecar (sidecar sem a chave = como era: por linguagem).
 kt_tl_conf(){
   jq -rn --argjson y "$1" --argjson side "$2" '
     def num($lo; $hi; $excl):
@@ -118,6 +122,7 @@ kt_tl_conf(){
     | (if $m == "kattis" then "TLMETHOD=kattis" else empty end),
       # relógio do TL: só a ida e volta o liga (o import de pacote Kattis nativo segue na parede, o padrão do MOJ)
       (if $rt and $side.tl_clock == "cpu" then "TLCLOCK=cpu" else empty end),
+      (if ($rt | not) or $side.tl_unified == true then "TLUNIFIED=y" else empty end),
       (if $rt and $side.tl_clock == "cpu" then ($side.wall_tl | num(1; 60; false)) as $w
          | (if $w != null then "WALLTL=\($w)" else empty end) else empty end),
       (if ($cf | test("^[0-9][0-9.+*/ ()-]*$")) then "TLMOD[calibrafactor]=\"\($cf)\"" else "TLMOD[calibrafactor]=1.35" end),

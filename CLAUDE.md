@@ -281,6 +281,16 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `tl_clock`/`wall_tl` (gen-problem-json) e `tl_clock` no índice de donos; o sidecar `kattis/` o leva na ida e volta
   (o import de pacote Kattis nativo NÃO liga o cpu). Testes: `test-tl-clock.sh`, `test-calib-methods.sh`
   (calibração no cpu, checksum, validate) e `kattis/test-kattis.sh`. Formato: `cdmoj/docs/PACOTE.md` "Relógio do TL".
+- **TL ÚNICO (05/11/2026; pedido do Roberto p/ a LATAM).** `TLUNIFIED=y` no conf = o mesmo TL em toda linguagem, como
+  se todas as good fossem de uma linguagem só (o modelo da spec do Kattis). Não se mede nada novo: as duas fórmulas
+  crescem com o W, então o TL único = o MÁX da tabela do método (`tl_unify_table`, `tl-methods.sh`, awk sem bc), aplicado
+  no `build-and-test.sh` logo depois da metade do método e dos shims do py, ANTES do default/TLMOD/TLOVERRIDE (que seguem
+  por cima; aviso soft `tl-unico-com-ajuste-por-linguagem`); na calibração também na tabela do outro método. A tabela
+  gravada segue por linguagem. A linha entra no tl-checksum (ligar recalibra: as pass/slow/wrong precisam ser julgadas
+  pelo único); nada no job. O servidor faz a MESMA conta no `tl_eff` (`tl_unify`, o `unified` vem no `tl_mods`; a cópia
+  literal está no `gen-problem-json.sh`, que serve `tl_unified`). O import Kattis NATIVO liga `TLUNIFIED=y` (decisão do
+  Ribas); a ida e volta preserva. `conf_tlunified_sane` (y|n). Testes: `test-calib-methods.sh`, `test-tl-methods.sh`,
+  `kattis/test-kattis.sh`.
 - **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
   o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
   `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o

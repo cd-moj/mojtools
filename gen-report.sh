@@ -30,7 +30,7 @@ PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" CPUNEEDEDINFO="" CPUGROUPSINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT="" TL_METHOD=""
-TL_CLOCK="" WALLCAP=""   # relógio do TL (TLCLOCK=cpu no conf): vazio = parede, o report.env de sempre
+TL_CLOCK="" WALLCAP="" TL_UNIFIED=""   # relógio do TL / TL único (TLCLOCK=cpu no conf): vazio = parede, o report.env de sempre
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 # tolerância (drift) acima do TL antes de TLE (build-and-test.sh: TLMOD[<lang>.drift] › TLMOD[default.drift]).
 # Vazio = report.env de um build-and-test antigo: sem o valor, mas o amarelo segue valendo pelo veredicto.
@@ -277,6 +277,7 @@ if (( ${#FILES[@]} > 0 )) && [[ "$REPORTMODE" != "ce" ]]; then
   tlhead="limite $(secs "$TL_LANG")s"
   # método do TL (build-and-test.sh/tl-methods.sh): só o Kattis se anuncia; o MOJ é o de sempre
   [[ "$TL_METHOD" == kattis ]] && tlhead="$tlhead · método Kattis"
+  [[ "$TL_UNIFIED" == y ]] && tlhead="$tlhead · TL único (o mesmo em toda linguagem)"
   # relógio do TL: no cpu os tempos são user+sys, e a parede é só o teto (quem dorme ou fica bloqueado morre nele)
   [[ "$TL_CLOCK" == cpu ]] && tlhead="$tlhead · tempo de CPU${WALLCAP:+ · teto de parede $(secs "$WALLCAP")s}"
   [[ -n "$TL_DRIFT" ]] && awk -v d="$TL_DRIFT" 'BEGIN{ exit !(d+0 > 0) }' && tlhead="$tlhead · tolerância +$(secs "$TL_DRIFT")s"

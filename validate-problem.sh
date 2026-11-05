@@ -315,6 +315,18 @@ cbad=""
 if [[ -n "$cbad" ]]; then add conf_tlclock_sane 0 "valor inválido no conf: $cbad"
 else add conf_tlclock_sane 1 "TLCLOCK=${_tlc:-wall}${_wtl:+ WALLTL=$_wtl}"; fi
 
+# --- conf_tlunified_sane: o TL ÚNICO (TLUNIFIED=y|n; cdmoj/docs/PACOTE.md "TL único"), por GREP (cpv). HARD: valor
+#     desconhecido faria o juiz cair no TL por linguagem calado. Soft (render_warnings): TL único JUNTO com ajuste POR
+#     LINGUAGEM (TLMOD[<lang>.sum|.mult], TLOVERRIDE[<lang>]) — eles valem por cima e desfazem o "mesmo TL em tudo".
+_tlu="$(cpv TLUNIFIED)"
+if [[ -z "$_tlu" || "$_tlu" == y || "$_tlu" == n ]]; then
+  add conf_tlunified_sane 1 "TLUNIFIED=${_tlu:-n}"
+  if [[ "$_tlu" == y ]] && grep -E '^[[:space:]]*(TLMOD\[[A-Za-z0-9]{1,16}\.(sum|mult)\]|TLOVERRIDE\[[A-Za-z0-9]{1,16}\])=' "$PKG/conf" 2>/dev/null \
+       | grep -qvE '\[default\]'; then   # o [default] vale p/ todas: não desfaz o TL único
+    render_leak="${render_leak}tl-unico-com-ajuste-por-linguagem "
+  fi
+else add conf_tlunified_sane 0 "valor inválido no conf: TLUNIFIED=$_tlu (y|n)"; fi
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 

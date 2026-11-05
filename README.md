@@ -227,6 +227,11 @@ cobrá-lo pelo **tempo de CPU** (user+sys): acrescente `TLCLOCK=cpu` ao `conf`. 
 bloqueado esperando algo ou dormindo. Não use em problema paralelo (`CPUNEEDED` > 1): lá o CPU soma as threads.
 Trocar o relógio recalibra. Detalhes em `cdmoj/docs/PACOTE.md`, seção "Relógio do TL".
 
+O tempo-limite sai **por linguagem**: cada linguagem com `good` tem o seu. Para ter o **mesmo tempo-limite em todas
+as linguagens** (como na spec do Kattis), acrescente `TLUNIFIED=y` ao `conf`. Ele vira o maior tempo-limite entre as
+linguagens, isto é, o do pior tempo entre todas as `good`, nos dois métodos. Ligar ou desligar recalibra. Detalhes em
+`cdmoj/docs/PACOTE.md`, seção "TL único".
+
 Falta ainda o arquivo `author`, que é obrigatório:
 
 ```sh
@@ -535,6 +540,13 @@ o `real` do timelog de dentro da jaula e o teto é `ETL = TL + 2,2 + 2·drift`. 
 A calibração herda o tempo cobrado: o W sai em segundos de CPU nos dois métodos. O `validate-problem.sh` reprova
 `TLCLOCK` fora de `wall|cpu`, `WALLTL` fora de 1..60 e `TLCLOCK=cpu` com `CPUNEEDED` > 1 (`conf_tlclock_sane`).
 Teste: `test-tl-clock.sh` (`make test-tl-clock`; o modo `wall` tem o run-trace idêntico ao de antes).
+
+**TL único** (05/11/2026; `TLUNIFIED=y` no conf). O `build-and-test.sh` unifica a tabela de trabalho logo depois de
+escolher a metade do método (`tl_unify_table`, `tl-methods.sh`): o máximo das chaves ≠ `default` em toda chave e no
+`default`. Na calibração, a tabela do outro método também. A tabela gravada continua **por linguagem**: o único é
+derivado dela, porque as duas fórmulas crescem com o W. O `TLMOD` sum/mult e o `TLOVERRIDE` por linguagem valem por
+cima (o `validate-problem.sh` avisa, soft). A linha entra no tl-checksum: ligar recalibra, e a fase pass/slow/wrong já
+julga pelo TL único. O `report.env` ganha `TL_UNIFIED=y`. Testes: `test-calib-methods.sh` e `test-tl-methods.sh`.
 
 **Paralelismo dos testes** (24/09/2026): cada teste roda em **k CPUs** (`CPUNEEDED` do conf, default 1)
 e até **P testes rodam ao mesmo tempo**. Quem decide P e quais CPUs é o **agente do juiz**, pelo

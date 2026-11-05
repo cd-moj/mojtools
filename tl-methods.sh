@@ -48,3 +48,21 @@ tl_kattis(){
   LC_ALL=C bc -l <<<"x = $a * $w / $r; scale = 0; n = x / 1; if (n < x) n = n + 1; if (n < 1) n = 1; scale = 20; n * $r" \
     | _tlm_clean
 }
+
+# tl_unified_on -> verdadeiro se o conf (já sourced) pede o TL ÚNICO (TLUNIFIED=y; 05/11/2026, pedido do Roberto p/ a
+# LATAM): o mesmo TL em toda linguagem, como se todas as good fossem de uma linguagem só. Valor desconhecido = não.
+tl_unified_on(){ [[ "${TLUNIFIED:-}" == y ]]; }
+
+# tl_unify_table <nome-do-array-associativo> — o TL ÚNICO a partir da tabela por linguagem: U = o máximo dos valores
+# das chaves ≠ default, e TODA chave (default inclusive) vira U. As duas fórmulas crescem com o W (MOJ: cf·W + 0,02;
+# Kattis: ⌈a·W/r⌉·r), então o máx dos TLs por linguagem É o TL do pior W entre todas as good — nada a medir de novo.
+# Sem chave calibrada (só o default, ex.: a tabela fictícia da fase das good) a tabela fica como está. Valor que não é
+# número é ignorado. Por awk (LC_ALL=C), sem bc: a mesma conta roda no servidor (tl_unify em jq, cdmoj lib/tl-store.sh).
+tl_unify_table(){
+  local -n _tut="$1"; local k u=""
+  u="$(for k in "${!_tut[@]}"; do [[ "$k" == default ]] || printf '%s\n' "${_tut[$k]}"; done \
+       | LC_ALL=C awk '/^([0-9]+\.?[0-9]*|\.[0-9]+)$/ { v = $1 + 0; if (m == "" || v > m) { m = v; s = $1 } } END { if (m != "") print s }')"
+  [[ -n "$u" ]] || return 0
+  for k in "${!_tut[@]}"; do _tut[$k]="$u"; done
+  _tut[default]="$u"
+}

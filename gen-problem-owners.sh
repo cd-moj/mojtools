@@ -167,8 +167,13 @@ for repodir in "$MOJ_PROBLEMS_DIR"/*; do
     if [[ "$_cf" == *TLCLOCK* ]]; then
       [[ "$(sed -nE 's/^[[:space:]]*TLCLOCK=["'"'"']?([a-z]*).*/\1/p' "$pdir/conf" 2>/dev/null | tail -1)" == cpu ]] && tlc=cpu
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" "$mods" "$tlc" \
+    # TL ÚNICO (TLUNIFIED=y): o Painel/status unificam o TL servido (o `unified` entra no tl_mods, como no cdmoj tl_conf_mods)
+    tlu=0
+    if [[ "$_cf" == *TLUNIFIED* ]]; then
+      [[ "$(sed -nE 's/^[[:space:]]*TLUNIFIED=["'"'"']?([A-Za-z]*).*/\1/p' "$pdir/conf" 2>/dev/null | tail -1)" == y ]] && tlu=1
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$id" "$repo" "$prob" "${author//$'\t'/ }" "$an" "${title//$'\t'/ }" "$pub" "$owner" "$collabs" "$colls" "$cks" "$pat" "$gl" "$htm" "$mlangs" "$ovr" "$mods" "$tlc" "$tlu" \
       | tr -d '\r' >> "$tsv"
   done
 done
@@ -184,7 +189,7 @@ rm -f "$newcache"
 REG="$CONTESTSDIR/treino/var/problem-repos.json"; reg="$(cat "$REG" 2>/dev/null)"; [[ -n "$reg" ]] || reg='{}'
 jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
   [ inputs | split("\t")
-    | .[1] as $repo | ($reg[$repo] // {}) as $rr
+    | .[1] as $repo | ($reg[$repo] // {}) as $rr | ((.[18] // "") == "1") as $tlu
     | { id:.[0], repo:$repo, prob:.[2], author:.[3], author_norm:.[4], title:.[5],
         public:(.[6]=="1"), html:((.[13] // .[6])=="1"),
         owner:(if (.[7]//"")=="" then ($rr.owner // null) else .[7] end),
@@ -199,8 +204,10 @@ jq -Rn --argjson now "$(date +%s 2>/dev/null || echo 0)" --argjson reg "$reg" '
         tl_mods:((.[16] // "")|split(";")|map(select(length>0)|split("=")|select(length==2)
                    |(.[0]|split(".")) as $lk | select(($lk|length)==2 and ((.[1]|tonumber?) != null))
                    |{l:$lk[0], k:$lk[1], v:(.[1]|tonumber)})
-                 | if length == 0 then {} else reduce .[] as $e ({sum:{}, mult:{}}; .[$e.k][$e.l] = $e.v) end),
-        tl_clock:(if (.[17] // "") == "cpu" then "cpu" else "wall" end) }
+                 | if length == 0 then {} else reduce .[] as $e ({sum:{}, mult:{}}; .[$e.k][$e.l] = $e.v) end
+                 | if $tlu then . + {unified: true} else . end),
+        tl_clock:(if (.[17] // "") == "cpu" then "cpu" else "wall" end),
+        tl_unified:$tlu }
     | select(.owner != null) ]
   | { generated_at:$now, count:length, problems:. }' "$tsv" > "$TMP" 2>/dev/null
 

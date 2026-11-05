@@ -169,9 +169,19 @@ mods_json="$(sed -nE 's/^[[:space:]]*TLMOD\[([A-Za-z0-9]{1,16})\.(sum|mult)\]=(-
               | select(.[0] as $l | ["default", "py2", "py3", "cc", "cxx", "hpp", "h"] | index($l) | not)]
              | if length == 0 then {}
                else reduce .[] as $e ({sum: {}, mult: {}}; .[$e[1]][$e[0]] = ($e[2] | tonumber)) end')"
+# TL ÚNICO (TLUNIFIED=y, 05/11/2026): vai no mods como `unified` (o tl_eff unifica o calibrado antes do resto — a regra do
+# cdmoj tl_conf_mods) e no json servível como `tl_unified` (a página do problema mostra UM chip). Última linha vence.
+tl_unified=false
+[[ "$(sed -nE 's/^[[:space:]]*TLUNIFIED=["'"'"']?([A-Za-z]*).*/\1/p' "$PKG/conf" 2>/dev/null | tail -1)" == y ]] && tl_unified=true
+[[ "$tl_unified" == true ]] && mods_json="$(jq -c '. + {unified: true}' <<<"${mods_json:-{\}}")"
 _TL_EFF_DEF='
+def tl_unify: ([ to_entries[] | select(.key != "default") | (.value | tonumber?) ] | max) as $u
+  | if $u == null then .
+    else ([ to_entries[] | select(.key != "default" and ((.value | tonumber?) == $u)) | .value ] | first) as $us
+         | map_values($us) + {default: $us} end;
 def tl_eff($cal; $ov; $m):
-  ($m.sum // {}) as $s | ($m.mult // {}) as $x
+  (if ($m.unified // false) == true then ($cal | tl_unify) else $cal end) as $cal
+  | ($m.sum // {}) as $s | ($m.mult // {}) as $x
   | ((($cal | keys) + ($ov | keys) + ($s | keys) + ($x | keys)) | unique) as $ks
   | reduce $ks[] as $k ({};
       .[$k] = (if $k == "default" then ($ov["default"] // $cal["default"])
@@ -252,8 +262,8 @@ out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --
   --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   --argjson cpun "$cpun" --argjson snuma "$snuma" --argjson fnl "$fnl_json" \
   --argjson swwa "$sw_wa" --argjson swtle "$sw_tle" --argjson swre "$sw_re" --argjson ntests "$ntests" \
-  --arg tlm "$tl_method" --arg tlc "$tl_clock" --argjson wtl "$wall_tl" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tl_clock:$tlc, wall_tl:$wtl, tags:$tags, collections:$colls, languages:$langs, public:$pub,
+  --arg tlm "$tl_method" --arg tlc "$tl_clock" --argjson wtl "$wall_tl" --argjson tlu "$tl_unified" \
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tl_clock:$tlc, wall_tl:$wtl, tl_unified:$tlu, tags:$tags, collections:$colls, languages:$langs, public:$pub,
     statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma,
     function_langs:$fnl, stop_when:{wa:$swwa, tle:$swtle, re:$swre}, tests:$ntests}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"

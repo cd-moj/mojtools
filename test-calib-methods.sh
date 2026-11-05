@@ -158,6 +158,21 @@ ck "dorme.c t2 (rodou até o fim): sem a marca" '[[ "$(jq -r ".wall // false" <<
 rm -f "$P/sols/slow/dorme.c"
 unset FAKE_CPUMULT
 
+echo "== TL ÚNICO (TLUNIFIED=y): a tabela segue por linguagem; o juízo usa o máx (o TL do py) em toda linguagem =="
+mkconf 'TLUNIFIED=y'
+calib
+DBG="$(cat "$TLF" 2>&1) | $(tst m.c big3)"
+ck "a tabela continua POR LINGUAGEM (c 0,3035, py 1,775)" 'num_eq "$(v TL c)" 0.3035 && num_eq "$(v TL py)" 1.775'
+ck "m.c big3 (0,6 s): AC pelo TL único 1,775 (por linguagem seria TLE no 0,3035)" '[[ "$(jq -r .code <<<"$(tst m.c big3)")" == AC ]] && num_eq "$(jq -r .tl <<<"$(tst m.c big3)")" 1.775'
+ck "e pelo Kattis único: tl_alt 3 (o do py), AC" '[[ "$(jq -r .code_alt <<<"$(tst m.c big3)")" == AC && "$(jq -r .tl_alt <<<"$(tst m.c big3)")" == 3 ]]'
+ck "s.c big3 (9 s) segue TLE" '[[ "$(jq -r .code <<<"$(tst s.c big3)")" == TLE ]]'
+( cd "$H" && bash build-and-test.sh c "$P/sols/slow/m.c" "$P" 2>/dev/null ) > "$W/bat.out"
+WB="$(head -1 "$W/bat.out")"; DBG="$(tail -1 "$W/bat.out") | $(grep -E "^TL_(LANG|UNIFIED)=" "$WB/report.env" | tr '\n' ' ')"
+ck "job em C: Accepted com o TL do py (TL_LANG 1.775) e TL_UNIFIED=y no report.env" '[[ "$(tail -1 "$W/bat.out")" == Accepted* ]] && grep -qx "TL_UNIFIED=y" "$WB/report.env" && num_eq "$(grep -m1 "^TL_LANG=" "$WB/report.env" | cut -d= -f2)" 1.775'
+mkconf $'TLUNIFIED=y\nTLOVERRIDE[c]=0.5'
+( cd "$H" && bash build-and-test.sh c "$P/sols/slow/m.c" "$P" 2>/dev/null ) > "$W/bat.out"
+ck "o TLOVERRIDE por linguagem segue por cima do único (c = 0,5: m.c TLE)" '[[ "$(tail -1 "$W/bat.out")" == "Time Limit Exceeded"* ]]'
+
 echo "== julgamento de job (fora da calibração) =="
 mkconf ''; calib                                     # a tabela das duas metades em tl.juizteste
 bat(){ rm -f "$FAKE_LOG"; ( cd "$H" && env "$@" bash build-and-test.sh c "$P/sols/slow/m.c" "$P" 2>/dev/null ) > "$W/bat.out"
@@ -226,6 +241,14 @@ CPUNEEDED=4'; do
 done
 valc $'TLCLOCK=wall
 CPUNEEDED=4'; ck "parede com CPUNEEDED=4: ok (o problema paralelo)" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]'
+
+echo "== validate-problem: conf_tlunified_sane =="
+valu(){ val "$1"; DBG="$(jq -c '(.checks[]|select(.name=="conf_tlunified_sane")), .render_warnings' "$RUNDIR"/validation/*.json 2>&1)"; }
+valu ''; ck "sem a chave: ok (n)" '[[ "$(head -1 <<<"$DBG" | jq -r .ok)" == true ]]'
+valu 'TLUNIFIED=y'; ck "y: ok, sem aviso" '[[ "$(head -1 <<<"$DBG" | jq -r .ok)" == true && "$DBG" != *tl-unico-com-ajuste* ]]'
+valu 'TLUNIFIED=sim'; ck "reprova TLUNIFIED=sim" '[[ "$(head -1 <<<"$DBG" | jq -r .ok)" == false ]]'
+valu $'TLUNIFIED=y\nTLMOD[spim.sum]=1'; ck "y com TLMOD por linguagem: aviso soft" '[[ "$(head -1 <<<"$DBG" | jq -r .ok)" == true && "$DBG" == *tl-unico-com-ajuste-por-linguagem* ]]'
+valu $'TLUNIFIED=y\nTLOVERRIDE[default]=2'; ck "y com TLOVERRIDE[default]: sem aviso (vale p/ todas)" '[[ "$DBG" != *tl-unico-com-ajuste* ]]'
 
 echo "== a calibração nunca libera grupo de CPU (26/10/2026) =="
 # a calibração disparada por um JOB de 2 grupos herdava o arquivo de liberação dele: cada build-and-test filho
