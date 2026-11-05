@@ -50,7 +50,7 @@ _renv(){ grep -m1 "^$2=" "$1/report.env" 2>/dev/null | cut -d= -f2- | tr -d "'\"
 # dois itens, e o servidor contava o TLE que o rerun desfez). Na fase pass/slow/wrong, code_alt/tl_alt = o
 # veredicto e o TL do OUTRO método (log.verdictalt; TL_LANG_ALT).
 sol_tests_json(){  # $1=workdir
-  local wb="$1" tl="" tla="" line file t
+  local wb="$1" tl="" tla="" line file t w
   local -A CODE=() ALT=(); local -a ORDER=()
   [[ -f "$wb/log.verdictall" ]] || { echo '[]'; return; }
   tl="$(_renv "$wb" TL_LANG)"; tla="$(_renv "$wb" TL_LANG_ALT)"
@@ -72,9 +72,13 @@ sol_tests_json(){  # $1=workdir
       elif [[ -s "$wb/$file-log.timelog" ]]; then
         t="$(grep -m1 '^real' "$wb/$file-log.timelog" 2>/dev/null | awk '{print $NF}')"
       fi
-      jq -cn --arg n "$file" --arg c "${CODE[$file]}" --arg t "$t" --arg tl "$tl" --arg ca "${ALT[$file]:-}" --arg tla "$tla" \
+      # `wall`: no relógio de CPU (TLCLOCK=cpu) o teste morreu pelo teto de PAREDE — o TLE não veio do CPU, que pode ter
+      # ficado abaixo do TL (o build-and-test deixa <file>-log.wallkill); a simulação do TL no servidor precisa saber
+      w=""; [[ -e "$wb/$file-log.wallkill" ]] && w=1
+      jq -cn --arg n "$file" --arg c "${CODE[$file]}" --arg t "$t" --arg tl "$tl" --arg ca "${ALT[$file]:-}" --arg tla "$tla" --arg w "$w" \
         '{name:$n, code:$c, time:($t|tonumber? // null), tl:($tl|tonumber? // null)}
-         + (if $ca != "" then {code_alt:$ca, tl_alt:($tla|tonumber? // null)} else {} end)'
+         + (if $ca != "" then {code_alt:$ca, tl_alt:($tla|tonumber? // null)} else {} end)
+         + (if $w == "1" then {wall:true} else {} end)'
     done
   } | jq -s -c '.'
 }

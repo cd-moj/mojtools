@@ -43,14 +43,16 @@ echo "run $(basename "${src:-?}") $name T=$T CPU=${MOJ_CAGE_CPUSEC:-}" >> "$FAKE
 rc=0; cpu=""
 # relógio de CPU (FAKE_CPUMULT): CPU = real × fator no cpu.stat do escopo (MOJ_CAGE_CPUSTAT, como o cage-run real); morto
 # no teto de CPU (SIGXCPU) antes da parede
+mult="$(grep -h -m1 -o 'CPUMULT [0-9.]*' "$D"/* 2>/dev/null | head -1 | cut -d' ' -f2)"   # por solução (a que dorme)
 if [[ -n "${FAKE_CPUMULT:-}" ]]; then
-  cpu="$(echo "$real * $FAKE_CPUMULT" | bc -l)"
+  cpu="$(echo "$real * ${mult:-$FAKE_CPUMULT}" | bc -l)"
   if [[ -n "${MOJ_CAGE_CPUSEC:-}" && "$(echo "$cpu > $MOJ_CAGE_CPUSEC" | bc -l)" == 1 ]]; then
     cpu="$MOJ_CAGE_CPUSEC"; real="$(echo "$cpu / $FAKE_CPUMULT" | bc -l)"; rc=152; : > "$OUT"
   fi
 fi
 if (( rc )); then :
 elif [[ "$(echo "$real > $T" | bc -l)" == 1 ]]; then real="$T"; rc=137; : > "$OUT"   # morto no teto
+  [[ -n "$cpu" ]] && cpu="$(echo "$T * ${mult:-$FAKE_CPUMULT}" | bc -l)"
 elif [[ " ${wrong#WRONG } " == *" $name "* ]]; then echo errado > "$OUT"
 else cat "$IN" > "$OUT"; fi
 printf 'real %s\nuser 0\nsys 0\nres 100\ncpu 99%%\n' "$real" > "$TLOG"
@@ -142,6 +144,7 @@ ck "parâmetro inválido cai no padrão (com aviso)" '[[ "$(v TLKATTIS py)" == 3
 
 echo "== relógio de CPU (TLCLOCK=cpu): o W sai do cpu.stat do escopo, o etl é o teto de CPU =="
 mkconf 'TLCLOCK=cpu'; export FAKE_CPUMULT=2      # o CPU é o dobro da parede (threads)
+printf '// TIMES 0.10 big3=50\n// CPUMULT 0.01\n' > "$P/sols/slow/dorme.c"   # dorme: pouco CPU, morre pela PAREDE
 calib
 DBG="$(cat "$TLF" 2>&1) $(tail -5 "$W/calib.out")"
 ck "TL[c] = 1,35 × 0,42 (o CPU do big3) + 0,02; TL[py] = 1,35 × 2,6 + 0,02" 'num_eq "$(v TL c)" 0.587 && num_eq "$(v TL py)" 3.53'
@@ -149,6 +152,10 @@ ck "tests[].time = o CPU (a parede do big3 é 0,21)" '[[ "$(tst a.c big3 | jq .t
 DBG="$(row s.c) | $(grep " s.c big3" "$FAKE_LOG" | sort -u)"
 ck "s.c: etl = o teto de CPU (3 = ⌈2 + 0,587 + 0,2⌉), parede 4 (o teto de CPU + 1)" '[[ "$(jq -r .etl <<<"$(row s.c)")" == 3 ]] && grep -q "run s.c big3 T=4.00 CPU=3" "$FAKE_LOG"'
 ck "s.c big3: morta no teto de CPU = TLE com time = etl" '[[ "$(jq -r .code <<<"$(tst s.c big3)")" == TLE ]] && num_eq "$(jq -r .time <<<"$(tst s.c big3)")" 3'
+DBG="$(tst dorme.c big3) | $(tst s.c big3)"
+ck "dorme.c big3: TLE pela PAREDE (wall:true, CPU 0,04 < TL); s.c (morta pelo CPU) sem a marca" '[[ "$(jq -r .code <<<"$(tst dorme.c big3)")" == TLE && "$(jq -r .wall <<<"$(tst dorme.c big3)")" == true && "$(jq -r ".wall // false" <<<"$(tst s.c big3)")" == false ]] && num_eq "$(jq -r .time <<<"$(tst dorme.c big3)")" 0.04'
+ck "dorme.c t2 (rodou até o fim): sem a marca" '[[ "$(jq -r ".wall // false" <<<"$(tst dorme.c t2)")" == false ]]'
+rm -f "$P/sols/slow/dorme.c"
 unset FAKE_CPUMULT
 
 echo "== julgamento de job (fora da calibração) =="

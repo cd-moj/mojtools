@@ -272,7 +272,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   (`_WALLKILL`: `real` de dentro ≥ WALLCAP−0,05, ou timelog de dentro vazio e o de fora ≥ WALLCAP — o timeout não
   tem `-k`); rc 124 sozinho NÃO decide. O tempo cobrado vai p/ `<teste>-log.exectime` — o calibreitor
   (`.calib-sols.json`), o `gen-report.sh` e o agente do juiz (`agent_tests_json`) o preferem ao `^real` — e a parede
-  numa linha `WALLTIME` própria (a EXECTIME NÃO ganha campo: o `read … sr` do calibreitor pega o resto da linha).
+  numa linha `WALLTIME` própria (a EXECTIME NÃO ganha campo: o `read … sr` do calibreitor pega o resto da linha). A
+  morte pela parede deixa `<teste>-log.wallkill`, e o calibreitor põe `wall: true` no teste do `.calib-sols.json` (a
+  simulação do TL no servidor não pode tratar como "não estourou" o TLE de quem dormiu com CPU abaixo do TL).
   `report.env`: `TL_CLOCK=cpu`, `WALLCAP` e `ETL=⌈CPUCAP⌉` (o `etl` que o servidor compara com b×TL). As DUAS chaves
   ficam DENTRO do tl-checksum (o contrário do TLMETHOD: o W medido muda de natureza ⇒ trocar recalibra; o juiz lê o
   conf do próprio cache). `conf_tlclock_sane` reprova valor inválido e `cpu` com `CPUNEEDED>1`. Servido como

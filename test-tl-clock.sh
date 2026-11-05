@@ -112,6 +112,7 @@ ck "xnoin (sem timelog de dentro, fora ≥ teto) = TLE"     '[[ "$(verdict t7xno
 ck "xxcpu (SIGXCPU no teto de CPU) = TLE"                 '[[ "$(verdict t8xxcpu)" == TLE ]]'
 ck "t1 = AC; EXECTIME com o CPU do cgroup (0,03+0,01)"   '[[ "$(verdict t1)" == AC ]] && grep -qx "EXECTIME t1 0.04 AC" "$TR"'
 ck "-log.exectime = o tempo cobrado"                      '[[ "$(cat "$WB/t3xslow-log.exectime")" == 0.20 && "$(cat "$WB/t5xorph-log.exectime")" == 3.00 ]]'
+ck "a marca da morte pela parede: xsleep e xnoin têm, xxcpu (SIGXCPU) e t1 não" '[[ -e "$WB/t4xsleep-log.wallkill" && -e "$WB/t7xnoin-log.wallkill" && ! -e "$WB/t8xxcpu-log.wallkill" && ! -e "$WB/t1-log.wallkill" ]]'
 ck "linha WALLTIME própria (a EXECTIME não ganha campo)"  'grep -qx "WALLTIME t3xslow 2.50" "$TR" && ! grep -qE "^EXECTIME [^ ]+ [^ ]+ [^ ]+ " "$TR"'
 ck "report.env: TL_CLOCK=cpu, WALLCAP=5.00, ETL=4 (o teto do tempo cobrado), fonte cgroup" '[[ "$(renv TL_CLOCK)" == cpu && "$(renv WALLCAP)" == 5.00 && "$(renv ETL)" == 4 && "$(renv TL_CPU_SOURCE)" == cgroup ]]'
 ck "o trace diz a fonte do CPU" 'grep -q "Execution Time is CPU time (source: cgroup)" "$TR"'

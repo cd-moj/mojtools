@@ -612,6 +612,9 @@ _judged_time() {
   [[ "$_JT" == "-" ]] && _JT=""
   [[ "$_WALLKILL" == 1 ]] || _WALLKILL=0
   printf '%s\n' "$_JT" > "$workdirbase/$1-log.exectime"
+  # a marca da morte pela parede (o calibreitor a leva ao .calib-sols.json como `wall`: a simulação do TL no servidor
+  # precisa saber que o TLE desse teste não veio do CPU, que pode ter ficado abaixo do TL)
+  if (( _WALLKILL )); then : > "$workdirbase/$1-log.wallkill"; else rm -f "$workdirbase/$1-log.wallkill"; fi
   return 0
 }
 # _wall_of <FILE> — o `real` do timelog de dentro (o da parede, que no relógio cpu só aparece no log)
