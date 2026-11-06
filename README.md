@@ -698,11 +698,14 @@ validate-problem.sh <pacote> [<id>]
 
 Sai com 0 se o pacote passou, diferente de 0 se reprovou, e sempre escreve um relatório em
 `$RUNDIR/validation/<id>.json` com o resultado de cada checagem. **Todas** as checagens são
-obrigatórias: `has_author`, `has_statement`, `html_builds`, `secao_entrada`, `secao_saida`,
-`examples_present`, `tests_paired`, `has_good_sol`, `good_sol_accepts`, **`scripts_exec`** (todo `scripts/**/*.sh` com +x — sem o bit, TUDO vira Compilation Error na jaula) e **`checker_src`** (compare.sh de testlib exige o `scripts/checker.cpp` junto), mais `score_file_sane` quando há `tests/score`.
+obrigatórias: `has_author`, `has_statement`, `html_builds`, `secao_entrada`, `secao_saida` (o enunciado tem
+`## Entrada` e `## Saída` — ou uma seção `## Interação`/`Interaction`/`Interacción`, que vale pelo par no problema
+interativo; `SAMPLE=no` não dispensa), `examples_present`, `tests_paired`, `has_good_sol`, `good_sol_accepts`, **`scripts_exec`** (todo `scripts/**/*.sh` com +x — sem o bit, TUDO vira Compilation Error na jaula) e **`checker_src`** (compare.sh de testlib exige o `scripts/checker.cpp` junto), mais `score_file_sane` quando há `tests/score`.
 
 Alguns avisos são só informativos e **não** reprovam: LaTeX vazando na prosa do enunciado, exemplo
-escrito à mão no texto, checker commitado como binário.
+escrito à mão no texto, checker commitado como binário, interativo (`scripts/arbitro.*`) sem a seção
+`## Interação` (`interativo-sem-secao-interacao`) e a seção `## Interação` no lugar de Entrada/Saída num pacote sem
+árbitro (`secao-interacao-sem-arbitro`).
 
 Se o pacote passa, o script chama o `gen-problem-json.sh` sozinho.
 

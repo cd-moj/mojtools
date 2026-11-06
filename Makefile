@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-tl-clock test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-sections test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-tl-clock test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -94,6 +94,11 @@ test-calib-lanes:
 ##                   servidor, cuja imagem não tem bc; e a mesma resposta do _num_in da CLI
 test-tl-methods:
 	@bash test-tl-methods.sh
+
+## test-sections — as seções obrigatórias do enunciado (05/11/2026): `## Entrada`+`## Saída`, OU `## Interação`
+##                 (Interaction/Interacción), que vale pelo par no problema interativo; SAMPLE=no não dispensa
+test-sections:
+	@bash test-statement-sections.sh
 
 ## test-tl-clock — o RELÓGIO do TL (TLCLOCK=cpu, 05/11/2026): user+sys de fora decide, a parede é só o teto
 ##                 (quem dorme/fica bloqueado morre nele = TLE, nunca RE); o padrão (parede) com o run-trace idêntico

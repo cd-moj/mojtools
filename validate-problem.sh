@@ -12,6 +12,10 @@
 #   has_author        — existe ./author (o Makefile exige p/ descobrir o problema)
 #   has_statement     — existe docs/enunciado.{md,org,tex}
 #   html_builds       — o render-statement.sh renderiza o enunciado PT
+#   secao_entrada, secao_saida — o enunciado tem `## Entrada` e `## Saída` (Input/Output/Salida, de 1 a 3 `#`), OU
+#                       uma seção `## Interação` (Interaction/Interacción), que vale pelo PAR (problema interativo).
+#                       Soft: `interativo-sem-secao-interacao` (há scripts/arbitro.* e não há a seção) e
+#                       `secao-interacao-sem-arbitro` (a seção substitui Entrada/Saída sem árbitro no pacote)
 #   html_builds_<lang>, secao_entrada_<lang>, secao_saida_<lang> — idem p/ cada tradução
 #                       docs/enunciado.<lang>.md presente (statement-langs.sh); nota de exemplo sem
 #                       tradução é aviso soft `nota-sem-traducao(<sample>,<lang>)` (cai na PT)
@@ -70,10 +74,38 @@ else
   add html_builds 0 "sem docs/enunciado.{md,org,tex}"
 fi
 
-# --- seções esperadas no enunciado (OBRIGATÓRIAS p/ liberar): ## Entrada e ## Saída ---
+# --- seções esperadas no enunciado (OBRIGATÓRIAS p/ liberar): ## Entrada e ## Saída — ou ## Interação ---
+# PROBLEMA INTERATIVO (05/11/2026; relato do Daniel Saad e do Roberto Sales): a E/S é a CONVERSA com o árbitro, e o
+# enunciado a descreve numa seção "## Interação" (Interaction, Interacción — a convenção do Kattis, cujo pacote nativo
+# chega assim pelo kattis/import.sh). Ela vale pelo PAR: com ela, Entrada e Saída deixam de ser obrigatórias (antes o
+# autor escrevia "## Input / See the Interaction section" só p/ passar aqui). NÃO é o SAMPLE=no que dispensa: a
+# submissão de função também o usa, e lá ## Entrada = parâmetros e ## Saída = retorno. Os mesmos ids (secao_entrada,
+# secao_saida) — os códigos de prontidão do servidor, da web e da CLI não mudam. As variantes acentuadas vão à mão: a
+# imagem roda em locale POSIX e o `grep -i` não dobra multibyte (o (saída|…) de sempre tem a mesma limitação).
+RX_ENT='^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)'
+RX_SAI='^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|salida|output)'
+RX_INT='^[[:space:]]*#{1,3}[[:space:]]*(intera(ç|Ç|c|C)(ã|Ã|a|A)o|interaction|interacci(ó|Ó|o|O)n)'
+# _secoes <texto> <sufixo do id> <falta-entrada> <falta-saída> — as duas checagens HARD de um enunciado (PT ou tradução)
+_secoes(){
+  local b="$1" sx="$2" int=0
+  grep -qiE "$RX_INT" <<<"$b" && int=1
+  if grep -qiE "$RX_ENT" <<<"$b"; then add "secao_entrada$sx" 1
+  elif (( int )); then add "secao_entrada$sx" 1 "dispensada: há a seção Interação (problema interativo)"
+  else add "secao_entrada$sx" 0 "$3"; fi
+  if grep -qiE "$RX_SAI" <<<"$b"; then add "secao_saida$sx" 1
+  elif (( int )); then add "secao_saida$sx" 1 "dispensada: há a seção Interação (problema interativo)"
+  else add "secao_saida$sx" 0 "$4"; fi
+}
 ebody=""; [[ -n "$enunf" ]] && ebody="$(cat "$enunf" 2>/dev/null)"
-if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)' <<<"$ebody"; then add secao_entrada 1; else add secao_entrada 0 "falta a seção '## Entrada'"; fi
-if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|salida|output)' <<<"$ebody"; then add secao_saida 1; else add secao_saida 0 "falta a seção '## Saída'"; fi
+_secoes "$ebody" "" "falta a seção '## Entrada' (ou '## Interação', no problema interativo)" \
+                    "falta a seção '## Saída' (ou '## Interação', no problema interativo)"
+# coerência (SOFT): o interativo é o pacote com o árbitro (scripts/arbitro.*, o que o driver exige — install-interactive.sh)
+_e_inter=0; compgen -G "$PKG/scripts/arbitro.*" >/dev/null 2>&1 && _e_inter=1
+if [[ -n "$ebody" ]]; then
+  if (( _e_inter )) && ! grep -qiE "$RX_INT" <<<"$ebody"; then render_leak="${render_leak}interativo-sem-secao-interacao "
+  elif (( ! _e_inter )) && grep -qiE "$RX_INT" <<<"$ebody" && ! { grep -qiE "$RX_ENT" <<<"$ebody" && grep -qiE "$RX_SAI" <<<"$ebody"; }
+  then render_leak="${render_leak}secao-interacao-sem-arbitro "; fi
+fi
 # --- traduções (docs/enunciado.<lang>.md): cada uma renderiza e tem as seções (HARD, como a PT) ---
 for _tl in $(stmt_langs_of "$PKG"); do
   [[ "$_tl" == pt ]] && continue
@@ -81,8 +113,8 @@ for _tl in $(stmt_langs_of "$PKG"); do
   if bash "$SELF/render-statement.sh" "$_tf" md "" "" "$_tl" 2>/dev/null | grep -qi '</body>'; then add "html_builds_$_tl" 1 "enunciado.$_tl.md"
   else add "html_builds_$_tl" 0 "pandoc não renderizou docs/enunciado.$_tl.md"; fi
   _tb="$(cat "$_tf" 2>/dev/null)"
-  if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(entrada|input)' <<<"$_tb"; then add "secao_entrada_$_tl" 1; else add "secao_entrada_$_tl" 0 "falta a seção de entrada (## Input / ## Entrada) em enunciado.$_tl.md"; fi
-  if grep -qiE '^[[:space:]]*#{1,3}[[:space:]]*(saída|saida|salida|output)' <<<"$_tb"; then add "secao_saida_$_tl" 1; else add "secao_saida_$_tl" 0 "falta a seção de saída (## Output / ## Salida) em enunciado.$_tl.md"; fi
+  _secoes "$_tb" "_$_tl" "falta a seção de entrada (## Input / ## Entrada) em enunciado.$_tl.md (ou ## Interaction / ## Interacción, no interativo)" \
+                         "falta a seção de saída (## Output / ## Salida) em enunciado.$_tl.md (ou ## Interaction / ## Interacción, no interativo)"
   # nota PT sem tradução: o aluno que lê em $_tl vê a explicação em PT (soft)
   for _nf in "$PKG/docs/notes"/*.md; do
     [[ -e "$_nf" ]] || continue; _nb="$(basename "$_nf" .md)"

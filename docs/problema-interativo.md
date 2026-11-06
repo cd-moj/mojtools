@@ -168,7 +168,11 @@ int main(int argc, char** argv) {
 
 ```bash
 # 1. monte o pacote normal (enunciado, tests/input com os cenários, tests/output
-#    como PLACEHOLDER em par — pode ser "ok"), sols/good, sols/wrong
+#    como PLACEHOLDER em par — pode ser "ok"), sols/good, sols/wrong.
+#    O ENUNCIADO descreve a conversa numa seção "## Interação" (Interaction, Interacción): ela
+#    vale pelo par Entrada/Saída na validação (05/11/2026), então NÃO escreva "## Entrada / veja a
+#    Interação" só p/ passar. Esqueleto: o problema, "## Interação" (quem fala primeiro, cada
+#    mensagem, limites de perguntas, o flush), "## Exemplo" (a conversa em duas colunas).
 
 # 2. instale o árbitro + driver comum:
 bash mojtools/interactive/install-interactive.sh <pacote> arbitro.cpp          # clássico

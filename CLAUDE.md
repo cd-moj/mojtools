@@ -120,8 +120,13 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `statement_langs`; a nota de exemplo sem tradução cai na PT.
 - `validate-problem.sh <pkg> [id]` — **portão de qualidade** (relatório em
   `run/validation/<id>.json`). `ok = (map(.ok)|all)` → todo check `add` é **HARD**. Exige
-  `## Entrada` e `## Saída` (aceita Input/Output e Salida); cada tradução ganha
-  `html_builds_<lang>`/`secao_*_<lang>` HARD e o aviso soft `nota-sem-traducao(<sample>,<lang>)`.
+  `## Entrada` e `## Saída` (aceita Input/Output e Salida) — OU uma seção `## Interação` (Interaction/Interacción),
+  que vale pelo PAR (05/11/2026, relato do Daniel Saad e do Roberto: o interativo escrevia "## Input / See the
+  Interaction section" só p/ passar; é a convenção do Kattis). NÃO é o `SAMPLE=no` que dispensa (função também o usa,
+  e lá Entrada = parâmetros). Mesmos ids (`secao_entrada`/`secao_saida`, detalhe "dispensada"); avisos soft
+  `interativo-sem-secao-interacao` (há `scripts/arbitro.*`) e `secao-interacao-sem-arbitro`. Variantes acentuadas à
+  mão no regex (`RX_INT`): a imagem roda em POSIX. Teste: `test-statement-sections.sh` (`make test-sections`). Cada
+  tradução ganha `html_builds_<lang>`/`secao_*_<lang>` HARD e o aviso soft `nota-sem-traducao(<sample>,<lang>)`.
   Avisos *soft* em `render_warnings` (ex.: exemplo embutido no texto).
   Se passar, chama `gen-problem-json.sh`.
 - **Transporte de `scripts/`**: o `moj push`/`clone` fazem round-trip COMPLETO da correção

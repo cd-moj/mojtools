@@ -89,6 +89,7 @@ conf="$PKG/conf"
 if ! grep -qE '^[[:space:]]*SAMPLE[[:space:]]*=' "$conf" 2>/dev/null; then
   { [[ -s "$conf" && -n "$(tail -c1 "$conf")" ]] && printf '\n'; printf 'SAMPLE=no\n'; } >> "$conf"
   echo "conf: SAMPLE=no (interativo não mostra caixa de exemplo; ponha o exemplo no texto, seção ## Exemplo)"
+  echo "enunciado: descreva a conversa numa seção ## Interação — ela vale por ## Entrada/## Saída na validação"
 fi
 grep -q 'ULIMITS\[-u\]' "$conf" 2>/dev/null || \
   echo "aviso: conf sem ULIMITS[-u] — interativo roda 2+ processos; recomende ULIMITS[-u]=10000"
