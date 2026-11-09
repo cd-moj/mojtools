@@ -587,6 +587,18 @@ Com uma falha confirmada, eles não rodam, e um grupo de `tests/score` com teste
 Antes, a parada espúria dava "Unknown ERROR" e, com grupos, um "Accepted" falso. Teste: `make
 test-final-loop`.
 
+**Regra do veredicto (09/11/2026).** É uma opção do CONTEST, não do pacote: o job a traz e o agente do juiz a
+passa em `MOJ_VERDICT_RULE`.
+- `worst` (o padrão; treino e provas antigas): o veredicto é o do teste mais grave (`VERDICTORDER`).
+- `first`: o veredicto é o do **1º teste que falhou** na ordem canônica — os exemplos (`tests/input/sample*`)
+  primeiro, depois o resto, cada parte em ordem natural de nome (`LC_ALL=C sort -V`: `t2` antes de `t10`). O pool
+  e o laço final usam essa ordem, então com `STOPWHEN_*` a execução para no 1º erro dessa ordem. Com grupos, a
+  nota não muda; só o veredicto.
+
+Só no `first` a ordem dos testes muda. No `worst`, a ordem do glob decide em que teste o `STOPWHEN` para (e o
+`Xp`), e isso fica como sempre foi. O `report.env` leva `VERDICT_RULE` e `FIRST_FAIL` (o 1º teste que falhou), e
+o report mostra o teste no cabeçalho. A calibração não passa a variável (`worst`). Teste: `make test-final-loop`.
+
 Lê do `conf` do problema: todas as chaves de limite (ver `cdmoj/docs/PACOTE.md`).
 
 ### `cage-run.sh`: a jaula
@@ -856,8 +868,8 @@ Não é um comando: é um trecho que o `build-and-test.sh` carrega sozinho quand
 `tests/score` (e não tem um `scripts/summary.sh` próprio). Interpreta os grupos, aplica o tudo ou nada
 por grupo, soma os pesos e reescreve o veredito com a nota.
 
-O veredito é o do **pior teste**, como no problema sem grupos (a mesma conta do `build-and-test.sh`:
-`SMALLRESP` → `VERDICT_CANON`); os grupos decidem só a nota. A última linha fica
+O veredito é o do **pior teste** (ou o do 1º que falhou, com a regra `first` do contest), como no problema sem
+grupos (a mesma conta do `build-and-test.sh`: `SMALLRESP` → `VERDICT_CANON`); os grupos decidem só a nota. A última linha fica
 `<veredito canônico>,<pontos>p. Pontos | <por grupo> | [quantitativos <código>(<n>) …]`:
 
 | Situação | Última linha (exemplo) |

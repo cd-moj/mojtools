@@ -30,6 +30,7 @@ PROBLEM="" LANGUAGE="" SRCBASENAME="" TL_LANG="1" SMALLRESP="" FINALRESP=""
 CORRECT=0 TOTALTESTS=0 TOTALTIME=0 PROBLEMTEMPLATEDIR="" HOSTBT="" STARTDATE=""
 RUNALL="" NPROCINFO="" CPUNEEDEDINFO="" CPUGROUPSINFO="" REPORTMODE="normal" TOOLCHAIN_ROOT="" TOOLCHAIN_VER=""
 VERDICT_CANON="" SCORE="" SCORE_MAX="" SCORE_KIND="" SCORE_GROUPS="" TL_DRIFT="" TL_METHOD=""
+VERDICT_RULE="" FIRST_FAIL=""   # regra do veredicto (MOJ_VERDICT_RULE): first = o do 1º teste que falhou
 TL_CLOCK="" WALLCAP="" TL_UNIFIED=""   # relógio do TL / TL único (TLCLOCK=cpu no conf): vazio = parede, o report.env de sempre
 [[ -e "$wb/report.env" ]] && source "$wb/report.env"
 # tolerância (drift) acima do TL antes de TLE (build-and-test.sh: TLMOD[<lang>.drift] › TLMOD[default.drift]).
@@ -237,6 +238,7 @@ if [[ "$SCORE_KIND" == points ]]; then
 elif (( TOTALTESTS > 0 )); then
   raw "<span class=\"pct\">$CORRECT / $TOTALTESTS testes AC · $(( CORRECT*100/TOTALTESTS ))%</span>"
 fi
+[[ "$VERDICT_RULE" == first && -n "$FIRST_FAIL" ]] && raw "<span class=\"pct\">veredicto do 1º teste que falhou: $(escs "$FIRST_FAIL")</span>"
 [[ -n "$TOTALTIME" ]] && raw "<span class=\"pct\">⏱ ${TOTALTIME}s no total</span>"
 (( PEAKMEM > 0 )) && raw "<span class=\"pct\">⛁ $(mem_fmt "$PEAKMEM") de pico</span>"
 raw "</div>"$'\n'

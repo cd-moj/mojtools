@@ -296,6 +296,13 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   literal está no `gen-problem-json.sh`, que serve `tl_unified`). O import Kattis NATIVO liga `TLUNIFIED=y` (decisão do
   Ribas); a ida e volta preserva. `conf_tlunified_sane` (y|n). Testes: `test-calib-methods.sh`, `test-tl-methods.sh`,
   `kattis/test-kattis.sh`.
+- **REGRA DO VEREDICTO (09/11/2026; opção do CONTEST, decisão do Ribas pós-LATAM).** `MOJ_VERDICT_RULE` (o job traz
+  `verdict_rule`, o agente repassa): `worst` (padrão; treino, contests antigos, calibração) = o teste mais grave;
+  `first` = o do 1º teste que falhou na ordem canônica — `tests/input/sample*` primeiro, depois o resto, cada parte em
+  `LC_ALL=C sort -V` (natural: t2 antes de t10). Só no `first` o `TESTS` (pool E laço final) é reordenado: no `worst` a
+  ordem do glob decide onde o STOPWHEN para e o `Xp` — mudar isso mexeria em prova antiga. `report.env`:
+  `VERDICT_RULE`, `FIRST_FAIL`; o report o mostra no banner. Com grupos a nota não muda (o `score-summary.sh` lê o
+  `SMALLRESP`). Teste: `test-final-loop.sh`.
 - **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
   o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
   `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o

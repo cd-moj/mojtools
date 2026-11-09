@@ -56,8 +56,8 @@ run(){
   local ra="$1"; shift
   local out; out="$(cd "$H" && env MOJ_PARALLEL=1 "$@" bash build-and-test.sh c "$W/sol.c" "$P" "$ra" 2>/dev/null)"
   WB="$(head -n1 <<<"$out")"; FIN="$(tail -n1 <<<"$out")"; TR="$WB/run-trace.log"
-  VC=""; SC=""; SR=""
-  [[ -f "$WB/report.env" ]] && eval "$( source "$WB/report.env"; printf 'VC=%q SC=%q SR=%q\n' "$VERDICT_CANON" "$SCORE" "$SMALLRESP" )"
+  VC=""; SC=""; SR=""; VR=""; FF=""
+  [[ -f "$WB/report.env" ]] && eval "$( source "$WB/report.env"; printf 'VC=%q SC=%q SR=%q VR=%q FF=%q\n' "$VERDICT_CANON" "$SCORE" "$SMALLRESP" "${VERDICT_RULE:-}" "${FIRST_FAIL:-}" )"
   DBG="FIN=$FIN | VC=$VC SC=$SC SR=$SR | runs: $(tr '\n' ' ' < "$RUNLOG")"
 }
 runs(){ grep -cx "$1" "$RUNLOG"; }
@@ -105,6 +105,31 @@ ck "t3 e t4 rodaram uma vez e têm EXECTIME com tempo" '[[ "$(runs t3)" == 1 && 
 mkpkg "" "" t1 t2xtle t3
 run n
 ck "RUNALL≠y com TLE confirmado: a cauda não roda"   '[[ "$FIN" == "Time Limit Exceeded,33p" && "$(runs t3)" == 0 ]] && clean_trace'
+
+echo "== REGRA DO VEREDICTO (MOJ_VERDICT_RULE, opção do contest): worst × first =="
+mkpkg "" "" t1 t2xwa t3xtle
+run y
+ck "sem a regra = o mais grave (TLE), como sempre"   '[[ "$SR" == TLE && "$VR" == worst ]]'
+run y MOJ_VERDICT_RULE=first
+ck "first = o do 1º que falhou (WA do t2)"            '[[ "$FIN" == "Wrong Answer,33p" && "$SR" == WA && "$VR" == first && "$FF" == t2xwa ]]'
+ck "o trace diz qual seria o mais grave"              'grep -q "Verdict rule first: WA (test t2xwa) instead of the most severe, TLE" "$TR"'
+ck "o report diz o teste"                             'grep -q "veredicto do 1º teste que falhou: t2xwa" "$WB/report.html"'
+mkpkg "" "" a1xtle sample1xwa
+run y MOJ_VERDICT_RULE=first
+ck "os EXEMPLOS vêm primeiro (sample1 antes de a1)"   '[[ "$SR" == WA && "$FF" == sample1xwa ]]'
+ck "e rodam primeiro"                                 '[[ "$(head -n1 "$RUNLOG")" == sample1xwa ]]'
+mkpkg "" "" t2xwa t10xtle
+run y MOJ_VERDICT_RULE=first
+ck "ordem NATURAL do nome (t2 antes de t10)"          '[[ "$SR" == WA && "$FF" == t2xwa ]]'
+mkpkg "" "STOPWHEN_TLE=y" t1 t2xtle t10xwa
+run y MOJ_VERDICT_RULE=first
+ck "com STOPWHEN: para no 1º (TLE), t10 nem roda"     '[[ "$SR" == TLE && "$FF" == t2xtle && "$(runs t10xwa)" == 0 ]] && clean_trace'
+mkpkg "" "" t1 t2
+run y MOJ_VERDICT_RULE=first
+ck "tudo certo continua Accepted"                     '[[ "$FIN" == "Accepted,100p" && -z "$FF" ]]'
+mkpkg $'g1_* - 40 pontos\ng2_* - 60 pontos' "" g1_a g2_axtle g2_bxwa
+run y MOJ_VERDICT_RULE=first
+ck "com grupos: a nota é a mesma, o veredicto é o 1º" '[[ "$VC" == "Time Limit Exceeded" && "$SC" == 40 && "$FF" == g2_axtle ]]'
 
 echo; echo "RESULT: $pass passed, $fail failed"
 (( fail == 0 ))

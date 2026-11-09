@@ -51,6 +51,8 @@ function write_report_env()
       printf 'WALLCAP=%q\n'          "${WALLCAP:-}"
       printf 'TL_CPU_SOURCE=%q\n'    "${TL_CPU_SOURCE:-}"   # cgroup (exato) | timelog (sem os filhos órfãos)
     fi
+    printf 'VERDICT_RULE=%q\n'       "${VERDICT_RULE:-worst}"   # worst | first (MOJ_VERDICT_RULE do job)
+    printf 'FIRST_FAIL=%q\n'         "${FIRST_FAIL:-}"          # o 1º teste que falhou na ordem julgada
     printf 'SMALLRESP=%q\n'          "${SMALLRESP:-}"
     printf 'FINALRESP=%q\n'          "${FINALRESP:-}"
     # veredicto CANÔNICO limpo (sem score) + score estruturado, p/ o backend casar/montar strings
@@ -715,6 +717,20 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   fi
   TESTS+=("$INPUT")
 done
+# REGRA DO VEREDICTO (09/11/2026; opção por contest, o job a traz em MOJ_VERDICT_RULE — o agente a repassa):
+#   worst (padrão, o de sempre) = o veredicto mais GRAVE entre os testes (VERDICTORDER abaixo);
+#   first = o do 1º teste que falhou NA ORDEM CANÔNICA: os exemplos (tests/input/sample*, a mesma seleção do
+#           enunciado) primeiro, depois o resto; dentro de cada parte, ordem de nome NATURAL (LC_ALL=C sort -V:
+#           2 antes de 10). É a regra do ICPC/BOCA: o time vê o erro do 1º teste em que errou.
+# Só no `first` a fila muda de ordem (pool E laço final): no worst a ordem do glob decide em que teste o STOPWHEN
+# para e, portanto, o "Xp" — o treino e as provas de antes não mudam nada.
+VERDICT_RULE=worst; FIRST_FAIL=""; FIRST_FAIL_VERDICT=""
+if [[ "${MOJ_VERDICT_RULE:-}" == first ]]; then
+  VERDICT_RULE=first
+  mapfile -t TESTS < <(printf '%s\n' "${TESTS[@]}" | LC_ALL=C awk -F/ '{ print ($NF ~ /^sample/ ? 0 : 1) "\t" $NF "\t" $0 }' \
+                         | LC_ALL=C sort -t $'\t' -k1,1n -k2,2V | cut -f3-)
+  LOG "  - Verdict rule: the FIRST failing test (samples first, then natural name order)"
+fi
 mkdir -p "$workdirbase/.claim"
 BAT_PID=$$; export BAT_PID
 _release_group() {  # anota em MOJ_RELEASE_FILE que o grupo $1 acabou (append-only; o agente dedupa)
@@ -774,13 +790,9 @@ SMALLRESP=AC
 # que o pool não rodou roda AQUI, em série no grupo 0, sem rerun de TLE (a execução serial é a referência).
 STOPPED=0
 NOTTESTED=()
-for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
+# a MESMA fila do pool (TESTS, já validada lá): no worst é a ordem do glob de sempre; no first, a canônica
+for INPUT in "${TESTS[@]}"; do
   LOG "--------------------------------------------------------------------"
-  if [[ ! -e "$INPUT" ]]; then
-    echo "Wrong package format. No input found"
-    LOG "$INPUT not found"
-    exit 3
-  fi
   FILE=$(basename $INPUT)
   LOG ""
   LOG "## Testfile: $FILE"
@@ -860,7 +872,13 @@ for INPUT in $PROBLEMTEMPLATEDIR/tests/input/*; do
   #LOG "THISVERDICT=$THISVERDICT"
   #LOG "${VERDICTORDER[$SMALLRESP]} , ${VERDICTORDER[$THISVERDICT]}"
   (( ${VERDICTORDER[$SMALLRESP]} < ${VERDICTORDER[$THISVERDICT]} )) && SMALLRESP=$THISVERDICT
+  [[ -z "$FIRST_FAIL" && ! "$THISVERDICT" =~ "AC" ]] && { FIRST_FAIL="$FILE"; FIRST_FAIL_VERDICT="$THISVERDICT"; }
 done
+# regra first: vale o 1º que falhou na ordem (o pior segue no log, p/ quem audita)
+if [[ "$VERDICT_RULE" == first && -n "$FIRST_FAIL" ]]; then
+  [[ "$SMALLRESP" != "$FIRST_FAIL_VERDICT" ]] && LOG "  - Verdict rule first: $FIRST_FAIL_VERDICT (test $FIRST_FAIL) instead of the most severe, $SMALLRESP"
+  SMALLRESP="$FIRST_FAIL_VERDICT"
+fi
 
 [[ "$SMALLRESP" =~ "AC" ]] && (( RESPERRO > 0 )) && SMALLRESP=UE
 

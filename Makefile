@@ -65,7 +65,8 @@ test-score:
 
 ## test-final-loop — o laço final depois do pool (26/10/2026): parada espúria (TLE que passa no rerun) roda a
 ##                   cauda em série; parada confirmada não roda; grupo com teste que não rodou não pontua;
-##                   sem linha EXECTIME vazia (build-and-test real, cage-run FALSO)
+##                   sem linha EXECTIME vazia; regra do veredicto worst × first (MOJ_VERDICT_RULE)
+##                   (build-and-test real, cage-run FALSO)
 test-final-loop:
 	@bash test-final-loop.sh
 
