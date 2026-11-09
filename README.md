@@ -520,6 +520,20 @@ do juiz) e **`MOJ_CALIB_ALT`** (com `MOJ_CALIBRATING`: julga também pelo outro 
 usado), `TL_METHOD_WANTED` (o pedido, quando a tabela não tinha a metade Kattis e o julgamento caiu no MOJ),
 `ETL` (o teto de cada teste) e, na calibração, `TL_METHOD_ALT`/`TL_LANG_ALT`.
 
+**Morte por memória = MLE** (09/11/2026). O teto duro do cgroup do teste (`max(600, MEMLIMITMB+64)` MB) mata o
+programa com SIGKILL. O escopo do systemd roda com `OOMPolicy=continue`: o kernel mata só o programa e o resto da
+jaula termina normalmente. O cage-run grava o `memory.events` do escopo em `<teste>-log.memevents` (via
+`MOJ_CAGE_MEMEVENTS`). O veredicto do teste é:
+
+- `MLE`, quando o teste morreu (RE ou RE_NZEC) e o `oom_kill` do `memory.events` é maior que 0. Vale mesmo sem
+  `MEMLIMITMB`;
+- `MLE`, quando o teste morreu, não há `memory.events` (juiz root, ou sem user manager) e o RSS medido passou do
+  `MEMLIMITMB`;
+- `TLE`, quando o tempo estourou antes: o TLE vence;
+- `MLE`, como sempre, quando o teste terminou com RSS acima do `MEMLIMITMB`.
+
+Com `STOPWHEN_RE=y`, o MLE também interrompe a execução. Teste: `test-mle-oom.sh` (`make test-mle`).
+
 **Relógio do TL** (05/11/2026; `TLCLOCK=cpu` no conf, o padrão é `wall`). No `wall` tudo é como sempre: o tempo é
 o `real` do timelog de dentro da jaula e o teto é `ETL = TL + 2,2 + 2·drift`. No `cpu`:
 

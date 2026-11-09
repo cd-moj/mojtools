@@ -17,7 +17,7 @@ TARFILE    ?= moj-sysroot-$(TAG).tar.zst
 # .deb proprietário do Dyalog APL (opcional): make sysroot-image APL=/caminho/dyalog.deb
 APL        ?=
 
-.PHONY: help check test-validator test-sections test-parallel test-score test-final-loop test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-tl-clock test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
+.PHONY: help check test-validator test-sections test-parallel test-score test-final-loop test-mle test-fn test-no-source test-calib test-calib-lanes test-tl-methods test-tl-clock test-kattis deps sysroot sysroot-image sysroot-tar sysroot-push
 
 help:
 	@sed -n '1,12p' Makefile
@@ -68,6 +68,11 @@ test-score:
 ##                   sem linha EXECTIME vazia (build-and-test real, cage-run FALSO)
 test-final-loop:
 	@bash test-final-loop.sh
+
+## test-mle — morte por memória vira MLE (oom_kill do memory.events; RSS sem ele), TLE vence, STOPWHEN_RE para no
+##            MLE (build-and-test real, cage-run FALSO)
+test-mle:
+	@bash test-mle-oom.sh
 
 ## test-fn — FUNCTION_LANGS (submissão de função): tl-checksum a ignora, gen-problem-json a serve,
 ##           validate-problem a confere, install-fn a grava, driver-langs.sh (a heurística)

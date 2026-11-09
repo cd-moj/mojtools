@@ -40,6 +40,8 @@ Usage: $0 <options>
               (ulimit -t; used when the problem's TL is CPU time, TLCLOCK=cpu). Env
               MOJ_CAGE_CPUSTAT=<file>: write the cpu.stat of the systemd scope there
               (the exact CPU of the run, orphans included; only with a scope)
+              MOJ_CAGE_MEMEVENTS=<file>: write the memory.events of the scope there
+              (oom_kill > 0 = the program was killed for memory; only with a scope)
 -B, --bwrap-time-file     Time log of all bubblewrap execution
 -w, --rw-dir              Exposes a directory as a persistend dir at '/tmp/rwdir'
               this option allows '-d','-i' and '-o' to be ommited
@@ -271,9 +273,16 @@ fi
 # desenfreada na hora (antes só havia o MLE por RSS medido DEPOIS da execução, que não
 # contém um estouro rápido). Sem user manager (CI/containers), degrada com aviso p/ o
 # comportamento clássico. Root continua no caminho cset/cgroup v1 acima.
+# OOMPolicy=continue (09/11/2026; LATAM: 29 envios que estouraram a memória saíram como Runtime Error): com o
+# padrão `stop`, depois que o kernel mata o programa por memória o systemd PARA o escopo e manda SIGTERM ao resto
+# da jaula — o `time` de dentro e o wrapper do cpu.stat/memory.events morrem sem gravar, e o build-and-test não tem
+# como saber que foi memória. Com `continue` o kernel mata só o programa e o resto termina normalmente. O probe é UM
+# (MemoryMax + OOMPolicy); systemd sem OOMPolicy em escopo cai no probe de antes, sem ele.
 SCOPE=""
 if [[ "$USER" != root && -n "$MEMLIMIT" ]] && command -v systemd-run >/dev/null 2>&1; then
-  if systemd-run --user --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
+  if systemd-run --user --scope --quiet -p MemoryMax=64M -p OOMPolicy=continue true 2>/dev/null; then
+    SCOPE="systemd-run --user --scope --quiet -p MemoryMax=${MEMLIMIT}M -p MemorySwapMax=0 -p OOMPolicy=continue --"
+  elif systemd-run --user --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
     SCOPE="systemd-run --user --scope --quiet -p MemoryMax=${MEMLIMIT}M -p MemorySwapMax=0 --"
   else
     echo "cage-run: sem user manager p/ cgroup v2 (systemd-run --user falhou); MLE fica só por RSS medido" >&2
@@ -347,11 +356,18 @@ done
 # real (05/11/2026) deu user 0.00 até p/ um laço infinito (o bwrap não repassa o rusage), e o `time` de dentro não vê o
 # filho que o aluno deixa órfão (quem o colhe é o init do bwrap). Um bash DENTRO do escopo e FORA do bwrap grava o
 # cpu.stat no fim; sem escopo (root, ou sem user manager) não há arquivo e o build-and-test cai no timelog de dentro.
+# MOJ_CAGE_MEMEVENTS=<arq> (09/11/2026): o mesmo bash grava o `memory.events` do escopo — o `oom_kill` > 0 é o sinal
+# EXATO de que o programa morreu por memória (o build-and-test dá MLE em vez de RE). Precisa do OOMPolicy=continue
+# acima: com `stop`, este bash também levava SIGTERM e não gravava nada.
 CPUWRAP=()
-if [[ -n "$SCOPE" && -n "${MOJ_CAGE_CPUSTAT:-}" ]]; then
-  rm -f "$MOJ_CAGE_CPUSTAT" 2>/dev/null
+if [[ -n "$SCOPE" && ( -n "${MOJ_CAGE_CPUSTAT:-}" || -n "${MOJ_CAGE_MEMEVENTS:-}" ) ]]; then
+  [[ -n "${MOJ_CAGE_CPUSTAT:-}" ]] && rm -f "$MOJ_CAGE_CPUSTAT" 2>/dev/null
+  [[ -n "${MOJ_CAGE_MEMEVENTS:-}" ]] && rm -f "$MOJ_CAGE_MEMEVENTS" 2>/dev/null
   CPUWRAP=(bash -c '"$@"; rc=$?; cg="$(grep -m1 "^0::" /proc/self/cgroup 2>/dev/null | cut -d: -f3-)"
-    [[ -n "$cg" ]] && cat "/sys/fs/cgroup${cg}/cpu.stat" > "$MOJ_CAGE_CPUSTAT" 2>/dev/null; exit $rc' cage-cpu)
+    if [[ -n "$cg" ]]; then
+      [[ -n "${MOJ_CAGE_CPUSTAT:-}" ]] && cat "/sys/fs/cgroup${cg}/cpu.stat" > "$MOJ_CAGE_CPUSTAT" 2>/dev/null
+      [[ -n "${MOJ_CAGE_MEMEVENTS:-}" ]] && cat "/sys/fs/cgroup${cg}/memory.events" > "$MOJ_CAGE_MEMEVENTS" 2>/dev/null
+    fi; exit $rc' cage-cpu)
 fi
 ([[ "${MOJ_CAGE_FSIZE:-}" =~ ^[0-9]+$ ]] && ulimit -f "$MOJ_CAGE_FSIZE" 2>/dev/null
  if [[ "${MOJ_CAGE_CPUSEC:-}" =~ ^[0-9]+$ ]] && (( MOJ_CAGE_CPUSEC >= 1 )); then

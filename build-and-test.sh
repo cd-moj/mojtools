@@ -563,7 +563,8 @@ function run-testinput()
   local FILE=$(basename $INPUT)
   # CAGE_CPUS (do worker, ou o grupo 0 no rerun): a jaula deste teste fica PINADA nessas CPUs
   # MOJ_CAGE_CPUSEC/MOJ_CAGE_CPUSTAT vazios (relógio de parede) = o cage-run de sempre
-  MOJ_CAGE_CPUSEC="$CPUSEC" MOJ_CAGE_CPUSTAT="${CPUSEC:+$workdirbase/$FILE-log.cpustat}" bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
+  MOJ_CAGE_CPUSEC="$CPUSEC" MOJ_CAGE_CPUSTAT="${CPUSEC:+$workdirbase/$FILE-log.cpustat}" \
+  MOJ_CAGE_MEMEVENTS="$workdirbase/$FILE-log.memevents" bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
        -r $LANGRUN \
        -t $workdirbase/$FILE-log.timelog\
@@ -638,11 +639,12 @@ _verdict_rc() {
   esac
 }
 # _stops <rc> — a REGRA DE PARADA (STOPWHEN_* do conf e RUNALL), a MESMA no pool paralelo e no laço final:
-# verdadeiro = depois deste teste não se roda mais nenhum.
+# verdadeiro = depois deste teste não se roda mais nenhum. O MLE (rc 9) para com o STOPWHEN_RE (09/11/2026): morrer
+# por memória é falha de execução, e até o MLE deixar de sair como RE era assim que esses testes paravam.
 _stops() {
   { (( $1 == 6 ))   && [[ "${STOPWHEN_WA:-}" == "y" ]];  } && return 0
   { (( $1 == 3 ))   && [[ "${STOPWHEN_TLE:-}" == "y" ]]; } && return 0
-  { (( $1 >= 126 )) && [[ "${STOPWHEN_RE:-}" == "y" ]];  } && return 0
+  { (( $1 >= 126 || $1 == 9 )) && [[ "${STOPWHEN_RE:-}" == "y" ]];  } && return 0
   { (( $1 != 0 ))   && [[ "$RUNALL" != "y" ]];           } && return 0
   return 1
 }
@@ -676,6 +678,22 @@ _verdict_for() {
   if [[ -n "${MEMLIMITMB:-}" && "$_V" != TLE && "$_V" != RE && "$_V" != RE_NZEC ]]; then
     local RSSKB=$(grep '^res' $workdirbase/$FILE-log.timelog 2>/dev/null|awk '{print $NF}')
     if [[ "$RSSKB" =~ ^[0-9]+$ ]] && (( RSSKB > MEMLIMITMB*1024 )); then _V=MLE; fi
+  fi
+  # MORTO POR MEMÓRIA = MLE, não RE (09/11/2026; LATAM: 29 envios que estouraram a memória saíram como Runtime
+  # Error). O teto duro do cgroup (max(600, MEMLIMITMB+64)) mata o programa com SIGKILL, e o exit 137 fazia a cadeia
+  # acima dizer RE. Dois sinais, nesta ordem:
+  #   1. `oom_kill` > 0 no memory.events do escopo (`-log.memevents`, gravado pelo cage-run): exato, vale até sem
+  #      MEMLIMITMB (o teto de 600 MB também é limite de memória);
+  #   2. sem esse arquivo (root/cgroup v1, sem user manager): o RSS medido acima do MEMLIMITMB num teste que morreu.
+  # O TLE fica: estourou o tempo antes.
+  if [[ "$_V" == RE || "$_V" == RE_NZEC ]]; then
+    local _OOMK; _OOMK="$(awk '$1 == "oom_kill" { print $2; exit }' "$workdirbase/$FILE-log.memevents" 2>/dev/null)"
+    if [[ "$_OOMK" =~ ^[0-9]+$ ]] && (( _OOMK > 0 )); then
+      _V=MLE
+    elif [[ -n "${MEMLIMITMB:-}" ]]; then
+      local _RSSKB; _RSSKB="$(grep '^res' "$workdirbase/$FILE-log.timelog" 2>/dev/null | awk '{print $NF}')"
+      [[ "$_RSSKB" =~ ^[0-9]+$ ]] && (( _RSSKB > MEMLIMITMB*1024 )) && _V=MLE
+    fi
   fi
 }
 

@@ -100,7 +100,13 @@ extensões legadas normalizadas p/ `py` (o lang-dir `py3` é só um symlink de c
   interativo dimensionam **`-Xmx = MEMLIMITMB`** (heap tão grande quanto o limite; 500m sem
   limite definido) e **`-Xss = stack do problema`** (threads da JVM não obedecem o `ulimit -s`).
   O veredito MLE continua sendo o RSS medido vs MEMLIMITMB; a folga de +64MB no cgroup evita
-  que o overhead da JVM vire RE por OOM. Pacotes interativos com driver COPIADO antes desta
+  que o overhead da JVM vire RE por OOM.
+- **Morte pelo teto do cgroup = MLE (09/11/2026; LATAM: 29 envios saíram RE).** O escopo roda com
+  `-p OOMPolicy=continue`: com o padrão `stop`, depois do OOM o systemd parava o escopo e mandava SIGTERM
+  ao `time` de dentro e ao wrapper do cpu.stat, e o build-and-test só via o exit 137 (RE). Agora o kernel
+  mata só o programa, o wrapper grava o `memory.events` do escopo (`MOJ_CAGE_MEMEVENTS`) e `oom_kill` > 0
+  vira MLE. systemd sem `OOMPolicy` em escopo cai no probe antigo (sem ele). Detalhes no README
+  ("Morte por memória = MLE"). Pacotes interativos com driver COPIADO antes desta
   mudança mantêm `-Xmx500m` até reinstalar o driver (`install-interactive.sh`).
 - **Stack: default 128MB p/ TODAS as linguagens** (`ULIMITS[-s]=131072`, rlimit herdado através
   do bwrap). Override por conf: **`STACKLIMITMB=<MB>`** (preferido, simétrico ao MEMLIMITMB;
