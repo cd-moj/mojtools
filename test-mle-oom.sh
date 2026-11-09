@@ -11,6 +11,7 @@
 # Roda o build-and-test.sh REAL numa cópia do mojtools com um cage-run.sh FALSO que decide pelo NOME do teste:
 #   xoom  = oom_kill 1, exit 137 · xoomnz = oom_kill 1, exit 1 · xkill = exit 137 e RSS de 1 GB, sem memory.events
 #   xsegv = exit 139, oom_kill 0 · xbig = AC com RSS de 1 GB · xtleoom = real 9 s, oom_kill 1, exit 137
+#   xoomac = oom_kill 1, exit 0 e saída certa (um filho morto por memória; o principal terminou)
 # Sem jaula, sem rede. `make test-mle`.
 set -u
 MT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -34,6 +35,7 @@ echo "$name" >> "$RUNLOG"
 case "$name" in
   *xtleoom*) real=9; oom=1; rc=137 ;;
   *xoomnz*)  oom=1; rc=1 ;;
+  *xoomac*)  oom=1 ;;
   *xoom*)    oom=1; rc=137 ;;
   *xkill*)   res=1048576; rc=137 ;;
   *xsegv*)   oom=0; rc=139 ;;
@@ -67,7 +69,7 @@ v(){ sed -n "s/^VERDICT\[$1\]=//p" "$WB/log.verdictall" 2>/dev/null | tail -1; }
 runs(){ grep -cx "$1" "$RUNLOG"; }
 
 echo "== cada sinal, com MEMLIMITMB=256 =="
-mkpkg "MEMLIMITMB=256" t1_xoom t2_xoomnz t3_xkill t4_xsegv t5_xbig t6_xtleoom t7
+mkpkg "MEMLIMITMB=256" t1_xoom t2_xoomnz t3_xkill t4_xsegv t5_xbig t6_xtleoom t7 t8_xoomac
 run
 ck "oom_kill + exit 137 = MLE (era RE)"                '[[ "$(v t1_xoom)" == MLE ]]'
 ck "oom_kill + exit 1 = MLE (era RE_NZEC)"             '[[ "$(v t2_xoomnz)" == MLE ]]'
@@ -76,6 +78,7 @@ ck "exit 139 sem sinal de memória = RE"                '[[ "$(v t4_xsegv)" == R
 ck "AC com RSS acima do limite = MLE (como sempre)"    '[[ "$(v t5_xbig)" == MLE ]]'
 ck "TLE vence o oom_kill"                              '[[ "$(v t6_xtleoom)" == TLE ]]'
 ck "teste normal = AC"                                 '[[ "$(v t7)" == AC ]]'
+ck "filho morto por memória e saída certa = MLE (não AC)" '[[ "$(v t8_xoomac)" == MLE ]]'
 
 echo "== sem MEMLIMITMB: o oom_kill decide sozinho; o RSS não =="
 mkpkg "" t1_xoom t2_xkill t3

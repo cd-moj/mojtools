@@ -525,8 +525,8 @@ programa com SIGKILL. O escopo do systemd roda com `OOMPolicy=continue`: o kerne
 jaula termina normalmente. O cage-run grava o `memory.events` do escopo em `<teste>-log.memevents` (via
 `MOJ_CAGE_MEMEVENTS`). O veredicto do teste é:
 
-- `MLE`, quando o teste morreu (RE ou RE_NZEC) e o `oom_kill` do `memory.events` é maior que 0. Vale mesmo sem
-  `MEMLIMITMB`;
+- `MLE`, quando o `oom_kill` do `memory.events` é maior que 0, qualquer que seja o resto (menos TLE): um programa
+  de vários processos pode ter um filho morto por memória e ainda terminar. Vale mesmo sem `MEMLIMITMB`;
 - `MLE`, quando o teste morreu, não há `memory.events` (juiz root, ou sem user manager) e o RSS medido passou do
   `MEMLIMITMB`;
 - `TLE`, quando o tempo estourou antes: o TLE vence;

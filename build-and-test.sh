@@ -683,14 +683,16 @@ _verdict_for() {
   # Error). O teto duro do cgroup (max(600, MEMLIMITMB+64)) mata o programa com SIGKILL, e o exit 137 fazia a cadeia
   # acima dizer RE. Dois sinais, nesta ordem:
   #   1. `oom_kill` > 0 no memory.events do escopo (`-log.memevents`, gravado pelo cage-run): exato, vale até sem
-  #      MEMLIMITMB (o teto de 600 MB também é limite de memória);
+  #      MEMLIMITMB (o teto de 600 MB também é limite de memória) e vale para QUALQUER veredicto menos o TLE — com
+  #      OOMPolicy=continue um programa de vários processos pode ter um filho morto por memória e ainda terminar
+  #      (AC/WA): o conjunto passou do teto;
   #   2. sem esse arquivo (root/cgroup v1, sem user manager): o RSS medido acima do MEMLIMITMB num teste que morreu.
   # O TLE fica: estourou o tempo antes.
-  if [[ "$_V" == RE || "$_V" == RE_NZEC ]]; then
+  if [[ "$_V" != TLE && "$_V" != MLE ]]; then
     local _OOMK; _OOMK="$(awk '$1 == "oom_kill" { print $2; exit }' "$workdirbase/$FILE-log.memevents" 2>/dev/null)"
     if [[ "$_OOMK" =~ ^[0-9]+$ ]] && (( _OOMK > 0 )); then
       _V=MLE
-    elif [[ -n "${MEMLIMITMB:-}" ]]; then
+    elif [[ -n "${MEMLIMITMB:-}" && ( "$_V" == RE || "$_V" == RE_NZEC ) ]]; then
       local _RSSKB; _RSSKB="$(grep '^res' "$workdirbase/$FILE-log.timelog" 2>/dev/null | awk '{print $NF}')"
       [[ "$_RSSKB" =~ ^[0-9]+$ ]] && (( _RSSKB > MEMLIMITMB*1024 )) && _V=MLE
     fi

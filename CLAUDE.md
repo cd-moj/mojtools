@@ -307,8 +307,8 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   override por conf `STACKLIMITMB=<MB>` (vence) ou `ULIMITS[-s]=<KB>`; a JVM espelha em `-Xss`.
   **Morte pelo teto do cgroup = MLE (09/11/2026)**: o escopo roda com `OOMPolicy=continue` (com `stop` o systemd
   matava o `time` e o wrapper junto e saía RE); o wrapper grava o `memory.events` (`MOJ_CAGE_MEMEVENTS` →
-  `<teste>-log.memevents`) e o `_verdict_for` dá MLE ao teste morto com `oom_kill` > 0 (ou, sem o arquivo, RSS acima
-  do MEMLIMITMB); TLE vence; o MLE para com `STOPWHEN_RE`. Teste: `test-mle-oom.sh`.
+  `<teste>-log.memevents`) e o `_verdict_for` dá MLE a todo teste com `oom_kill` > 0 (até AC/WA: filho morto, principal
+  terminou) e, sem o arquivo, ao teste morto com RSS acima do MEMLIMITMB; TLE vence; o MLE para com `STOPWHEN_RE`. Teste: `test-mle-oom.sh`.
 - `lang/<lang>/run.sh`: mesmo contrato p/ toda linguagem aceita. O tempo-limite de **compilação**
   é 30s por default; linguagem de compilador lento sobe via arquivo **`lang/<lang>/compile-tl`**
   (segundos; o problema pode sobrescrever com `scripts/<lang>/compile-tl`) — ex.: `kt` (Kotlin,
