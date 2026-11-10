@@ -612,8 +612,9 @@ passa em `MOJ_VERDICT_RULE`.
 - `worst` (o padrão; treino e provas antigas): o veredicto é o do teste mais grave (`VERDICTORDER`).
 - `first`: o veredicto é o do **1º teste que falhou** na ordem canônica — os exemplos (`tests/input/sample*`)
   primeiro, depois o resto, cada parte em ordem natural de nome (`LC_ALL=C sort -V`: `t2` antes de `t10`). O pool
-  e o laço final usam essa ordem, então com `STOPWHEN_*` a execução para no 1º erro dessa ordem. Com grupos, a
-  nota não muda; só o veredicto.
+  e o laço final usam essa ordem, então com `STOPWHEN_*` a execução para no 1º erro dessa ordem. Com grupos e
+  sem `STOPWHEN_*`, a nota não muda, só o veredicto. Com `STOPWHEN_*` a parada cai em outro teste, e os grupos que
+  não rodaram ficam zerados: a nota pode mudar. Por isso o contest novo só nasce `first` no modo icpc.
 
 Só no `first` a ordem dos testes muda. No `worst`, a ordem do glob decide em que teste o `STOPWHEN` para (e o
 `Xp`), e isso fica como sempre foi. O `report.env` leva `VERDICT_RULE` e `FIRST_FAIL` (o 1º teste que falhou), e

@@ -312,8 +312,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `first` = o do 1º teste que falhou na ordem canônica — `tests/input/sample*` primeiro, depois o resto, cada parte em
   `LC_ALL=C sort -V` (natural: t2 antes de t10). Só no `first` o `TESTS` (pool E laço final) é reordenado: no `worst` a
   ordem do glob decide onde o STOPWHEN para e o `Xp` — mudar isso mexeria em prova antiga. `report.env`:
-  `VERDICT_RULE`, `FIRST_FAIL`; o report o mostra no banner. Com grupos a nota não muda (o `score-summary.sh` lê o
-  `SMALLRESP`). Teste: `test-final-loop.sh`.
+  `VERDICT_RULE`, `FIRST_FAIL`; o report o mostra no banner. Com grupos e SEM `STOPWHEN_*` a nota não muda (o
+  `score-summary.sh` lê o `SMALLRESP`); com STOPWHEN a parada cai em outro teste e a nota pode mudar (o contest novo
+  só nasce `first` no icpc — cdmoj `cc_settings_conf_lines`). Teste: `test-final-loop.sh`.
 - **RERUN SÓ DO TLE PERTO DO TL (10/11/2026; interferência de memória medida até ~1,6×).** No laço final, o TLE com
   tempo cobrado ≤ max(`TLERERUN_BAND` × (TL + drift), TL + drift + 1 s) e abaixo do teto ETL roda de novo em série (`_tle_near`;
 o piso de 1 s é da revisão de 10/11: com TL de 0,0335 s o múltiplo sozinho não salvava um soluço de 80 ms; padrão 2,0, conf ou env
