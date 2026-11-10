@@ -89,6 +89,15 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   (mktemp+mv) e `.calib-reports/` troca por rename no fim — outro slot julgando o mesmo
   problema nunca vê placeholder/tabela parcial. Nunca reintroduzir escrita direta no
   diretório compartilhado do pacote durante a calibração (raiz de veredicto errado).
+- **Calibração INCREMENTAL (10/11/2026, opt-in)** no `calibreitor.sh`: com `MOJ_CALIB_MEMO_DIR` (o agente passa
+  `<cache>/<id>/calib-memo`) toda solução rodada grava o retrato do workdir (`_memo_save`: verdictall/alt, report.env/
+  html, `<teste>-log.{exectime,timelog,wallkill}`, as linhas EXECTIME/WALLTIME do trace); com `MOJ_CALIB_REUSE=1` a raia
+  restaura o da MESMA chave (`_memo_restore`, workdir novo + `$TEMP.item.<i>.out`) e o pai segue igual. Chave
+  (`_memo_key`): `tl-checksum.sh --context` (o estreito SEM `sols/`) + o código VERSIONADO do mojtools (`git ls-files`;
+  sem git, `find`) + `MOJ_TEST_CPUS` + `CAGE_ROOT` + host + categoria + runall + nome e conteúdo da solução + (fora as
+  good) a tabela de TL das good sem a linha da data + `MOJ_CALIB_ALT`. TTL `MOJ_CALIB_MEMO_TTL_DAYS` (14). O `sols`
+  leva `reused_at`; o log diz "reaproveitado (medido em …)" e o resumo conta. Teste: `test-calib-memo.sh`
+  (`make test-calib-memo`).
 - `statement-langs.sh` (sourceável) — **FONTE ÚNICA dos idiomas do enunciado** (2026-09-15):
   `stmt_langs_all` (pt en es), `stmt_file <pkg> <lang>` (PT = enunciado.{md,org,tex}; outro =
   `docs/enunciado.<lang>.md`), `stmt_langs_of`, `stmt_note_file` (nota do idioma › PT),

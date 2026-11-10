@@ -22,13 +22,19 @@
 # diferentes de solução).
 #   uso: tl-checksum.sh --all-sols <pkgdir>
 # O validador de entrada (scripts/validator.cpp) entra só na versão do pacote (ver o laço de scripts).
+# `--context` = o CONTEXTO de julgamento de QUALQUER solução: o estreito SEM `sols/` (conf, tests, scripts). É a base da
+# chave do memo da calibração incremental (calibreitor.sh, MOJ_CALIB_MEMO_DIR): mudou o contexto, nenhuma solução se
+# reaproveita; mudou só uma solução, só ela roda de novo.
+#   uso: tl-checksum.sh --context <pkgdir>
 set -u
-ALL_SOLS=0
+ALL_SOLS=0; CONTEXT=0
 [[ "${1:-}" == --all-sols ]] && { ALL_SOLS=1; shift; }
-pkg="${1:?uso: tl-checksum.sh [--all-sols] <pkgdir>}"
+[[ "${1:-}" == --context ]] && { CONTEXT=1; shift; }
+pkg="${1:?uso: tl-checksum.sh [--all-sols|--context] <pkgdir>}"
 [[ -d "$pkg" ]] || { echo "tl-checksum: pacote inexistente: $pkg" >&2; exit 1; }
 SOLDIRS=(sols/good)
 (( ALL_SOLS )) && SOLDIRS+=(sols/pass sols/slow sols/wrong sols/upcoming)
+(( CONTEXT )) && SOLDIRS=()
 {
   # conf: calibrafactor/ULIMITS/CALIBRATIONTL/ALLOWPARALLELTEST/etc. mudam o TL. A linha SAMPLE
   # (exemplos no enunciado, statement-langs.sh) NÃO muda julgamento nem TL: fica de fora, senão

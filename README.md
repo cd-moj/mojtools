@@ -587,6 +587,14 @@ Com uma falha confirmada, eles não rodam, e um grupo de `tests/score` com teste
 Antes, a parada espúria dava "Unknown ERROR" e, com grupos, um "Accepted" falso. Teste: `make
 test-final-loop`.
 
+**Calibração incremental (10/11/2026, opt-in).** Com `MOJ_CALIB_MEMO_DIR=<dir>` o `calibreitor.sh` guarda um retrato do
+resultado de cada solução; com `MOJ_CALIB_REUSE=1` ele reaproveita o retrato da solução cuja chave não mudou, em vez de
+rodá-la. A chave cobre o contexto de julgamento (`tl-checksum.sh --context`: conf, testes, scripts), o código do
+mojtools, a largura, a jaula, o host, a solução e — para pass/slow/wrong — a tabela de TL que saiu das good. Uma
+solução nova roda sozinha; uma good editada (W novo) faz a fase 2 inteira rodar; conf ou teste mudado roda tudo.
+Retratos com mais de `MOJ_CALIB_MEMO_TTL_DAYS` (14) não valem. O agente do juiz passa o diretório sempre e o reuse só
+quando o autor pede (`moj calibrate --reuse`, ☐ ♻ no editor). Teste: `make test-calib-memo`.
+
 **Rerun só do TLE perto do TL (10/11/2026).** O rerun serial vale para o TLE cujo tempo cobrado ficou até
 `TLERERUN_BAND` × (TL + tolerância) — padrão 2,0; conf `TLERERUN_BAND=<x>` (número > 1, o `validate-problem.sh`
 reprova outro valor) ou env `MOJ_TLE_RERUN_BAND`, que vence. Vizinhos pesados em memória no mesmo soquete inflam o

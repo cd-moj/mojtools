@@ -21,6 +21,10 @@ TOREMOVE=
 
 function sai()
 {
+  # calibração incremental: quantas soluções vieram do memo (o autor precisa saber que esses tempos são de antes)
+  if [[ "${MEMO_REUSE:-0}" == 1 && -n "${MEMO_DIR:-}" ]]; then
+    echo; echo "Calibração incremental (reaproveitar): $(grep -c . "$TEMP.reused" 2>/dev/null || echo 0) solução(ões) reaproveitada(s) de medições anteriores; as demais rodaram agora."
+  fi
   # publica os reports coletados (staging -> dir final; o rename torna a troca "de uma vez"
   # p/ quem lê o dir depois — nunca fica um dir meio-copiado de um run abortado)
   if [[ -n "$CALIBSTAGE" && -d "$CALIBSTAGE" ]]; then
@@ -90,8 +94,10 @@ sols_add(){  # $1=workdir $2=file $3=lang $4=category $5=verdict
   sol_tests_json "$1" > "$TEMP.tests.json"
   jq -cn --arg f "$2" --arg l "$3" --arg cat "$4" --arg v "$5" \
      --arg m "$(_renv "$1" TL_METHOD)" --arg e "$(_renv "$1" ETL)" \
+     --arg ra "$(head -n1 "$1/.memo-at" 2>/dev/null)" \
      --slurpfile tests "$TEMP.tests.json" \
      '{file:$f, lang:$l, category:$cat, verdict:$v, tests:($tests[0] // [])}
+      + (($ra|tonumber? // null) as $x | if $x != null then {reused_at:$x} else {} end)
       + (if $m != "" then {method:$m} else {} end)
       + (($e|tonumber? // null) as $x | if $x != null then {etl:$x} else {} end)' \
      >> "$TEMP.sols.jsonl" 2>/dev/null
@@ -199,6 +205,71 @@ else
 fi
 [[ "${MOJ_CALIB_LANES:-1}" == 0 ]] && CALIB_GROUPS=("${CALIB_GROUPS[0]}")
 
+# ===== CALIBRAÇÃO INCREMENTAL (10/11/2026; pedido do Ribas: "aproveitar resultados que já tinham calculado — às vezes
+# muda só uma solução nova —, OPT-IN, desabilitado por padrão, sempre com a opção de rodar tudo") ==================
+# O agente passa MOJ_CALIB_MEMO_DIR (<cache>/<id>/calib-memo, fora do pkg/, que é trocado a cada versão): toda solução
+# rodada GRAVA o retrato do seu workdir lá. Só com MOJ_CALIB_REUSE=1 (o pedido de calibração com `reuse`) a raia, antes
+# de rodar, procura o retrato da MESMA chave e o RESTAURA no lugar do build-and-test — o pai lê o $TEMP.item.<i>.out e o
+# workdir como sempre (W, LANGOK, tabela, `sols`, reports: nada muda no resto). A CHAVE é tudo que decide o resultado
+# de uma solução: o contexto de julgamento (tl-checksum --context: conf, tests, scripts), o código do mojtools (os .sh
+# da raiz, lang/, interactive/, testlib/, fn/), a largura (MOJ_TEST_CPUS), a jaula (CAGE_ROOT), o host, a categoria e o
+# runall, o nome e o CONTEÚDO da solução e — para pass/slow/wrong — a TABELA DE TL que saiu das good (sem o comentário
+# com a data) e o MOJ_CALIB_ALT. Mudou a tabela (uma good nova mudou o W) ⇒ pass/slow/wrong rodam de novo. Retrato mais
+# velho que MOJ_CALIB_MEMO_TTL_DAYS (14) não vale e é apagado. O `sols` leva `reused_at` (quando foi medido) na solução
+# reaproveitada; o log diz "reaproveitado". ⚠ O tempo reaproveitado é o de QUANDO foi medido (outra carga no juiz).
+MEMO_DIR="${MOJ_CALIB_MEMO_DIR:-}"; MEMO_REUSE="${MOJ_CALIB_REUSE:-0}"; MEMO_CTX=""
+MEMO_TTL_DAYS="${MOJ_CALIB_MEMO_TTL_DAYS:-14}"; [[ "$MEMO_TTL_DAYS" =~ ^[0-9]+$ ]] || MEMO_TTL_DAYS=14
+if [[ -n "$MEMO_DIR" ]] && mkdir -p "$MEMO_DIR" 2>/dev/null; then
+  find "$MEMO_DIR" -mindepth 1 -maxdepth 1 -mtime +"$MEMO_TTL_DAYS" -exec rm -rf {} + 2>/dev/null
+  MEMO_CTX="$( { printf 'memo-v1\n'; bash ./tl-checksum.sh --context "$PROBLEMDIR"
+                 # só o código VERSIONADO (um cache compilado dentro de testlib/ ou interactive/ mudaria a chave a cada
+                 # calibração); sem git (cópia avulsa), tudo
+                 git ls-files -- '*.sh' lang interactive testlib fn 2>/dev/null \
+                   || { find . -maxdepth 1 -name '*.sh' -type f; find lang interactive testlib fn -type f 2>/dev/null; }; } \
+               | { read -r v; read -r ctx; printf '%s\n%s\n' "$v" "$ctx"; LC_ALL=C sort | while IFS= read -r f; do printf '=%s\n' "$f"; cat "$f" 2>/dev/null; done; } \
+               | sha256sum | cut -c1-32 )"
+  [[ -n "$MEMO_CTX" ]] || MEMO_DIR=""
+else
+  MEMO_DIR=""
+fi
+# _memo_key <solução> <runall> -> a chave (32 hex) desta solução nesta calibração
+_memo_key(){
+  local f="$1" cat; cat="$(basename "$(dirname "$f")")"
+  { printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$MEMO_CTX" "${MOJ_TEST_CPUS:-}" "${CAGE_ROOT:-}" "$HOSTNAME" \
+      "$cat" "$2" "${f##*/}" "${MOJ_CALIB_ALT:-}"
+    sha256sum < "$f"
+    [[ "$cat" == good ]] || grep -v '^#' "$CALTL" 2>/dev/null; } | sha256sum | cut -c1-32
+}
+# _memo_save <chave> <i> : o retrato do workdir da solução i (só com veredicto). Só o que o pai lê: verdictall/alt,
+# report.env/html, os <teste>-log.{exectime,timelog,wallkill} e as linhas EXECTIME/WALLTIME do trace. Troca atômica.
+_memo_save(){
+  local key="$1" i="$2" T A tmp f
+  [[ -n "$MEMO_DIR" && -n "$key" ]] || return 0
+  T="$(head -n1 "$TEMP.item.$i.out" 2>/dev/null)"; A="$(tail -n1 "$TEMP.item.$i.out" 2>/dev/null)"
+  [[ -n "$A" && "$A" != "$T" && -d "$T" ]] || return 0
+  tmp="$MEMO_DIR/.$key.$BASHPID"; rm -rf "$tmp"; mkdir -p "$tmp" 2>/dev/null || return 0
+  cp "$TEMP.item.$i.out" "$tmp/out"
+  for f in log.verdictall log.verdictalt report.env report.html; do [[ -f "$T/$f" ]] && cp "$T/$f" "$tmp/"; done
+  find "$T" -maxdepth 1 -type f \( -name '*-log.exectime' -o -name '*-log.timelog' -o -name '*-log.wallkill' \) -exec cp {} "$tmp/" \; 2>/dev/null
+  grep -E '^(EXECTIME|WALLTIME)[[:space:]]' "$T/run-trace.log" > "$tmp/run-trace.log" 2>/dev/null
+  printf '%s\n' "$EPOCHSECONDS" > "$tmp/.memo-at"
+  rm -rf "$MEMO_DIR/$key"; mv -T "$tmp" "$MEMO_DIR/$key" 2>/dev/null || rm -rf "$tmp"
+}
+# _memo_restore <chave> <i> -> rc 0 e o item i pronto (workdir NOVO, removido no fim como os outros), ou rc 1
+_memo_restore(){
+  local key="$1" i="$2" d wd at
+  [[ "$MEMO_REUSE" == 1 && -n "$MEMO_DIR" && -n "$key" ]] || return 1
+  d="$MEMO_DIR/$key"; [[ -s "$d/out" && -s "$d/.memo-at" ]] || return 1
+  at="$(head -n1 "$d/.memo-at")"; [[ "$at" =~ ^[0-9]+$ ]] || return 1
+  (( EPOCHSECONDS - at <= MEMO_TTL_DAYS * 86400 )) || return 1
+  wd="$(mktemp -d)" || return 1
+  cp -a "$d/." "$wd/" 2>/dev/null && rm -f "$wd/out" || { rm -rf "$wd"; return 1; }
+  { printf '%s\n' "$wd"; tail -n +2 "$d/out"; } > "$TEMP.item.$i.out"
+  : > "$TEMP.item.$i.err"; printf '%s\n' "$key" >> "$TEMP.reused"   # contagem p/ o resumo (o índice se repete entre fases)
+  MEMO_AT="$at"
+  return 0
+}
+
 # _run_phase <runall> <solução…> : roda as soluções em L = min(grupos, soluções) raias e espera todas (barreira).
 # Deixa $TEMP.item.<i>.out (o stdout do build-and-test: 1ª linha = workdir, última = veredicto) p/ o pai.
 _run_phase(){
@@ -215,6 +286,11 @@ _run_phase(){
       for (( i=0; i<n; i++ )); do
         mkdir "$TEMP.claim/$i" 2>/dev/null || continue
         f="${items[i]}"; lg="$(lang_canon "${f##*.}")"
+        key=""; [[ -n "$MEMO_DIR" ]] && key="$(_memo_key "$f" "$runall")"
+        if _memo_restore "$key" "$i"; then
+          echo "  [raia $li] ${f##*/} — reaproveitado (medido em $(date -u -d "@$MEMO_AT" '+%Y-%m-%d %H:%M UTC' 2>/dev/null))"
+          continue
+        fi
         # a solução COMEÇOU: o resultado de cada uma só sai no fim da fase, e uma calibração morta no teto de
         # wall-clock (o agente mata a árvore) deixaria o log sem dizer qual solução estava rodando
         echo "  [raia $li] ${f##*/}"
@@ -224,6 +300,7 @@ _run_phase(){
         else
           bash build-and-test.sh "$lg" "$f" "$PROBLEMDIR" "$runall" > "$TEMP.item.$i.out" 2> "$TEMP.item.$i.err"
         fi
+        _memo_save "$key" "$i"
       done ) &
     pids+=($!)
   done
