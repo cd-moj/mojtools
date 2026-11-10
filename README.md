@@ -592,14 +592,18 @@ resultado de cada solução; com `MOJ_CALIB_REUSE=1` ele reaproveita o retrato d
 rodá-la. A chave cobre o contexto de julgamento (`tl-checksum.sh --context`: conf, testes, scripts), o código do
 mojtools, a largura, a jaula, o host, a solução e — para pass/slow/wrong — a tabela de TL que saiu das good. Uma
 solução nova roda sozinha; uma good editada (W novo) faz a fase 2 inteira rodar; conf ou teste mudado roda tudo.
-Retratos com mais de `MOJ_CALIB_MEMO_TTL_DAYS` (14) não valem. O agente do juiz passa o diretório sempre e o reuse só
+Retratos com mais de `MOJ_CALIB_MEMO_TTL_DAYS` (14) não valem. A chave leva também a impressão do toolchain da jaula
+(`os-release` e os compiladores), falha de ambiente (Compilation Error, Judge Error, linguagem indisponível) nunca vai ao
+memo, e os retratos ficam num subdiretório por contexto — o de contexto velho sai na calibração seguinte. O agente do juiz passa o diretório sempre e o reuse só
 quando o autor pede (`moj calibrate --reuse`, ☐ ♻ no editor). Teste: `make test-calib-memo`.
 
 **Rerun só do TLE perto do TL (10/11/2026).** O rerun serial vale para o TLE cujo tempo cobrado ficou até
-`TLERERUN_BAND` × (TL + tolerância) — padrão 2,0; conf `TLERERUN_BAND=<x>` (número > 1, o `validate-problem.sh`
+`TLERERUN_BAND` × (TL + tolerância), e nunca menos que TL + tolerância + 1 s (o piso: com o TL mínimo da calibração,
+0,0335 s, o múltiplo sozinho dava 0,07 s e um soluço de 80 ms virava TLE) — padrão 2,0; conf `TLERERUN_BAND=<x>` (número > 1, o `validate-problem.sh`
 reprova outro valor) ou env `MOJ_TLE_RERUN_BAND`, que vence. Vizinhos pesados em memória no mesmo soquete inflam o
 tempo em até ~1,6× (bancada de 06–07/11): a solução correta perto do TL vira TLE por azar e passa no rerun. O TLE
-longe (laço infinito, morto no ETL, ou morto pela parede no `TLCLOCK=cpu`) não repete mais — custava o ETL inteiro de
+longe (laço infinito, morto no teto ETL — conferido pelo tempo, qualquer que seja o TL —, ou morto pela parede no
+`TLCLOCK=cpu`) não repete mais — custava o ETL inteiro de
 novo. O 1º rerun que confirma o TLE desliga os seguintes, como antes. O trace diz qual foi o caso. Teste: `make
 test-final-loop`.
 

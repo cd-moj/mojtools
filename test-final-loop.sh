@@ -36,6 +36,8 @@ echo "$name" >> "$RUNLOG"
 [[ "$name" == *xtle* ]] && real=9
 [[ "$name" == *xslow* ]] && real=1.5
 if [[ "$name" == *xflk* && ! -e "$FLAKY/$name" ]]; then : > "$FLAKY/$name"; real=1.3; fi
+if [[ "$name" == *xfar* && ! -e "$FLAKY/$name" ]]; then : > "$FLAKY/$name"; real=2.5; fi   # 2,5× o TL de 1 s, só na 1ª
+if [[ "$name" == *xjit* ]]; then if [[ ! -e "$FLAKY/$name" ]]; then : > "$FLAKY/$name"; real=0.08; else real=0.01; fi; fi  # soluço de 80 ms na 1ª, 10 ms depois
 if [[ "$name" == *xwa* ]]; then echo errado > "$OUT"; else cat "$IN" > "$OUT"; fi
 printf 'real %s\nuser 0\nsys 0\nres 100\ncpu 99%%\n' "$real" > "$TLOG"
 exit 0
@@ -117,15 +119,25 @@ mkpkg "" "" t1 t2xtle t3xflk
 run y
 ck "TLE longe não repete e NÃO gasta o rerun: o instável depois passa" '[[ "$(runs t2xtle)" == 1 && "$(runs t3xflk)" == 2 ]] && grep -q "EXECTIME t3xflk 0.05 AC" "$TR"'
 ck "o trace diz que o longe não repetiu"              'grep -q "Rerun: not needed — this TLE is far from the time limit" "$TR"'
-mkpkg "" "TLERERUN_BAND=1.2" t1 t2xflk
+mkpkg "" "" t1 t2xfar
 run y
-ck "TLERERUN_BAND=1.2 no conf: o de 1,3 s já é longe" '[[ "$SR" == TLE && "$(runs t2xflk)" == 1 ]]'
-mkpkg "" "TLERERUN_BAND=1.2" t1 t2xflk
-run y MOJ_TLE_RERUN_BAND=1.5
-ck "MOJ_TLE_RERUN_BAND vence o conf"                  '[[ "$SR" == AC && "$(runs t2xflk)" == 2 ]]'
-mkpkg "" "TLERERUN_BAND=abc" t1 t2xflk
+ck "2,5 s com TL de 1 s (além de 2× e do piso de TL+1 s): longe, TLE" '[[ "$SR" == TLE && "$(runs t2xfar)" == 1 ]]'
+mkpkg "" "TLERERUN_BAND=3" t1 t2xfar
 run y
-ck "banda inválida = 2,0"                             '[[ "$SR" == AC && "$(runs t2xflk)" == 2 ]] && clean_trace'
+ck "TLERERUN_BAND=3 no conf: o de 2,5 s fica perto e passa" '[[ "$SR" == AC && "$(runs t2xfar)" == 2 ]]'
+mkpkg "" "TLERERUN_BAND=1.5" t1 t2xfar
+run y MOJ_TLE_RERUN_BAND=3
+ck "MOJ_TLE_RERUN_BAND vence o conf"                  '[[ "$SR" == AC && "$(runs t2xfar)" == 2 ]]'
+mkpkg "" "TLERERUN_BAND=abc" t1 t2xfar
+run y
+ck "banda inválida = 2,0"                             '[[ "$SR" == TLE && "$(runs t2xfar)" == 1 ]] && clean_trace'
+# o caso da revisão: o TL mínimo da calibração (0,0335 s, metade dos TLs de C/C++) e um soluço de 80 ms
+mkpkg "" "" t2xjit; printf 'TL[c]=.0335\nTL[default]=.0335\n' > "$P/tl"
+run y
+ck "TL de 0,0335 s com soluço de 80 ms: o piso de TL+1 s repete e passa" '[[ "$SR" == AC && "$(runs t2xjit)" == 2 ]]'
+mkpkg "" "" t1 t2xtle; printf 'TL[c]=3\nTL[default]=3\n' > "$P/tl"
+run y
+ck "laço infinito com TL de 3 s (morto no teto, ETL ≤ 2×TL): não repete" '[[ "$SR" == TLE && "$(runs t2xtle)" == 1 ]]'
 
 echo "== REGRA DO VEREDICTO (MOJ_VERDICT_RULE, opção do contest): worst × first =="
 mkpkg "" "" t1 t2xwa t3xtle

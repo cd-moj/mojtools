@@ -565,6 +565,7 @@ function run-testinput()
   local FILE=$(basename $INPUT)
   # CAGE_CPUS (do worker, ou o grupo 0 no rerun): a jaula deste teste fica PINADA nessas CPUs
   # MOJ_CAGE_CPUSEC/MOJ_CAGE_CPUSTAT vazios (relógio de parede) = o cage-run de sempre
+  rm -f "$workdirbase/$FILE-log.memevents"   # o da execução ANTERIOR (o rerun) nunca decide esta (revisão de 10/11/2026)
   MOJ_CAGE_CPUSEC="$CPUSEC" MOJ_CAGE_CPUSTAT="${CPUSEC:+$workdirbase/$FILE-log.cpustat}" \
   MOJ_CAGE_MEMEVENTS="$workdirbase/$FILE-log.memevents" bash cage-run.sh $CAGEROOTARG $EXTRABINDINGS ${CAGE_CPUS:+-C "$CAGE_CPUS"} -d $workdir -i $INPUT -o $workdirbase/$FILE-team_output \
        -s $workdirbase/$FILE-stderr $SHIELDPARAMS\
@@ -727,8 +728,15 @@ done
 VERDICT_RULE=worst; FIRST_FAIL=""; FIRST_FAIL_VERDICT=""
 if [[ "${MOJ_VERDICT_RULE:-}" == first ]]; then
   VERDICT_RULE=first
+  _TESTS0=("${TESTS[@]}")
   mapfile -t TESTS < <(printf '%s\n' "${TESTS[@]}" | LC_ALL=C awk -F/ '{ print ($NF ~ /^sample/ ? 0 : 1) "\t" $NF "\t" $0 }' \
                          | LC_ALL=C sort -t $'\t' -k1,1n -k2,2V | cut -f3-)
+  # o reordenamento não saiu completo (fork/EAGAIN sob carga, sort quebrado): vale a ordem de antes — a fila tem
+  # sempre todos os testes, e a regra continua "o 1º que falhou".
+  if (( ${#TESTS[@]} != ${#_TESTS0[@]} )); then
+    TESTS=("${_TESTS0[@]}")
+    LOG "  - Verdict rule: could not sort the tests; keeping the default order"
+  fi
   LOG "  - Verdict rule: the FIRST failing test (samples first, then natural name order)"
 fi
 mkdir -p "$workdirbase/.claim"
@@ -776,13 +784,20 @@ TLERERUN=${TLERERUN:=y}
 TLERERUN_BAND="${MOJ_TLE_RERUN_BAND:-${TLERERUN_BAND:-2.0}}"
 [[ "$TLERERUN_BAND" =~ ^[0-9]+\.?[0-9]*$ ]] && LC_ALL=C awk -v b="$TLERERUN_BAND" 'BEGIN{exit !(b > 1)}' || TLERERUN_BAND=2.0
 # _tle_near <teste> -> rc 0 se o TLE desse teste ficou perto do TL (vale repetir). Usa o tempo cobrado (_judged_time).
+# "Perto" = até TLERERUN_BAND × (TL + drift), e NUNCA menos que TL + drift + 1 s: o TL mínimo da calibração é 0,0335 s
+# (1,35 × 0,01 + 0,02 — mais da metade dos TLs de C/C++), e só o múltiplo dava 0,07 s; um soluço de 80 ms (cache frio,
+# vizinho) virava TLE definitivo, que o rerun de antes salvava (revisão de 10/11/2026). O morto no TETO (tempo ≥ ETL −
+# 0,05: laço infinito, o SIGXCPU no relógio de CPU) nunca é perto, qualquer que seja o TL.
 _tle_near() {
   local _JT="" _WALLKILL=0 _CPUSRC=""
   _judged_time "$1"
   (( _WALLKILL )) && return 1
   [[ "$_JT" =~ ^[0-9]+\.?[0-9]*$ ]] || return 0
-  LC_ALL=C awk -v t="$_JT" -v tl="${TL[$LANGUAGE]:-0}" -v d="${TLDRIFT:-0}" -v b="$TLERERUN_BAND" \
-    'BEGIN{ exit !(tl + 0 <= 0 || t + 0 <= b * (tl + d)) }'
+  LC_ALL=C awk -v t="$_JT" -v tl="${TL[$LANGUAGE]:-0}" -v d="${TLDRIFT:-0}" -v b="$TLERERUN_BAND" -v e="${ETL:-0}" \
+    'BEGIN{ if (tl + 0 <= 0) exit 0
+            if (e + 0 > 0 && t + 0 >= e - 0.05) exit 1
+            lim = b * (tl + d); f = tl + d + 1.0; if (f > lim) lim = f
+            exit !(t + 0 <= lim) }'
 }
 
 declare -A VERDICT

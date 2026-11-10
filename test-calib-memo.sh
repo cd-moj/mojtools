@@ -25,7 +25,7 @@ while (( $# )); do case "$1" in
   -s) SERR="$2"; shift 2;; -B) BW="$2"; shift 2;; -d) D="$2"; shift 2;; -T) T="$2"; shift 2;;
   -r|-R|-M|-b|-S|-U|-C) shift 2;; *) shift;; esac; done
 [[ -n "$BW" ]] && : > "$BW"; [[ -n "$SERR" ]] && : > "$SERR"
-if [[ -n "$RW" && -z "$IN" ]]; then echo "BIN=sol" > "$OUT"; : > "$TLOG"; exit 0; fi
+if [[ -n "$RW" && -z "$IN" ]]; then [[ -n "${FAKE_CE:-}" ]] && { : > "$TLOG"; exit 1; }; echo "BIN=sol" > "$OUT"; : > "$TLOG"; exit 0; fi
 name="$(basename "$IN")"
 spec="$(grep -h -m1 -o 'TIMES .*' "$D"/* 2>/dev/null | head -1)"; wrong="$(grep -h -m1 -o 'WRONG .*' "$D"/* 2>/dev/null | head -1)"
 read -r _ real rest <<<"$spec"; real="${real:-0.05}"
@@ -81,7 +81,7 @@ ck "calibrou e nenhum memo nasceu"                         '[[ "$(cat "$W/base.r
 echo "== com o diretório, sem o reuse: tudo roda e o memo nasce =="
 calib grava MOJ_CALIB_MEMO_DIR="$M"
 DBG="$(ls "$M" 2>&1)"
-ck "7 retratos (um por solução)"                            '[[ "$(find "$M" -mindepth 1 -maxdepth 1 -type d ! -name ".*" | wc -l)" == 7 ]]'
+ck "7 retratos (um por solução), num diretório só (o contexto)" '[[ "$(find "$M" -mindepth 1 -maxdepth 1 -type d | wc -l)" == 1 && "$(find "$M" -mindepth 2 -maxdepth 2 -type d ! -name ".*" | wc -l)" == 7 ]]'
 ck "todas as soluções rodaram"                             '[[ "$(ran grava)" == "a.c b.py c.cpp p.c s.c s2.c w.c " ]]'
 ck "o vetor não tem reused_at"                             '[[ "$(nsols grava)" == 0 ]]'
 DBG="$(diff <(norm_tl "$W/base.tl") <(norm_tl "$W/grava.tl"))"
@@ -125,11 +125,20 @@ echo "t2" > "$P/tests/output/t2"
 
 echo "== memo vencido e reuse sem diretório =="
 calib re1 MOJ_CALIB_MEMO_DIR="$M"
-for d in "$M"/*/; do printf '%s\n' "$((EPOCHSECONDS - 20*86400))" > "$d/.memo-at"; done
+for d in "$M"/*/*/; do printf '%s\n' "$((EPOCHSECONDS - 20*86400))" > "$d/.memo-at"; done
 calib vencido MOJ_CALIB_MEMO_DIR="$M" MOJ_CALIB_REUSE=1
 ck "retrato com mais de 14 dias não vale: as 8 rodaram"    '[[ "$(ran vencido | wc -w)" == 8 && "$(nsols vencido)" == 0 ]]'
 calib semdir MOJ_CALIB_REUSE=1
 ck "MOJ_CALIB_REUSE sem o diretório: roda tudo"            '[[ "$(ran semdir | wc -w)" == 8 ]] && ! grep -q "Calibração incremental" "$W/semdir.log"'
+
+echo "== revisão de 10/11: contexto velho sai; falha de ambiente não vai ao memo =="
+ck "depois de mudar conf e testes, só o contexto atual fica" '[[ "$(find "$M" -mindepth 1 -maxdepth 1 -type d | wc -l)" == 1 ]]'
+rm -rf "$M"
+calib ce MOJ_CALIB_MEMO_DIR="$M" FAKE_CE=1
+DBG="$(grep -c "Compilation Error" "$W/ce.log")"
+ck "toolchain fora (Compilation Error em tudo): nenhum retrato" '[[ "$(find "$M" -mindepth 2 -maxdepth 2 -type d ! -name ".*" 2>/dev/null | wc -l)" == 0 ]]'
+calib ce2 MOJ_CALIB_MEMO_DIR="$M" MOJ_CALIB_REUSE=1
+ck "…e a calibração seguinte (toolchain de volta) roda tudo" '[[ "$(ran ce2 | wc -w)" == 8 && "$(nsols ce2)" == 0 ]]'
 
 echo "== com raias (3 grupos): o reuse vale em cada raia =="
 calib raias0 MOJ_CALIB_MEMO_DIR="$M"

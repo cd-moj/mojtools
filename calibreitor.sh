@@ -219,16 +219,31 @@ fi
 # reaproveitada; o log diz "reaproveitado". ⚠ O tempo reaproveitado é o de QUANDO foi medido (outra carga no juiz).
 MEMO_DIR="${MOJ_CALIB_MEMO_DIR:-}"; MEMO_REUSE="${MOJ_CALIB_REUSE:-0}"; MEMO_CTX=""
 MEMO_TTL_DAYS="${MOJ_CALIB_MEMO_TTL_DAYS:-14}"; [[ "$MEMO_TTL_DAYS" =~ ^[0-9]+$ ]] || MEMO_TTL_DAYS=14
+# Revisão de 10/11/2026: (1) a chave leva a IMPRESSÃO DO TOOLCHAIN da jaula (os-release + tamanho/mtime dos compiladores
+# e interpretadores — o molde da chave do interactive/prep.sh): rootfs atualizado ou toolchain consertado não reaproveita
+# o resultado de antes; (2) falha de AMBIENTE não vai ao memo (_memo_save); (3) os retratos ficam num subdiretório por
+# CONTEXTO, e os de contexto velho saem na largada — o memo não cresce a cada edição do pacote.
+_memo_toolchain(){
+  local r="${CAGE_ROOT:-}" b
+  cat "$r/etc/os-release" 2>/dev/null
+  for b in gcc g++ cc c++ javac java kotlinc pypy3 python3 rustc go ghc fpc ocamlfind mono node ruby perl; do
+    stat -L -c '%n %s %Y' "$r/usr/bin/$b" "$r/usr/local/bin/$b" 2>/dev/null
+  done
+  ls -l --time-style=+%s "$r/opt" 2>/dev/null
+}
 if [[ -n "$MEMO_DIR" ]] && mkdir -p "$MEMO_DIR" 2>/dev/null; then
-  find "$MEMO_DIR" -mindepth 1 -maxdepth 1 -mtime +"$MEMO_TTL_DAYS" -exec rm -rf {} + 2>/dev/null
-  MEMO_CTX="$( { printf 'memo-v1\n'; bash ./tl-checksum.sh --context "$PROBLEMDIR"
+  MEMO_CTX="$( { printf 'memo-v2\n'; bash ./tl-checksum.sh --context "$PROBLEMDIR"; _memo_toolchain | sha256sum
                  # só o código VERSIONADO (um cache compilado dentro de testlib/ ou interactive/ mudaria a chave a cada
                  # calibração); sem git (cópia avulsa), tudo
                  git ls-files -- '*.sh' lang interactive testlib fn 2>/dev/null \
                    || { find . -maxdepth 1 -name '*.sh' -type f; find lang interactive testlib fn -type f 2>/dev/null; }; } \
-               | { read -r v; read -r ctx; printf '%s\n%s\n' "$v" "$ctx"; LC_ALL=C sort | while IFS= read -r f; do printf '=%s\n' "$f"; cat "$f" 2>/dev/null; done; } \
+               | { read -r v; read -r ctx; read -r tc; printf '%s\n%s\n%s\n' "$v" "$ctx" "$tc"; LC_ALL=C sort | while IFS= read -r f; do printf '=%s\n' "$f"; cat "$f" 2>/dev/null; done; } \
                | sha256sum | cut -c1-32 )"
-  [[ -n "$MEMO_CTX" ]] || MEMO_DIR=""
+  if [[ -n "$MEMO_CTX" ]]; then
+    find "$MEMO_DIR" -mindepth 1 -maxdepth 1 ! -name "$MEMO_CTX" -exec rm -rf {} + 2>/dev/null   # contexto velho
+    MEMO_DIR="$MEMO_DIR/$MEMO_CTX"; mkdir -p "$MEMO_DIR" 2>/dev/null || MEMO_DIR=""
+    [[ -n "$MEMO_DIR" ]] && find "$MEMO_DIR" -mindepth 1 -maxdepth 1 -mtime +"$MEMO_TTL_DAYS" -exec rm -rf {} + 2>/dev/null
+  else MEMO_DIR=""; fi
 else
   MEMO_DIR=""
 fi
@@ -247,6 +262,9 @@ _memo_save(){
   [[ -n "$MEMO_DIR" && -n "$key" ]] || return 0
   T="$(head -n1 "$TEMP.item.$i.out" 2>/dev/null)"; A="$(tail -n1 "$TEMP.item.$i.out" 2>/dev/null)"
   [[ -n "$A" && "$A" != "$T" && -d "$T" ]] || return 0
+  # falha de AMBIENTE nunca vai ao memo (toolchain ausente, jaula sem rootfs, juiz quebrado): reaproveitá-la publicaria
+  # uma tabela de TL sem a linguagem até alguém pedir "rodar tudo"
+  [[ "$A" =~ Compilation\ Error|Judge\ Error|Unknown|availa|INPUT\ NOT\ TESTED ]] && return 0
   tmp="$MEMO_DIR/.$key.$BASHPID"; rm -rf "$tmp"; mkdir -p "$tmp" 2>/dev/null || return 0
   cp "$TEMP.item.$i.out" "$tmp/out"
   for f in log.verdictall log.verdictalt report.env report.html; do [[ -f "$T/$f" ]] && cp "$T/$f" "$tmp/"; done

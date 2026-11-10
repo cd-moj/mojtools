@@ -92,7 +92,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
 - **Calibração INCREMENTAL (10/11/2026, opt-in)** no `calibreitor.sh`: com `MOJ_CALIB_MEMO_DIR` (o agente passa
   `<cache>/<id>/calib-memo`) toda solução rodada grava o retrato do workdir (`_memo_save`: verdictall/alt, report.env/
   html, `<teste>-log.{exectime,timelog,wallkill}`, as linhas EXECTIME/WALLTIME do trace); com `MOJ_CALIB_REUSE=1` a raia
-  restaura o da MESMA chave (`_memo_restore`, workdir novo + `$TEMP.item.<i>.out`) e o pai segue igual. Chave
+  restaura o da MESMA chave (`_memo_restore`, workdir novo + `$TEMP.item.<i>.out`) e o pai segue igual. Revisão de 10/11:
+  a chave leva a impressão do toolchain (`_memo_toolchain`), falha de ambiente não é salva, e os retratos moram em
+  `<dir>/<contexto>/` (o contexto velho sai na largada). Chave
   (`_memo_key`): `tl-checksum.sh --context` (o estreito SEM `sols/`) + o código VERSIONADO do mojtools (`git ls-files`;
   sem git, `find`) + `MOJ_TEST_CPUS` + `CAGE_ROOT` + host + categoria + runall + nome e conteúdo da solução + (fora as
   good) a tabela de TL das good sem a linha da data + `MOJ_CALIB_ALT`. TTL `MOJ_CALIB_MEMO_TTL_DAYS` (14). O `sols`
@@ -313,7 +315,8 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   `VERDICT_RULE`, `FIRST_FAIL`; o report o mostra no banner. Com grupos a nota não muda (o `score-summary.sh` lê o
   `SMALLRESP`). Teste: `test-final-loop.sh`.
 - **RERUN SÓ DO TLE PERTO DO TL (10/11/2026; interferência de memória medida até ~1,6×).** No laço final, o TLE com
-  tempo cobrado ≤ `TLERERUN_BAND` × (TL + drift) roda de novo em série (`_tle_near`; padrão 2,0, conf ou env
+  tempo cobrado ≤ max(`TLERERUN_BAND` × (TL + drift), TL + drift + 1 s) e abaixo do teto ETL roda de novo em série (`_tle_near`;
+o piso de 1 s é da revisão de 10/11: com TL de 0,0335 s o múltiplo sozinho não salvava um soluço de 80 ms; padrão 2,0, conf ou env
   `MOJ_TLE_RERUN_BAND`, inválido = 2,0) e o rerun vale; o longe (e a morte pela parede) não repete. O 1º rerun que
   confirma desliga os seguintes (`TLERERUN=n`), como antes. `conf_tlererun_sane` (HARD, awk). Testes:
   `test-final-loop.sh` (xslow/xflk/xtle), `test-calib-methods.sh`.
