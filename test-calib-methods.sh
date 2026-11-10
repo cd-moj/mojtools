@@ -250,6 +250,14 @@ valu 'TLUNIFIED=sim'; ck "reprova TLUNIFIED=sim" '[[ "$(head -1 <<<"$DBG" | jq -
 valu $'TLUNIFIED=y\nTLMOD[spim.sum]=1'; ck "y com TLMOD por linguagem: aviso soft" '[[ "$(head -1 <<<"$DBG" | jq -r .ok)" == true && "$DBG" == *tl-unico-com-ajuste-por-linguagem* ]]'
 valu $'TLUNIFIED=y\nTLOVERRIDE[default]=2'; ck "y com TLOVERRIDE[default]: sem aviso (vale p/ todas)" '[[ "$DBG" != *tl-unico-com-ajuste* ]]'
 
+echo "== validate-problem: conf_tlererun_sane (faixa do rerun de TLE, 10/11/2026) =="
+valr(){ val "$1"; DBG="$(jq -c '.checks[]|select(.name=="conf_tlererun_sane")' "$RUNDIR"/validation/*.json 2>&1)"; }
+valr ''; ck "sem a chave: ok (2.0)" '[[ "$(jq -r .ok <<<"$DBG")" == true && "$(jq -r .detail <<<"$DBG")" == *2.0* ]]'
+valr 'TLERERUN_BAND=1.5'; ck "1.5: ok" '[[ "$(jq -r .ok <<<"$DBG")" == true ]]'
+for bad in 'TLERERUN_BAND=1' 'TLERERUN_BAND=0.8' 'TLERERUN_BAND=abc' 'TLERERUN_BAND=-2'; do
+  valr "$bad"; ck "reprova $bad" '[[ "$(jq -r .ok <<<"$DBG")" == false ]]'
+done
+
 echo "== a calibração nunca libera grupo de CPU (26/10/2026) =="
 # a calibração disparada por um JOB de 2 grupos herdava o arquivo de liberação dele: cada build-and-test filho
 # anotava o grupo 1 como livre e o agente o devolvia ao escalonador com o job ainda julgando nele

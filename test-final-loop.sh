@@ -11,7 +11,8 @@
 #
 # Roda o build-and-test.sh REAL (com score-summary.sh e gen-report.sh reais) numa cópia do mojtools com um
 # cage-run.sh FALSO que decide pelo NOME do teste:
-#   xtle = real 9 s (TLE sempre) · xflk = TLE só na 1ª execução, AC depois (o teste "instável") · xwa = WA
+#   xtle = real 9 s (TLE LONGE do TL de 1 s, sempre) · xslow = real 1,5 s (TLE PERTO, sempre) · xflk = 1,3 s só na 1ª
+#   execução, AC depois (o teste "instável", a interferência) · xwa = WA
 # Cada execução é anotada em $RUNLOG. Sem jaula, sem rede. `make test-final-loop`.
 set -u
 MT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -33,7 +34,8 @@ if [[ -n "$RW" && -z "$IN" ]]; then echo "BIN=sol" > "$OUT"; : > "$TLOG"; exit 0
 name="$(basename "$IN")"; real=0.05
 echo "$name" >> "$RUNLOG"
 [[ "$name" == *xtle* ]] && real=9
-if [[ "$name" == *xflk* && ! -e "$FLAKY/$name" ]]; then : > "$FLAKY/$name"; real=9; fi
+[[ "$name" == *xslow* ]] && real=1.5
+if [[ "$name" == *xflk* && ! -e "$FLAKY/$name" ]]; then : > "$FLAKY/$name"; real=1.3; fi
 if [[ "$name" == *xwa* ]]; then echo errado > "$OUT"; else cat "$IN" > "$OUT"; fi
 printf 'real %s\nuser 0\nsys 0\nres 100\ncpu 99%%\n' "$real" > "$TLOG"
 exit 0
@@ -81,7 +83,7 @@ echo "== parada CONFIRMADA (STOPWHEN_TLE): a cauda NÃO roda; sem linha vazia ne
 mkpkg "" "STOPWHEN_TLE=y" t1 t2xtle t3 t4
 run y
 ck "Time Limit Exceeded"                              '[[ "$FIN" == "Time Limit Exceeded,25p" && "$SR" == TLE ]]'
-ck "t3 e t4 nunca rodaram; t2xtle: pool + rerun"     '[[ "$(runs t3)" == 0 && "$(runs t4)" == 0 && "$(runs t2xtle)" == 2 ]]'
+ck "t3 e t4 nunca rodaram; t2xtle (LONGE): sem rerun" '[[ "$(runs t3)" == 0 && "$(runs t4)" == 0 && "$(runs t2xtle)" == 1 ]]'
 ck "o trace diz por que não rodaram"                  '[[ "$(grep -c "not run: a previous test stopped the run" "$TR")" == 2 ]]'
 ck "sem EXECTIME vazio e sem bad array subscript"     'clean_trace'
 
@@ -105,6 +107,25 @@ ck "t3 e t4 rodaram uma vez e têm EXECTIME com tempo" '[[ "$(runs t3)" == 1 && 
 mkpkg "" "" t1 t2xtle t3
 run n
 ck "RUNALL≠y com TLE confirmado: a cauda não roda"   '[[ "$FIN" == "Time Limit Exceeded,33p" && "$(runs t3)" == 0 ]] && clean_trace'
+
+echo "== RERUN SÓ DO TLE PERTO DO TL (10/11/2026: TLERERUN_BAND, padrão 2×) =="
+mkpkg "" "" t1 t2xslow t3xslow t4
+run y
+ck "TLE perto confirmado: rerun UMA vez, o 2º perto não repete" '[[ "$SR" == TLE && "$(runs t2xslow)" == 2 && "$(runs t3xslow)" == 1 ]]'
+ck "o trace diz por que repetiu"                      'grep -q "Rerun: because got TLE near the time limit (within 2.0x)" "$TR"'
+mkpkg "" "" t1 t2xtle t3xflk
+run y
+ck "TLE longe não repete e NÃO gasta o rerun: o instável depois passa" '[[ "$(runs t2xtle)" == 1 && "$(runs t3xflk)" == 2 ]] && grep -q "EXECTIME t3xflk 0.05 AC" "$TR"'
+ck "o trace diz que o longe não repetiu"              'grep -q "Rerun: not needed — this TLE is far from the time limit" "$TR"'
+mkpkg "" "TLERERUN_BAND=1.2" t1 t2xflk
+run y
+ck "TLERERUN_BAND=1.2 no conf: o de 1,3 s já é longe" '[[ "$SR" == TLE && "$(runs t2xflk)" == 1 ]]'
+mkpkg "" "TLERERUN_BAND=1.2" t1 t2xflk
+run y MOJ_TLE_RERUN_BAND=1.5
+ck "MOJ_TLE_RERUN_BAND vence o conf"                  '[[ "$SR" == AC && "$(runs t2xflk)" == 2 ]]'
+mkpkg "" "TLERERUN_BAND=abc" t1 t2xflk
+run y
+ck "banda inválida = 2,0"                             '[[ "$SR" == AC && "$(runs t2xflk)" == 2 ]] && clean_trace'
 
 echo "== REGRA DO VEREDICTO (MOJ_VERDICT_RULE, opção do contest): worst × first =="
 mkpkg "" "" t1 t2xwa t3xtle

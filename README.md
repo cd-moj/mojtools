@@ -587,6 +587,14 @@ Com uma falha confirmada, eles não rodam, e um grupo de `tests/score` com teste
 Antes, a parada espúria dava "Unknown ERROR" e, com grupos, um "Accepted" falso. Teste: `make
 test-final-loop`.
 
+**Rerun só do TLE perto do TL (10/11/2026).** O rerun serial vale para o TLE cujo tempo cobrado ficou até
+`TLERERUN_BAND` × (TL + tolerância) — padrão 2,0; conf `TLERERUN_BAND=<x>` (número > 1, o `validate-problem.sh`
+reprova outro valor) ou env `MOJ_TLE_RERUN_BAND`, que vence. Vizinhos pesados em memória no mesmo soquete inflam o
+tempo em até ~1,6× (bancada de 06–07/11): a solução correta perto do TL vira TLE por azar e passa no rerun. O TLE
+longe (laço infinito, morto no ETL, ou morto pela parede no `TLCLOCK=cpu`) não repete mais — custava o ETL inteiro de
+novo. O 1º rerun que confirma o TLE desliga os seguintes, como antes. O trace diz qual foi o caso. Teste: `make
+test-final-loop`.
+
 **Regra do veredicto (09/11/2026).** É uma opção do CONTEST, não do pacote: o job a traz e o agente do juiz a
 passa em `MOJ_VERDICT_RULE`.
 - `worst` (o padrão; treino e provas antigas): o veredicto é o do teste mais grave (`VERDICTORDER`).

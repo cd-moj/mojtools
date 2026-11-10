@@ -18,7 +18,7 @@ cp "$MT"/build-and-test.sh "$MT"/gen-report.sh "$MT"/lang-canon.sh "$H"/; cp -r 
 cat > "$H/cage-run.sh" <<'EOF'
 #!/bin/bash
 # cage-run FALSO: registra -C por teste, simula compilação (BIN=) e execução (saída = entrada;
-# nome com "wa" = saída errada; nome com "tle" = tempo 9 s).
+# nome com "wa" = saída errada; nome com "tle" = tempo 1,5 s — TLE PERTO do TL de 1 s, o que o rerun repete).
 CPUS=""; IN=""; OUT=""; TLOG=""; RW=""; SERR=""; BW=""
 while (( $# )); do case "$1" in
   -C) CPUS="$2"; shift 2;; -i) IN="$2"; shift 2;; -o) OUT="$2"; shift 2;; -t) TLOG="$2"; shift 2;;
@@ -29,7 +29,7 @@ if [[ -n "$RW" && -z "$IN" ]]; then echo "BIN=sol" > "$OUT"; : > "$TLOG"; exit 0
 name="$(basename "$IN")"
 echo "start $(date +%s%N) $name cpus=${CPUS:-none}" >> "$FAKE_LOG"
 sleep "${FAKE_SLEEP:-0.25}"
-real=0.05; [[ "$name" == *tle* ]] && real=9
+real=0.05; [[ "$name" == *tle* ]] && real=1.5
 if [[ "$name" == *wa* ]]; then echo errado > "$OUT"; else cat "$IN" > "$OUT"; fi
 printf 'real %s\nuser 0\nsys 0\nres 100\ncpu 99%%\n' "$real" > "$TLOG"
 echo "end $(date +%s%N) $name" >> "$FAKE_LOG"

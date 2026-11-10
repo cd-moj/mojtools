@@ -303,6 +303,11 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   ordem do glob decide onde o STOPWHEN para e o `Xp` — mudar isso mexeria em prova antiga. `report.env`:
   `VERDICT_RULE`, `FIRST_FAIL`; o report o mostra no banner. Com grupos a nota não muda (o `score-summary.sh` lê o
   `SMALLRESP`). Teste: `test-final-loop.sh`.
+- **RERUN SÓ DO TLE PERTO DO TL (10/11/2026; interferência de memória medida até ~1,6×).** No laço final, o TLE com
+  tempo cobrado ≤ `TLERERUN_BAND` × (TL + drift) roda de novo em série (`_tle_near`; padrão 2,0, conf ou env
+  `MOJ_TLE_RERUN_BAND`, inválido = 2,0) e o rerun vale; o longe (e a morte pela parede) não repete. O 1º rerun que
+  confirma desliga os seguintes (`TLERERUN=n`), como antes. `conf_tlererun_sane` (HARD, awk). Testes:
+  `test-final-loop.sh` (xslow/xflk/xtle), `test-calib-methods.sh`.
 - **`TLOVERRIDE[<lang>|default]` no conf** (ver `cdmoj/docs/PACOTE.md`): o autor manda no TL —
   o `build-and-test.sh` o aplica DEPOIS dos `TLMOD` (override é FINAL), exceto sob
   `MOJ_CALIBRATING=1` (a calibração mede de verdade; o calibreitor exporta). O servidor lê o

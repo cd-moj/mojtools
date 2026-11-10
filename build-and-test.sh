@@ -766,6 +766,24 @@ fi
 CAGE_CPUS="${CPU_GROUPS[0]:-}"
 
 TLERERUN=${TLERERUN:=y}
+# RERUN SÓ DO TLE PERTO DO TL (10/11/2026; bancada de 06–07/11: vizinhos pesados em memória no mesmo soquete
+# inflam o tempo em até +64%, e uma solução correta perto do TL vira TLE por azar). O TLE cujo tempo cobrado ficou
+# até TLERERUN_BAND × (TL + drift) roda de novo, em série no grupo 0, e o resultado do rerun é o que vale — o time não
+# vê nada além do veredicto (silencioso). O TLE LONGE (laço infinito, morto no ETL, ou morto pela PAREDE no cpu) não
+# repete mais: não é interferência, e o rerun custava o ETL inteiro de novo. Sem tempo medido = repete (o de sempre).
+# O 1º rerun que CONFIRMA o TLE desliga os seguintes (TLERERUN=n), como antes: o custo fica limitado.
+# Padrão 2,0; conf `TLERERUN_BAND=<x>` (número > 1) ou env `MOJ_TLE_RERUN_BAND` (vence) — inválido = 2,0.
+TLERERUN_BAND="${MOJ_TLE_RERUN_BAND:-${TLERERUN_BAND:-2.0}}"
+[[ "$TLERERUN_BAND" =~ ^[0-9]+\.?[0-9]*$ ]] && LC_ALL=C awk -v b="$TLERERUN_BAND" 'BEGIN{exit !(b > 1)}' || TLERERUN_BAND=2.0
+# _tle_near <teste> -> rc 0 se o TLE desse teste ficou perto do TL (vale repetir). Usa o tempo cobrado (_judged_time).
+_tle_near() {
+  local _JT="" _WALLKILL=0 _CPUSRC=""
+  _judged_time "$1"
+  (( _WALLKILL )) && return 1
+  [[ "$_JT" =~ ^[0-9]+\.?[0-9]*$ ]] || return 0
+  LC_ALL=C awk -v t="$_JT" -v tl="${TL[$LANGUAGE]:-0}" -v d="${TLDRIFT:-0}" -v b="$TLERERUN_BAND" \
+    'BEGIN{ exit !(tl + 0 <= 0 || t + 0 <= b * (tl + d)) }'
+}
 
 declare -A VERDICT
 [[ -e $workdirbase/log.verdictall ]] && source $workdirbase/log.verdictall
@@ -815,8 +833,10 @@ for INPUT in "${TESTS[@]}"; do
   fi
 
   if [[ "$THISVERDICT" == "TLE" && $THISRERUN -eq 0 ]]; then
-    if [[ "$TLERERUN" == "y" ]]; then
-	    LOG " - Rerun: because got TLE while running parallel tests"
+    if [[ "$TLERERUN" == "y" ]] && ! _tle_near "$FILE"; then
+	    LOG " - Rerun: not needed — this TLE is far from the time limit (over ${TLERERUN_BAND}x, or killed at the wall cap)"
+    elif [[ "$TLERERUN" == "y" ]]; then
+	    LOG " - Rerun: because got TLE near the time limit (within ${TLERERUN_BAND}x)"
 	    run-testinput $INPUT
 	    THISRERUN=1
       source $workdirbase/log.verdictall

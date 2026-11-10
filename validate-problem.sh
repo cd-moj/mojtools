@@ -359,6 +359,13 @@ if [[ -z "$_tlu" || "$_tlu" == y || "$_tlu" == n ]]; then
   fi
 else add conf_tlunified_sane 0 "valor inválido no conf: TLUNIFIED=$_tlu (y|n)"; fi
 
+# --- conf_tlererun_sane: a FAIXA do rerun de TLE (TLERERUN_BAND=<x>, número > 1; padrão 2,0 — build-and-test.sh repete
+#     só o TLE até x × TL). HARD: o juiz troca valor inválido por 2,0 calado, e o autor acharia que mudou. awk, sem bc.
+_trb="$(cpv TLERERUN_BAND)"
+if [[ -z "$_trb" ]] || { [[ "$_trb" =~ ^[0-9]+\.?[0-9]*$ ]] && LC_ALL=C awk -v b="$_trb" 'BEGIN{exit !(b > 1)}'; }; then
+  add conf_tlererun_sane 1 "TLERERUN_BAND=${_trb:-2.0}"
+else add conf_tlererun_sane 0 "valor inválido no conf: TLERERUN_BAND=$_trb (número maior que 1; padrão 2.0)"; fi
+
 # --- tl_present (soft: informativo) ---
 tl_present=false; { [[ -f "$PKG/tl" ]] || [[ -f "$PKG/tl.$HOSTNAME" ]]; } && tl_present=true
 
