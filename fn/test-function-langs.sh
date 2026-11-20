@@ -5,7 +5,9 @@
 #   • validate-problem.sh: conf_function_sane reprova linguagem sem scripts/<lang>/compile.sh e id
 #     inválido; avisa driver fora da lista (render_warnings);
 #   • fn/driver-langs.sh: main num heredoc = driver; ban/OpenMP (programa completo) não;
-#   • fn/install-fn.sh grava a linha (união, só as linguagens pedidas ou já declaradas), sem conf também.
+#   • fn/install-fn.sh grava a linha (união, só as linguagens pedidas ou já declaradas), sem conf também;
+#   • gen-problem-json.sh serve `script_langs` = os scripts/<lang>/ com compile.sh (py3 → py), o que o servidor usa p/
+#     recusar no envio a linguagem que o juiz não roda neste problema (cdmoj lib/langs.sh lang_runnable).
 # Sem jaula e sem rede (o validate defere as soluções; o gen-problem-json usa o pandoc se houver).
 # `make test-fn`.
 set -u
@@ -49,6 +51,15 @@ gj 'FUNCTION_LANGS="c, py3 ,cc"'; ck "canônico e ordenado: [c,cpp,py]" '[[ "$DB
 gj 'FUNCTION_LANGS=c # comentário'; ck "comentário fora: [c]" '[[ "$DBG" == "[\"c\"]" ]]'
 gj '# sem a linha'; ck "sem a linha: []" '[[ "$DBG" == "[]" ]]'
 gj 'FUNCTION_LANGS=*'; ck "glob não expande: []" '[[ "$DBG" == "[]" ]]'
+
+echo "== gen-problem-json serve script_langs =="
+mkdir -p "$P/scripts/grepe" "$P/scripts/l"; printf '#!/bin/bash\n' > "$P/scripts/grepe/compile.sh"; printf '#!/bin/bash\n' > "$P/scripts/l/run.sh"
+gj '# sem a linha'; DBG="$(jq -c .script_langs "$CONTESTSDIR/treino/var/jsons-private/repo#pp.json" 2>&1)"
+ck "scripts com compile.sh, py3 → py, ordenado; sem compile.sh fica de fora: [c,cpp,grepe,py]" '[[ "$DBG" == "[\"c\",\"cpp\",\"grepe\",\"py\"]" ]]'
+rm -rf "$P/scripts/grepe" "$P/scripts/l"; mv "$P/scripts" "$W/scripts.bak"
+gj '# sem a linha'; DBG="$(jq -c .script_langs "$CONTESTSDIR/treino/var/jsons-private/repo#pp.json" 2>&1)"
+ck "pacote sem scripts/: []" '[[ "$DBG" == "[]" ]]'
+mv "$W/scripts.bak" "$P/scripts"
 
 echo "== driver-langs (a heurística) =="
 DBG="$(bash "$MT/fn/driver-langs.sh" "$P" | paste -sd,)"

@@ -126,7 +126,9 @@ cada comando + contrato de `lang/<lang>/`. **Formato do pacote: `cdmoj/docs/PACO
   tags + **coleções** (`.moj-meta.json` `collections` — um problema pode estar em várias; VAZIO = a coleção homônima da org, a MESMA regra do `gen-problem-owners.sh`, desde 25/09/2026) +
   HTML (via render-statement) + exemplos (de `tests/*`, ordem `sample*`) + explicações
   (`docs/sample-notes.json`).
-  **Ignora `docs/solucao.md`** (editorial não vai ao aluno). **Um render por idioma**: PT em
+  **Ignora `docs/solucao.md`** (editorial não vai ao aluno). **`script_langs`** (20/11/2026) = os `scripts/<lang>/` com
+  `compile.sh` (py3/py2 → py), a regra do build-and-test p/ "Language not availale": o servidor recusa no envio a linguagem
+  fora da plataforma que o pacote não traz (cdmoj `lang_runnable`). **Um render por idioma**: PT em
   `title`/`statement_html_b64` (compat), traduções em `statements{<lang>:{title,html_b64}}` +
   `statement_langs`; a nota de exemplo sem tradução cai na PT.
 - `validate-problem.sh <pkg> [id]` — **portão de qualidade** (relatório em

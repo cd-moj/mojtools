@@ -77,6 +77,17 @@ colls='[]'
 # da cadeia de fallback de contest (handlers/contest/problems.sh).
 langs='[]'
 [[ -f "$meta" ]] && langs="$(jq -c '(.languages // [])' "$meta" 2>/dev/null)"; [[ -n "$langs" ]] || langs='[]'
+# ----- 2d. linguagens que o PACOTE traz (scripts/<lang>/compile.sh) -----
+# O juiz compila pelo `scripts/<lang>/compile.sh` do pacote e, sem ele, pelo `lang/<lang>/` do mojtools; sem nenhum dos
+# dois o veredicto é "Language '<lang>' not availale" (build-and-test.sh). Linguagem que NÃO é da plataforma (grepe, l,
+# lpp…) só roda quando o pacote a traz — o servidor lê este campo p/ recusar o envio na hora (cdmoj lib/langs.sh
+# `lang_runnable`), sem abrir o pacote. Mesma regra do build-and-test: o nome do diretório é o id canônico, e o py
+# legado vem de `scripts/py3`|`scripts/py2`.
+script_langs="$(for _d in "$PKG"/scripts/*/; do
+    [[ -f "$_d/compile.sh" ]] || continue; _l="$(basename "$_d")"
+    case "$_l" in py3|py2) _l=py;; esac; printf '%s\n' "$_l"
+  done 2>/dev/null | sort -u | jq -R . | jq -cs .)"
+[[ -n "$script_langs" ]] || script_langs='[]'
 
 # ----- 3. tags (linhas começando com #, minúsculas) -----
 tags='[]'
@@ -259,11 +270,11 @@ mkdir -p "$TREINO_JSONS" "$(dirname "$TREINO_JSONS")/jsons-private" 2>/dev/null
 # ainda não é servido (defesa em profundidade; json legado sem o campo continua passando).
 out_json="$(jq -cn --arg id "$ID" --arg title "$title" --arg author "$author" --argjson tl "$tl_json" \
   --argjson tags "$tags" --argjson colls "$colls" --argjson langs "$langs" --rawfile html "$b64f" \
-  --argjson pub "$public" --argjson slangs "$langs_json" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
+  --argjson pub "$public" --argjson slangs "$langs_json" --argjson sclangs "$script_langs" --slurpfile stmts "$stmts_f" --slurpfile smp "$samples_f" \
   --argjson cpun "$cpun" --argjson snuma "$snuma" --argjson fnl "$fnl_json" \
   --argjson swwa "$sw_wa" --argjson swtle "$sw_tle" --argjson swre "$sw_re" --argjson ntests "$ntests" \
   --arg tlm "$tl_method" --arg tlc "$tl_clock" --argjson wtl "$wall_tl" --argjson tlu "$tl_unified" \
-  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tl_clock:$tlc, wall_tl:$wtl, tl_unified:$tlu, tags:$tags, collections:$colls, languages:$langs, public:$pub,
+  '{id:$id, title:$title, author:$author, time_limits:$tl, tl_method:$tlm, tl_clock:$tlc, wall_tl:$wtl, tl_unified:$tlu, tags:$tags, collections:$colls, languages:$langs, script_langs:$sclangs, public:$pub,
     statement_langs:$slangs, statement_html_b64:$html, samples:($smp[0] // []), cpu_needed:$cpun, same_numa:$snuma,
     function_langs:$fnl, stop_when:{wa:$swwa, tle:$swtle, re:$swre}, tests:$ntests}
    + (if ($stmts[0]|length) > 0 then {statements:$stmts[0]} else {} end)')"

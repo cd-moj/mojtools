@@ -765,7 +765,9 @@ Variáveis: `VALIDATE_RUN_SOLS=0` pula a execução das soluções; `RUNDIR` diz
 
 Além de título/autor/TL/tags/coleções/idiomas/exemplos, o json leva **`cpu_needed`** e **`same_numa`**
 (o `CPUNEEDED`/`SAMENUMA` do conf, lidos por sed): é por ele que o checklist pré-prova do contest sabe
-que um problema paralelo precisa de juiz com k CPUs, sem abrir pacote.
+que um problema paralelo precisa de juiz com k CPUs, sem abrir pacote. E leva **`script_langs`**: as linguagens que o
+PACOTE traz (`scripts/<lang>/compile.sh`; `py3`/`py2` → `py`). Linguagem que não é da plataforma (grepe, l, lpp…) só roda
+no problema que a traz, e o servidor recusa o envio dela nos outros (`lang_unavailable`).
 
 ```
 gen-problem-json.sh <pacote> [<id>]
